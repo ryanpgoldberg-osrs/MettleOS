@@ -342,7 +342,7 @@ export const WRIT_POOL = [
   { id:"z_ex_1", title:"Theatre Unlocked",       category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, objective:"Complete Theatre of Blood entry mode with a modifier" },
   { id:"z_ex_2", title:"Tombs of Amascut",       category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, requiresFn:(_,kc)=>(kc.tombs_of_amascut??0)===0, objective:"Enter and complete Tombs of Amascut for the first time" },
   { id:"z_ex_3", title:"Slayer Dungeon Deep",    category:"Exploration", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Complete a Slayer task in every major dungeon" },
-  { id:"z_ex_4", title:"Ancient Curses",         category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, objective:"Complete the quest chain to unlock Ancient Curses" },
+  { id:"z_ex_4", title:"Ancient Secrets",        category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, objective:"Complete Desert Treasure II" },
   { id:"z_ex_5", title:"Farming Mastery",        category:"Exploration", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:false, objective:"Unlock the Farming Guild" },
   { id:"z_ex_6", title:"The Grand Exchange Gamble",category:"Economic",  tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Earn 5M GP through merching or flipping" },
 

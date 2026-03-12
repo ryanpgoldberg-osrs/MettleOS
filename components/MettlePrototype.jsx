@@ -71,6 +71,17 @@ function activeTrialPrompt(trial) {
   return "The moment has arrived. Only completion settles the draw.";
 }
 
+function makeQueueEntryId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `debt_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function toDeferredQueueEntry(writ) {
+  return { ...writ, queueEntryId: writ.queueEntryId || makeQueueEntryId() };
+}
+
 // ─────────────────────────────────────────────
 // COMPONENT
 // ─────────────────────────────────────────────
@@ -95,6 +106,7 @@ export default function MettlePrototype() {
   const [mustClearAll,   setMustClearAll]   = useState(false);
   const [draftHistory,   setDraftHistory]   = useState([]);
   const [currentDraft,   setCurrentDraft]   = useState([]);
+  const [draftMode,      setDraftMode]      = useState("normal");
   const [activeWrit,     setActiveWrit]     = useState(null);
   const [activeView,     setActiveView]     = useState("board");
   const [xpDrop,         setXpDrop]         = useState(null);
@@ -142,7 +154,7 @@ export default function MettlePrototype() {
     if(save.streak)              setStreak(save.streak);
     if(save.completedIds)        setCompletedIds(save.completedIds);
     if(save.history)             setHistory(save.history);
-    if(save.debtWrits)           setDebtWrits(save.debtWrits);
+    if(save.debtWrits)           setDebtWrits(save.debtWrits.map(toDeferredQueueEntry));
     if(save.mustClearAll)        setMustClearAll(save.mustClearAll);
     if(save.draftHistory)        setDraftHistory(save.draftHistory);
     if(save.statsLoaded)         setStatsLoaded(save.statsLoaded);
@@ -254,6 +266,7 @@ export default function MettlePrototype() {
     const last5=draftHistory.slice(-5);
     const draft=generateDraft(skillLevels,bossKC,completedIds,last5,debtWrits,mettleLevel,null,streak,favoredDrawsRemaining);
     setCurrentDraft(draft);
+    setDraftMode("normal");
     setDraftHistory(prev=>[...prev,draft.map(w=>w.id)]);
     // Decrement favored draws if active
     if (favoredDrawsRemaining > 0) {
@@ -267,6 +280,7 @@ export default function MettlePrototype() {
     const draft = generateDraft(skillLevels, bossKC, completedIds, last5, debtWrits, mettleLevel, currentDraft.length);
     setMettleSeals(prev => prev - REROLL_COST);
     setCurrentDraft(draft);
+    setDraftMode("normal");
     setDraftHistory(prev => [...prev, draft.map(w => w.id)]);
   }
 
@@ -276,6 +290,7 @@ export default function MettlePrototype() {
     const expanded = generateDraft(skillLevels, bossKC, completedIds, last5, debtWrits, mettleLevel, currentDraft.length + 1);
     setMettleSeals(prev => prev - EXTRA_CHOICE_COST);
     setCurrentDraft(expanded);
+    setDraftMode("normal");
     setDraftHistory(prev => [...prev, expanded.map(w => w.id)]);
   }
 
@@ -286,13 +301,32 @@ export default function MettlePrototype() {
 
   function acceptTrial() {
     if (!pendingTrialData || trialCeremonyStep < 5) return;
+    if (pendingTrialData.finalTrial) {
+      const resolvedPath = assignedPath || computePath(history);
+      const finalDraft = generateFinalTrialDraft(resolvedPath).map(writ => ({
+        ...writ,
+        sourceTrialId: pendingTrialData.id,
+      }));
+      setAssignedPath(resolvedPath);
+      setPathRevealed(true);
+      setCurrentDraft(finalDraft);
+      setDraftMode("final_trial");
+      setTrialPhase(null);
+      setPendingTrialData(null);
+      setTrialCeremonyStep(0);
+      return;
+    }
     setActiveWrit({ ...pendingTrialData, acceptedAt: Date.now() });
     setTrialPhase(null);
     setPendingTrialData(null);
     setTrialCeremonyStep(0);
   }
 
-  function chooseWrit(writ) { setCurrentDraft([]); setActiveWrit(writ); }
+  function chooseWrit(writ) {
+    setCurrentDraft([]);
+    setDraftMode("normal");
+    setActiveWrit({ ...writ, acceptedAt: writ.acceptedAt || Date.now() });
+  }
 
   // ── FORK HANDLERS
   function chooseForkOption(fork, option) {
@@ -334,6 +368,12 @@ export default function MettlePrototype() {
     setLandmarkPhase(null);
   }
 
+  function triggerQuestCapeLandmark() {
+    if (!questCapeLandmark || activeWrit || trialPhase || currentDraft.length > 0 || activeFork || activeLandmark) return;
+    setActiveLandmark(questCapeLandmark);
+    setLandmarkPhase("revealed");
+  }
+
   // ── PATH ASSIGNMENT (auto-assign when entering Zaros tier)
   useEffect(() => {
     if (mettleLevel >= 81 && !assignedPath && history.length > 0) {
@@ -364,6 +404,9 @@ export default function MettlePrototype() {
       nextStreak = streak + 1;
       sealsGained += streakSealBonus(nextStreak);
       if(!completedIds.includes(activeWrit.id)) setCompletedIds(prev=>[...prev,activeWrit.id]);
+      if (activeWrit.sourceTrialId && !completedIds.includes(activeWrit.sourceTrialId)) {
+        setCompletedIds(prev => [...prev, activeWrit.sourceTrialId]);
+      }
       setXpDrop({amount:writXp(activeWrit),id:Date.now()});
       setTimeout(()=>setXpDrop(null),1800);
       // Grant Favored state for 5 draws after completing a Trial
@@ -376,7 +419,7 @@ export default function MettlePrototype() {
       const newDeferCounts = { ...categoryDeferCounts, [cat]: (categoryDeferCounts[cat] || 0) + 1 };
       setCategoryDeferCounts(newDeferCounts);
 
-      const newDebt=[...debtWrits,{...activeWrit}];
+      const newDebt=[...debtWrits,toDeferredQueueEntry(activeWrit)];
       setDebtWrits(newDebt);
       if (newDebt.length>=3) setMustClearAll(true);
 
@@ -397,9 +440,9 @@ export default function MettlePrototype() {
     setActiveWrit(null);
   }
 
-  function clearDebtWrit(id) {
-    const c=debtWrits.find(x=>x.id===id); if(!c) return;
-    const newDebt=debtWrits.filter(x=>x.id!==id);
+  function clearDebtWrit(queueEntryId) {
+    const c=debtWrits.find(x=>x.queueEntryId===queueEntryId); if(!c) return;
+    const newDebt=debtWrits.filter(x=>x.queueEntryId!==queueEntryId);
     const nextStreak = streak + 1;
     const sealsGained = sealsForWrit(c) + streakSealBonus(nextStreak);
     setDebtWrits(newDebt);
@@ -427,7 +470,7 @@ export default function MettlePrototype() {
   function failReckoningWrit(id) {
     const rw = reckoningWrits.find(x => x.id === id); if (!rw) return;
     setReckoningWrits(prev => prev.filter(x => x.id !== id));
-    const newDebt = [...debtWrits, { ...rw }];
+    const newDebt = [...debtWrits, toDeferredQueueEntry(rw)];
     setDebtWrits(newDebt);
     setStreak(0);
     if (newDebt.length >= 3) setMustClearAll(true);
@@ -438,7 +481,7 @@ export default function MettlePrototype() {
   function resetRun() {
     if (!confirmReset) { setConfirmReset(true); return; }
     setMettleXP(0); setMettleSeals(0); setStreak(0); setCompletedIds([]); setHistory([]);
-    setDebtWrits([]); setMustClearAll(false); setDraftHistory([]); setCurrentDraft([]); setActiveWrit(null);
+    setDebtWrits([]); setMustClearAll(false); setDraftHistory([]); setCurrentDraft([]); setDraftMode("normal"); setActiveWrit(null);
     setCategoryDeferCounts({}); setReckoningWrits([]); setReckoningTotals({});
     setTrialPhase(null); setPendingTrialData(null); setExpandedHistoryIdx(null);
     setFavoredDrawsRemaining(0);
@@ -469,6 +512,8 @@ export default function MettlePrototype() {
   const statusColor = draftStatus==="blocked"?"#f87171":draftStatus==="cursed"?"#fbbf24":draftStatus==="favored"?"#c4b5fd":draftStatus==="hot_streak"?"#fb923c":"#4ade80";
   const tierColor   = TIER_COLORS[currentTier]||"#fff";
   const writPoolCount = WRIT_POOL.filter(w=>!w.trial).length;
+  const questCapeLandmark = LANDMARK_WRITS.find(lm => lm.id === "landmark_quest_cape");
+  const canTriggerQuestCape = !!questCapeLandmark && !completedLandmarks.includes(questCapeLandmark.id);
   const tierCounts = TIER_ORDER.map(t=>({
     tier:t, color:TIER_COLORS[t],
     count:WRIT_POOL.filter(w=>w.tier===t&&!w.trial).length,
@@ -741,7 +786,19 @@ export default function MettlePrototype() {
           {assignedPath && (
             <div style={{border:"1px solid #6b21a8",padding:"10px 16px",background:"#0f0a14",marginBottom:"12px",fontSize:"11px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span style={{color:"#d8b4fe",letterSpacing:"2px"}}>PATH ASSIGNED: <span style={{color:"#fff",fontWeight:"700"}}>{assignedPath.toUpperCase()}</span></span>
-              <span style={{color:"#555"}}>Final Trial pool locked at Level 99</span>
+              <span style={{color:"#555"}}>{pathRevealed ? "Final Trial path revealed" : "Final Trial pool locked at Level 99"}</span>
+            </div>
+          )}
+
+          {canTriggerQuestCape && !activeWrit && !trialPhase && currentDraft.length === 0 && !activeFork && !activeLandmark && (
+            <div style={{border:"1px solid #1e3a5f",padding:"10px 16px",background:"#0d1117",marginBottom:"12px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px"}}>
+              <div>
+                <div style={{fontSize:"10px",letterSpacing:"3px",color:"#93c5fd",marginBottom:"4px"}}>MANUAL LANDMARK</div>
+                <div style={{fontSize:"11px",color:"#64748b"}}>Quest Cape cannot be read from Wise Old Man, so mark it manually when earned.</div>
+              </div>
+              <button style={s.btn(false,"#172554","#93c5fd")} onClick={triggerQuestCapeLandmark}>
+                MARK QUEST CAPE
+              </button>
             </div>
           )}
 
@@ -801,15 +858,15 @@ export default function MettlePrototype() {
                 DEFER QUEUE — {debtWrits.length} OUTSTANDING
                 {mustClearAll && " · BLOCKED — CLEAR ALL TO DRAW AGAIN"}
               </div>
-              {debtWrits.map((c,i)=>(
-                <div key={i} style={s.debtCard}>
+              {debtWrits.map((c)=>(
+                <div key={c.queueEntryId || c.id} style={s.debtCard}>
                   <div>
                     <div style={{color:"#f87171",fontSize:"13px",fontWeight:"700"}}>⚠ DEFERRED — {c.title}</div>
                     <div style={{color:"#666",fontSize:"11px",marginTop:"2px"}}>{c.objective}</div>
                     {c.modifier && <div style={{color:"#fb923c",fontSize:"10px",marginTop:"2px"}}>MODIFIER: {c.modifier}</div>}
                     {c.reckoning && <div style={{color:"#7c3aed",fontSize:"10px",marginTop:"2px"}}>ORIGINATED FROM RECKONING</div>}
                   </div>
-                  <button style={s.btn(false,"#14380f","#4ade80")} onClick={()=>clearDebtWrit(c.id)}>
+                  <button style={s.btn(false,"#14380f","#4ade80")} onClick={()=>clearDebtWrit(c.queueEntryId)}>
                     CLEAR (+{writXp(c)} XP)
                   </button>
                 </div>
@@ -1000,15 +1057,23 @@ export default function MettlePrototype() {
                 </div>
               ) : (
                 <div>
-                  <div style={{...s.secHead,marginBottom:"12px"}}>CHOOSE ONE — OTHERS DISAPPEAR PERMANENTLY</div>
-                  <div style={{display:"flex",gap:"8px",marginBottom:"16px",flexWrap:"wrap"}}>
-                    <button style={s.btn(false,"#111827", mettleSeals >= REROLL_COST ? "#93c5fd" : "#4b5563")} onClick={rerollCurrentDraft} disabled={mettleSeals < REROLL_COST}>
-                      REROLL DRAFT ({REROLL_COST} SEALS)
-                    </button>
-                    <button style={s.btn(false,"#1f2937", mettleSeals >= EXTRA_CHOICE_COST && currentDraft.length < 5 ? "#c4b5fd" : "#4b5563")} onClick={buyExtraDraftChoice} disabled={mettleSeals < EXTRA_CHOICE_COST || currentDraft.length >= 5}>
-                      +1 CHOICE ({EXTRA_CHOICE_COST} SEALS)
-                    </button>
+                  <div style={{...s.secHead,marginBottom:"12px"}}>
+                    {draftMode === "final_trial" ? "THE FINAL TRIAL — FIVE WRITS DRAWN, CHOOSE ONE" : "CHOOSE ONE — OTHERS DISAPPEAR PERMANENTLY"}
                   </div>
+                  {draftMode === "final_trial" ? (
+                    <div style={{fontSize:"11px",color:"#8c7a44",marginBottom:"16px",lineHeight:"1.6"}}>
+                      Your path has been revealed. The final pool is fixed at five choices and cannot be rerolled.
+                    </div>
+                  ) : (
+                    <div style={{display:"flex",gap:"8px",marginBottom:"16px",flexWrap:"wrap"}}>
+                      <button style={s.btn(false,"#111827", mettleSeals >= REROLL_COST ? "#93c5fd" : "#4b5563")} onClick={rerollCurrentDraft} disabled={mettleSeals < REROLL_COST}>
+                        REROLL DRAFT ({REROLL_COST} SEALS)
+                      </button>
+                      <button style={s.btn(false,"#1f2937", mettleSeals >= EXTRA_CHOICE_COST && currentDraft.length < 5 ? "#c4b5fd" : "#4b5563")} onClick={buyExtraDraftChoice} disabled={mettleSeals < EXTRA_CHOICE_COST || currentDraft.length >= 5}>
+                        +1 CHOICE ({EXTRA_CHOICE_COST} SEALS)
+                      </button>
+                    </div>
+                  )}
                   <div style={s.draftGrid(currentDraft.length)}>
                     {currentDraft.map((w,i)=>(
                       <div key={i} style={{...s.draftCard, borderColor: w.modifier ? "#3d2a08" : "#2a2a2a"}}
@@ -1018,6 +1083,7 @@ export default function MettlePrototype() {
                         <div style={{fontSize:"10px",marginBottom:"8px"}}>
                           <span style={s.tag(CAT_COLORS[w.category]||"#555")}>{w.category.toUpperCase()}</span>
                           <span style={s.tag(TIER_COLORS[w.tier]||"#555")}>{w.tier.toUpperCase()}</span>
+                          {draftMode === "final_trial" && <span style={s.tag("#d4af37")}>FINAL TRIAL</span>}
                           {w.modifier && <span style={s.tag("#fb923c")}>⚡ MODIFIED</span>}
                         </div>
                         <div style={{fontSize:"16px",fontWeight:"700",color:"#fff",marginBottom:"8px"}}>{w.title}</div>
