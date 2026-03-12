@@ -40,9 +40,9 @@ import { loadSave, SAVE_KEY, writeSave } from "./utils/persistence.js";
 import { accountAverage } from "./utils/skillHelpers.js";
 
 function trialFlavorLine(trial) {
-  if (!trial) return "The board has made its judgment.";
+  if (!trial) return "The ledger has made its judgment.";
   if (trial.tier === "Zaros") return "Your path narrows. Only proof remains.";
-  if (trial.category === "Trial") return "The board has measured your account and found a weakness worth naming.";
+  if (trial.category === "Trial") return "The ledger has measured your account and found a weakness worth naming.";
   return "Comfort is not part of this trial.";
 }
 
@@ -61,7 +61,7 @@ function activeTrialPrompt(trial) {
   if (trial.acceptedAt) {
     if (trial.trialModifier) return "The terms are fixed. Enter prepared and clear the trial.";
     if (trial.tier === "Zaros") return "The trial stands open. Only execution remains.";
-    if (trial.tier === "Zamorak") return "No more ceremony. The board expects action.";
+    if (trial.tier === "Zamorak") return "No more ceremony. The ledger expects action.";
     return "The writ is now active. Enter and settle it.";
   }
   if (trial.trialModifier) return "Restriction imposed. Completion now carries weight.";
@@ -512,7 +512,7 @@ export default function MettlePrototype({
     onResetToEntry?.();
   }
 
-  const displayFont = "'RuneScape UF', 'Palatino Linotype', 'Book Antiqua', Georgia, serif";
+  const displayFont = "'RuneScape UF', 'Arial Black', 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif";
   const s = {
     root:      { fontFamily:"'Courier New', monospace",background:"radial-gradient(circle at top left, rgba(212,175,55,0.08), transparent 26%), radial-gradient(circle at 82% 18%, rgba(122,122,122,0.06), transparent 22%), linear-gradient(180deg, #080808 0%, #0c0c0c 46%, #090909 100%)",color:"#d4d4d4",minHeight:"100vh",padding:"30px 24px 48px",maxWidth:"1040px",margin:"0 auto" },
     header:    { border:"1px solid #1a1a1a",padding:"24px 24px 18px",marginBottom:"24px",background:"linear-gradient(180deg, rgba(212,175,55,0.05) 0%, rgba(16,16,16,0.98) 20%, rgba(10,10,10,0.98) 100%)",boxShadow:"0 0 0 1px rgba(255,255,255,0.02), inset 0 1px 0 rgba(255,255,255,0.03)" },
@@ -745,7 +745,7 @@ export default function MettlePrototype({
       {statsLoaded && (
         <div style={{display:"flex",gap:"4px",marginBottom:"24px"}}>
           {["board","stats","history"].map(v=>(
-            <button key={v} style={s.btn(activeView===v)} onClick={()=>setActiveView(v)}>{v.toUpperCase()}</button>
+            <button key={v} style={s.btn(activeView===v)} onClick={()=>setActiveView(v)}>{v === "board" ? "LEDGER" : v.toUpperCase()}</button>
           ))}
           <div style={{flex:1}}/>
           {confirmReset ? (
@@ -805,7 +805,7 @@ export default function MettlePrototype({
           {/* PENDING TRIAL NOTICE */}
           {pendingTrial && !activeWrit && !trialPhase && currentDraft.length === 0 && !activeFork && !activeLandmark && (
             <div style={{border:"1px solid #d4af37",padding:"10px 16px",background:"#141008",marginBottom:"12px",fontSize:"11px",color:"#fbbf24"}}>
-              ⚔ TRIAL OF METTLE APPROACHING — Level {pendingTrial.triggerLevel}. The board demands you answer.
+              ⚔ TRIAL OF METTLE APPROACHING — Level {pendingTrial.triggerLevel}. The ledger demands you answer.
             </div>
           )}
 
@@ -895,7 +895,7 @@ export default function MettlePrototype({
               <div style={{fontSize:"10px",letterSpacing:"6px",color:"#d4af37",marginBottom:"24px"}}>⚔ TRIAL OF METTLE ⚔</div>
               <div style={{fontSize:"14px",letterSpacing:"4px",color:"#fbbf24",marginBottom:"12px"}}>LEVEL {pendingTrialData.triggerLevel}</div>
               <div style={{fontSize:"11px",color:"#666",marginBottom:"32px",maxWidth:"400px",margin:"0 auto 32px",lineHeight:"1.6"}}>
-                The board has watched your progress. A Trial has been summoned. It cannot be drafted around. It cannot be ignored. It must be faced.
+                The ledger has watched your progress. A Trial has been summoned. It cannot be drafted around. It cannot be ignored. It must be faced.
               </div>
               <button style={{padding:"14px 48px",fontFamily:"inherit",fontWeight:"700",fontSize:"14px",letterSpacing:"4px",background:"transparent",color:"#d4af37",border:"1px solid #d4af37",cursor:"pointer"}} onClick={revealTrial}>
                 REVEAL TRIAL
@@ -963,7 +963,7 @@ export default function MettlePrototype({
                 <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg, rgba(255,255,255,0.015) 0%, rgba(0,0,0,0) 26%, rgba(0,0,0,0.24) 100%)",pointerEvents:"none"}} />
                 <div style={{position:"relative",textAlign:"center"}}>
                   <div style={{fontSize:"10px",letterSpacing:"6px",color:"#7a6a34",marginBottom:"10px"}}>TRIAL IN PROGRESS</div>
-                  <div style={{fontSize:"11px",letterSpacing:"3px",color:"#9ca3af",marginBottom:"18px",textTransform:"uppercase"}}>The reveal has passed. The board now expects execution.</div>
+                  <div style={{fontSize:"11px",letterSpacing:"3px",color:"#9ca3af",marginBottom:"18px",textTransform:"uppercase"}}>The reveal has passed. The ledger now expects execution.</div>
                   <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:"84px",height:"84px",border:"1px solid rgba(212,175,55,0.42)",borderRadius:"999px",marginBottom:"16px",boxShadow:"0 0 22px rgba(212,175,55,0.10)",background:"radial-gradient(circle, rgba(212,175,55,0.08) 0%, rgba(212,175,55,0.02) 60%, rgba(0,0,0,0) 100%)"}}>
                     <div style={{fontSize:"30px",color:"#fbbf24",lineHeight:1}}>✦</div>
                   </div>

@@ -4,14 +4,14 @@ import { skillLabel } from "../utils/labels.js";
 export const LANDMARK_WRITS = [
   { id:"landmark_first_99", title:"First Level 99", category:"Landmark", tier:"Zaros", difficulty:"Elite", xp:1000,
     conditionFn: (skills, _kc) => SKILLS.some(s => skills[s] >= 99),
-    objectiveFn: (skills) => { const maxed = SKILLS.filter(s => skills[s] >= 99); return `You have reached 99 in ${maxed.map(skillLabel).join(", ")}. The board acknowledges mastery.`; },
+    objectiveFn: (skills) => { const maxed = SKILLS.filter(s => skills[s] >= 99); return `You have reached 99 in ${maxed.map(skillLabel).join(", ")}. The ledger acknowledges mastery.`; },
     objective:"Reach level 99 in any skill." },
   { id:"landmark_quest_cape", title:"Quest Cape", category:"Landmark", tier:"Zaros", difficulty:"Elite", xp:1500, landmark:true,
     conditionFn: () => false, // Manual trigger — we can't detect quest completion from WOM API skill data alone
     objective:"Complete all quests. One of the defining moments of any OSRS account." },
   { id:"landmark_total_1900", title:"Total Level 1900", category:"Landmark", tier:"Zaros", difficulty:"Elite", xp:1000,
     conditionFn: (skills) => { const total = Object.values(skills).reduce((a,b) => a+b, 0); return total >= 1900; },
-    objectiveFn: (skills) => { const total = Object.values(skills).reduce((a,b) => a+b, 0); return `Total level ${total} — you've reached the 1900 milestone. The board marks this moment.`; },
+    objectiveFn: (skills) => { const total = Object.values(skills).reduce((a,b) => a+b, 0); return `Total level ${total} — you've reached the 1900 milestone. The ledger marks this moment.`; },
     objective:"Reach 1900 total level." },
   { id:"landmark_first_raid", title:"First Raid Completion", category:"Landmark", tier:"Bandos", difficulty:"Hard", xp:800,
     conditionFn: (_s, kc) => (kc.chambers_of_xeric??0) > 0 || (kc.theatre_of_blood??0) > 0 || (kc.tombs_of_amascut??0) > 0,

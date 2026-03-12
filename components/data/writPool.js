@@ -520,7 +520,7 @@ export const WRIT_POOL = [
   { id:"trial_90", category:"Trial", tier:"Zaros", triggerLevel:90, difficulty:"Elite", xp:1500, repeatable:false, trial:true,
     titleFn:(s,kc)=>{ const b=hardestUntouchedBoss(kc, s); return `Trial of Mettle: ${bossLabel(b)}`; },
     title:"Trial of Mettle: Elite Challenge",
-    objectiveFn:(s,kc)=>{ const b=hardestUntouchedBoss(kc, s); return `Kill ${bossLabel(b)} — the board has spoken. ${(kc[b]??0)} KC. Non-skippable.`; },
+    objectiveFn:(s,kc)=>{ const b=hardestUntouchedBoss(kc, s); return `Kill ${bossLabel(b)} — the ledger has spoken. ${(kc[b]??0)} KC. Non-skippable.`; },
     objective:"Highest-difficulty uncompleted boss. Non-skippable." },
   { id:"trial_99", title:"The Final Trial", category:"Trial", tier:"Zaros", triggerLevel:99, difficulty:"Elite", xp:2000, repeatable:false, trial:true, finalTrial:true, objective:"The series finale. Your Path is revealed. Five writs drawn. You choose one." },
 

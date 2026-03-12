@@ -12,7 +12,7 @@ export default function EntryScreen({ onComplete }) {
   const [fetchError, setFetchError] = useState("");
   const [manualSkills, setManualSkills] = useState(DEFAULT_SKILLS);
   const [manualKC, setManualKC] = useState(DEFAULT_KC);
-  const displayFont = "'RuneScape UF', 'Palatino Linotype', 'Book Antiqua', Georgia, serif";
+  const displayFont = "'RuneScape UF', 'Arial Black', 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif";
 
   useEffect(() => {
     const save = loadSave();
@@ -437,13 +437,13 @@ export default function EntryScreen({ onComplete }) {
                 <div>
                   <div style={s.topRail}>
                     <div style={s.codeBlock}>
-                      <div style={s.docket}>METTLE / BOARD INITIATION</div>
+                      <div style={s.docket}>METTLE / LEDGER INITIATION</div>
                       <div style={s.docket}>SERIES ENTRY / FIRST CONTACT</div>
                     </div>
                     <div style={s.sigilWrap}>
                       <div style={s.sigil}>✦</div>
                       <div style={s.sigilMeta}>
-                        BOARD STATUS
+                        LEDGER STATUS
                         <br />
                         LISTENING
                         <br />
@@ -457,13 +457,13 @@ export default function EntryScreen({ onComplete }) {
                   </h1>
                   <div style={s.divider} />
                   <p style={s.body}>
-                    A contract board generated from your account&apos;s gaps. The things your
+                    A contract ledger generated from your account&apos;s gaps. The things your
                     stats say you should be able to do but haven&apos;t. Each run is yours alone.
-                    No two accounts face the same board.
+                    No two accounts face the same ledger.
                   </p>
                 </div>
                 <div style={{ ...s.docket, color: "#444" }}>
-                  THIS BOARD DOES NOT MEASURE POTENTIAL. IT MEASURES NEGLECT.
+                  THIS LEDGER DOES NOT MEASURE POTENTIAL. IT MEASURES NEGLECT.
                 </div>
               </div>
 
@@ -471,7 +471,7 @@ export default function EntryScreen({ onComplete }) {
                 <div>
                   <div style={s.asideLabel}>INTAKE SUMMARY</div>
                   <div style={s.asideTitle}>
-                    The board reads your account, isolates the gaps, and turns them into a run
+                    The ledger reads your account, isolates the gaps, and turns them into a run
                     only your profile could receive.
                   </div>
                   <div style={s.ledgerRow}>
@@ -481,7 +481,7 @@ export default function EntryScreen({ onComplete }) {
                     </div>
                   </div>
                   <div style={s.ledgerRow}>
-                    <div style={s.ledgerIndex}>02 / GENERATE THE BOARD</div>
+                    <div style={s.ledgerIndex}>02 / GENERATE THE LEDGER</div>
                     <div style={s.ledgerBody}>
                       Drafts, trials, reckoning pressure, and landmarks emerge from what your
                       account has and has not done.
@@ -490,7 +490,7 @@ export default function EntryScreen({ onComplete }) {
                   <div style={s.ledgerRow}>
                     <div style={s.ledgerIndex}>03 / PROVE IT</div>
                     <div style={s.ledgerBody}>
-                      The board is not shared. No templates. No universal checklist. Just your
+                      The ledger is not shared. No templates. No universal checklist. Just your
                       blind spots turned into obligations.
                     </div>
                   </div>
@@ -509,15 +509,15 @@ export default function EntryScreen({ onComplete }) {
           <div style={s.frame}>
             <div className="entry-input-grid" style={s.inputShell}>
               <div className="entry-intro" style={s.inputIntro}>
-                <div style={s.inputLabel}>BOARD INTAKE</div>
-                <div style={s.inputTitle}>Give the board a name to work with.</div>
+                <div style={s.inputLabel}>LEDGER INTAKE</div>
+                <div style={s.inputTitle}>Give the ledger a name to work with.</div>
                 <div style={s.inputCopy}>
-                  Wise Old Man is the default path. It lets the board build your first draft from
+                  Wise Old Man is the default path. It lets the ledger build your first draft from
                   real account data in one step.
                 </div>
                 <div style={s.inputStat}>SOURCE / Wise Old Man API</div>
                 <div style={s.inputStat}>FALLBACK / Manual stat and boss KC entry</div>
-                <div style={s.inputStat}>OUTPUT / A board tailored to your account&apos;s gaps</div>
+                <div style={s.inputStat}>OUTPUT / A ledger tailored to your account&apos;s gaps</div>
               </div>
 
               <div style={s.intake}>
