@@ -44,12 +44,14 @@ export const BOSS_BANDS = [
 
 export const XP_BREAKPOINTS = [
   { xp:0,     level:1  },
-  { xp:2000,  level:20 },
-  { xp:7000,  level:40 },
-  { xp:17000, level:60 },
-  { xp:37000, level:80 },
-  { xp:67000, level:99 },
+  { xp:2500,  level:20 },
+  { xp:9000,  level:40 },
+  { xp:22000, level:60 },
+  { xp:45000, level:80 },
+  { xp:85000, level:99 },
 ];
+
+export const MAX_METTLE_XP = XP_BREAKPOINTS[XP_BREAKPOINTS.length - 1].xp;
 
 export const COMBAT_MODIFIERS = ["No food","No overhead prayers","Gear cap (max Rune)","Inventory limit (16 slots)","Time limit (15 min)","No potions","No special attacks","Protection prayers disabled","No safespots","Weapon locked after entering fight","Must equip one cosmetic item","Max 1 teleport item"];
 export const SKILLING_MODIFIERS = ["No teleporting","No banking","Ironman-style gathering","Limited inventory (16 slots)","Tool downgrade (steel tier)","No stamina potions","Must process gathered resources","Randomized resource order"];

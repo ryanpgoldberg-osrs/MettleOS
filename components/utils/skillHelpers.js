@@ -1,15 +1,36 @@
 import { BOSS_BANDS, PRODUCTION, SKILLS, SKILLING } from "../data/constants.js";
 
-export function hardestUntouchedBoss(bossKC) {
-  for (const band of BOSS_BANDS) {
-    const untouched = band.filter(b => (bossKC[b] ?? 0) === 0);
-    if (untouched.length > 0) return untouched[0];
-  }
-  return BOSS_BANDS[0][0];
+function accountBossSeed(skillLevels = {}, bossKC = {}) {
+  const skillSeed = Object.entries(skillLevels).reduce(
+    (sum, [skill, level], index) => sum + (index + 1) * (level ?? 0) * (skill.length + 3),
+    0
+  );
+  const bossSeed = Object.entries(bossKC).reduce(
+    (sum, [boss, kc], index) => sum + (index + 1) * (kc ?? 0) * (boss.length + 7),
+    0
+  );
+  return skillSeed + bossSeed;
 }
 
-export function firstUntouchedFromPool(pool, bossKC) {
-  return pool.find(b => (bossKC[b] ?? 0) === 0) || pool[0];
+function seededChoice(pool, seed) {
+  if (pool.length === 0) return undefined;
+  const normalized = Math.abs(seed) % pool.length;
+  return pool[normalized];
+}
+
+export function hardestUntouchedBoss(bossKC, skillLevels = {}) {
+  const seed = accountBossSeed(skillLevels, bossKC);
+  for (const band of BOSS_BANDS) {
+    const untouched = band.filter(b => (bossKC[b] ?? 0) === 0);
+    if (untouched.length > 0) return seededChoice(untouched, seed);
+  }
+  return seededChoice(BOSS_BANDS[0], seed) || BOSS_BANDS[0][0];
+}
+
+export function firstUntouchedFromPool(pool, bossKC, skillLevels = {}) {
+  const untouched = pool.filter(b => (bossKC[b] ?? 0) === 0);
+  if (untouched.length > 0) return seededChoice(untouched, accountBossSeed(skillLevels, bossKC));
+  return lowestKCBoss(bossKC, pool, skillLevels);
 }
 
 export function lowestSkill(skillLevels, exclude = []) {
@@ -27,10 +48,11 @@ export function lowestProductionSkill(skillLevels) {
   return [...PRODUCTION].sort((a, b) => skillLevels[a] - skillLevels[b])[0];
 }
 
-export function lowestKCBoss(bossKC, eligibleBosses) {
-  const zeroes = eligibleBosses.filter(b => (bossKC[b] ?? 0) === 0);
-  if (zeroes.length > 0) return zeroes[0];
-  return [...eligibleBosses].sort((a, b) => (bossKC[a] ?? 0) - (bossKC[b] ?? 0))[0];
+export function lowestKCBoss(bossKC, eligibleBosses, skillLevels = {}) {
+  const seed = accountBossSeed(skillLevels, bossKC);
+  const minKC = eligibleBosses.reduce((lowest, boss) => Math.min(lowest, bossKC[boss] ?? 0), Infinity);
+  const candidates = eligibleBosses.filter(b => (bossKC[b] ?? 0) === minKC);
+  return seededChoice(candidates, seed) || eligibleBosses[0];
 }
 
 export function accountAverage(skillLevels) {

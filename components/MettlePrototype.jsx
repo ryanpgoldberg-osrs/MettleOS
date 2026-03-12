@@ -6,9 +6,8 @@ import {
   DEFAULT_SKILLS,
   DIFF_COLORS,
   EXTRA_CHOICE_COST,
-  
   KEY_BOSSES,
-  
+  MAX_METTLE_XP,
   METTLE_UNLOCKS,
   RECKONING_CATEGORIES,
   REMOVE_MODIFIER_COST,
@@ -86,16 +85,30 @@ function toDeferredQueueEntry(writ) {
 // COMPONENT
 // ─────────────────────────────────────────────
 
-export default function MettlePrototype() {
+/**
+ * @param {{
+ *   initialSkillLevels?: Record<string, number> | null,
+ *   initialBossKC?: Record<string, number> | null,
+ *   initialRsn?: string,
+ *   onResetToEntry?: (() => void) | null,
+ * }} [props]
+ */
+export default function MettlePrototype({
+  initialSkillLevels = null,
+  initialBossKC = null,
+  initialRsn = "",
+  onResetToEntry = null,
+} = {}) {
+  const hasInitialStats = Boolean(initialSkillLevels && initialBossKC);
   const [inputMode,    setInputMode]    = useState("manual");
-  const [rsn,          setRsn]          = useState("");
+  const [rsn,          setRsn]          = useState(initialRsn);
   const [loading,      setLoading]      = useState(false);
   const [fetchError,   setFetchError]   = useState("");
-  const [statsLoaded,  setStatsLoaded]  = useState(false);
-  const [manualSkills, setManualSkills] = useState(DEFAULT_SKILLS);
-  const [manualKC,     setManualKC]     = useState(DEFAULT_KC);
-  const [skillLevels,  setSkillLevels]  = useState(DEFAULT_SKILLS);
-  const [bossKC,       setBossKC]       = useState(DEFAULT_KC);
+  const [statsLoaded,  setStatsLoaded]  = useState(hasInitialStats);
+  const [manualSkills, setManualSkills] = useState(initialSkillLevels ?? DEFAULT_SKILLS);
+  const [manualKC,     setManualKC]     = useState(initialBossKC ?? DEFAULT_KC);
+  const [skillLevels,  setSkillLevels]  = useState(initialSkillLevels ?? DEFAULT_SKILLS);
+  const [bossKC,       setBossKC]       = useState(initialBossKC ?? DEFAULT_KC);
 
   const [mettleXP,       setMettleXP]       = useState(0);
   const [mettleSeals,    setMettleSeals]    = useState(0);
@@ -146,9 +159,12 @@ export default function MettlePrototype() {
 
   // ── LOAD
   useEffect(() => {
+    if (hasInitialStats) return;
     const save=loadSave(); if(!save) return;
     if(save.skillLevels)         setSkillLevels(save.skillLevels);
+    if(save.skillLevels)         setManualSkills(save.skillLevels);
     if(save.bossKC)              setBossKC(save.bossKC);
+    if(save.bossKC)              setManualKC(save.bossKC);
     if(save.mettleXP)            setMettleXP(save.mettleXP);
     if(save.mettleSeals)         setMettleSeals(save.mettleSeals);
     if(save.streak)              setStreak(save.streak);
@@ -167,7 +183,7 @@ export default function MettlePrototype() {
     if(save.completedLandmarks)  setCompletedLandmarks(save.completedLandmarks);
     if(save.assignedPath)        setAssignedPath(save.assignedPath);
     if(save.pathRevealed)        setPathRevealed(save.pathRevealed);
-  }, []);
+  }, [hasInitialStats]);
 
   // ── SAVE
   useEffect(() => {
@@ -221,6 +237,8 @@ export default function MettlePrototype() {
       if(!res.ok) throw new Error(`${res.status}`);
       const data=await res.json();
       const levels={}; SKILLS.forEach(s=>{levels[s]=data?.skills?.[s]??1;});
+      const resolvedRsn = data?.rsn ?? trimmed;
+      setRsn(resolvedRsn);
       setSkillLevels(levels); setManualSkills(levels);
       const kc={}; KEY_BOSSES.forEach(b=>{kc[b]=data?.bosses?.[b]??0;});
       setBossKC(kc); setManualKC(kc); setStatsLoaded(true);
@@ -359,7 +377,7 @@ export default function MettlePrototype() {
     setCompletedLandmarks(prev => [...prev, lm.id]);
     const xpGained = lm.xp;
     const sealsGained = 3; // landmark bonus
-    setMettleXP(prev => Math.min(67000, prev + xpGained));
+    setMettleXP(prev => Math.min(MAX_METTLE_XP, prev + xpGained));
     setMettleSeals(prev => prev + sealsGained);
     setXpDrop({ amount: xpGained, id: Date.now() });
     setTimeout(() => setXpDrop(null), 1800);
@@ -370,6 +388,7 @@ export default function MettlePrototype() {
 
   function triggerQuestCapeLandmark() {
     if (!questCapeLandmark || activeWrit || trialPhase || currentDraft.length > 0 || activeFork || activeLandmark) return;
+    setActiveView("board");
     setActiveLandmark(questCapeLandmark);
     setLandmarkPhase("revealed");
   }
@@ -433,7 +452,7 @@ export default function MettlePrototype() {
         setCategoryDeferCounts(prev => ({ ...prev, [cat]: 0 }));
       }
     }
-    if(xpGained>0) setMettleXP(prev=>Math.min(67000,prev+xpGained));
+    if(xpGained>0) setMettleXP(prev=>Math.min(MAX_METTLE_XP,prev+xpGained));
     if(sealsGained>0) setMettleSeals(prev=>prev+sealsGained);
     setStreak(nextStreak);
     setHistory(prev=>[{...activeWrit,result,xpGained,sealsGained,baseXp:activeWrit.xp,modifierXpBonus:modifierXpBonus(activeWrit),streakAfter:nextStreak,timestamp:Date.now()},...prev]);
@@ -447,7 +466,7 @@ export default function MettlePrototype() {
     const sealsGained = sealsForWrit(c) + streakSealBonus(nextStreak);
     setDebtWrits(newDebt);
     if (newDebt.length===0) setMustClearAll(false);
-    setMettleXP(prev=>Math.min(67000,prev+writXp(c)));
+    setMettleXP(prev=>Math.min(MAX_METTLE_XP,prev+writXp(c)));
     setMettleSeals(prev=>prev+sealsGained);
     setStreak(nextStreak);
     if(!completedIds.includes(c.id)) setCompletedIds(prev=>[...prev,c.id]);
@@ -459,7 +478,7 @@ export default function MettlePrototype() {
     const nextStreak = streak + 1;
     const sealsGained = sealsForWrit(rw) + streakSealBonus(nextStreak);
     setReckoningWrits(prev => prev.filter(x => x.id !== id));
-    setMettleXP(prev => Math.min(67000, prev + writXp(rw)));
+    setMettleXP(prev => Math.min(MAX_METTLE_XP, prev + writXp(rw)));
     setMettleSeals(prev => prev + sealsGained);
     setStreak(nextStreak);
     setXpDrop({ amount: writXp(rw), id: Date.now() });
@@ -490,23 +509,29 @@ export default function MettlePrototype() {
     setAssignedPath(null); setPathRevealed(false);
     setConfirmReset(false);
     try { localStorage.removeItem(SAVE_KEY); } catch {}
+    onResetToEntry?.();
   }
 
+  const displayFont = "'RuneScape UF', 'Palatino Linotype', 'Book Antiqua', Georgia, serif";
   const s = {
-    root:      { fontFamily:"'Courier New', monospace",background:"#0c0c0c",color:"#d4d4d4",minHeight:"100vh",padding:"24px",maxWidth:"960px",margin:"0 auto" },
-    header:    { borderBottom:"1px solid #2a2a2a",paddingBottom:"20px",marginBottom:"24px" },
-    xpBar:     { height:"3px",background:"#222",marginTop:"14px",borderRadius:"2px" },
-    xpFill:    pct=>({height:"100%",background:"#fff",borderRadius:"2px",width:`${pct}%`,transition:"width 0.4s"}),
-    btn:       (active,bg,fg)=>({ padding:"8px 18px",fontFamily:"inherit",fontWeight:"700",fontSize:"12px",letterSpacing:"1px", background:bg||(active?"#fff":"#111"),color:fg||(active?"#000":"#888"),border:`1px solid ${active?"#fff":"#2a2a2a"}`,cursor:"pointer" }),
-    secHead:   { fontSize:"10px",letterSpacing:"3px",color:"#555",marginBottom:"12px" },
-    activeCard:{ border:"1px solid #555",padding:"20px",background:"#131313",marginBottom:"16px" },
-    debtCard:  { border:"1px solid #3d1515",padding:"12px 16px",background:"#0f0808",marginBottom:"6px",display:"flex",justifyContent:"space-between",alignItems:"center" },
-    reckoningCard: { border:"1px solid #6b21a8",padding:"12px 16px",background:"#0f0a14",marginBottom:"6px" },
+    root:      { fontFamily:"'Courier New', monospace",background:"radial-gradient(circle at top left, rgba(212,175,55,0.08), transparent 26%), radial-gradient(circle at 82% 18%, rgba(122,122,122,0.06), transparent 22%), linear-gradient(180deg, #080808 0%, #0c0c0c 46%, #090909 100%)",color:"#d4d4d4",minHeight:"100vh",padding:"30px 24px 48px",maxWidth:"1040px",margin:"0 auto" },
+    header:    { border:"1px solid #1a1a1a",padding:"24px 24px 18px",marginBottom:"24px",background:"linear-gradient(180deg, rgba(212,175,55,0.05) 0%, rgba(16,16,16,0.98) 20%, rgba(10,10,10,0.98) 100%)",boxShadow:"0 0 0 1px rgba(255,255,255,0.02), inset 0 1px 0 rgba(255,255,255,0.03)" },
+    xpBar:     { height:"4px",background:"#171717",marginTop:"16px" },
+    xpFill:    pct=>({height:"100%",background:"linear-gradient(90deg, #b8922c 0%, #f0e0ad 100%)",width:`${pct}%`,transition:"width 0.4s"}),
+    btn:       (active,bg,fg)=>({ padding:"8px 18px",fontFamily:"inherit",fontWeight:"700",fontSize:"12px",letterSpacing:"1px", background:bg||(active?"#161616":"#101010"),color:fg||(active?"#f3e3a3":"#888"),border:`1px solid ${active?"#7a6530":"#2a2a2a"}`,cursor:"pointer",boxShadow:active?"inset 0 1px 0 rgba(255,255,255,0.05), 0 0 18px rgba(212,175,55,0.05)":"none" }),
+    secHead:   { fontSize:"10px",letterSpacing:"3px",color:"#7b6a32",marginBottom:"12px" },
+    activeCard:{ border:"1px solid #3d3421",padding:"20px",background:"linear-gradient(180deg, rgba(212,175,55,0.05) 0%, rgba(18,18,18,0.98) 16%, rgba(11,11,11,0.98) 100%)",marginBottom:"16px",boxShadow:"inset 0 1px 0 rgba(255,255,255,0.03)" },
+    debtCard:  { border:"1px solid #3d1515",padding:"12px 16px",background:"linear-gradient(180deg, rgba(111,25,25,0.10) 0%, rgba(15,8,8,0.96) 100%)",marginBottom:"6px",display:"flex",justifyContent:"space-between",alignItems:"center" },
+    reckoningCard: { border:"1px solid #6b21a8",padding:"12px 16px",background:"linear-gradient(180deg, rgba(107,33,168,0.12) 0%, rgba(15,10,20,0.96) 100%)",marginBottom:"6px" },
     draftGrid: n=>({ display:"grid",gridTemplateColumns:`repeat(${Math.min(n, 3)}, 1fr)`,gap:"12px" }),
-    draftCard: { border:"1px solid #2a2a2a",padding:"16px",background:"#0f0f0f",cursor:"pointer" },
+    draftCard: { border:"1px solid #2b2416",padding:"16px",background:"linear-gradient(180deg, rgba(212,175,55,0.04) 0%, rgba(16,16,16,0.96) 18%, rgba(12,12,12,0.98) 100%)",cursor:"pointer",boxShadow:"inset 0 1px 0 rgba(255,255,255,0.03)" },
     tag:       color=>({ display:"inline-block",fontSize:"10px",letterSpacing:"1px",color:color||"#555",marginRight:"8px" }),
     numInput:  { background:"#0c0c0c",border:"1px solid #2a2a2a",color:"#fff",padding:"2px 6px",fontFamily:"inherit",fontSize:"12px",textAlign:"right" },
-    footer:    { marginTop:"48px",borderTop:"1px solid #1a1a1a",paddingTop:"12px",display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:"8px",fontSize:"10px",color:"#3a3a3a",letterSpacing:"1px" },
+    footer:    { marginTop:"48px",borderTop:"1px solid #1a1a1a",paddingTop:"12px",display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:"8px",fontSize:"10px",color:"#4a4a4a",letterSpacing:"1px" },
+    displayHero:{ fontFamily:displayFont,fontSize:"44px",lineHeight:"0.95",letterSpacing:"1px",textTransform:"uppercase",color:"#f3efe0",textShadow:"0 1px 0 rgba(0,0,0,0.55), 0 0 18px rgba(212,175,55,0.08)" },
+    displayValue:{ fontFamily:displayFont,fontSize:"34px",lineHeight:"1",letterSpacing:"1px",color:"#f0e3b3",textShadow:"0 1px 0 rgba(0,0,0,0.5)" },
+    displayCardTitle:{ fontFamily:displayFont,fontSize:"24px",lineHeight:"1.08",letterSpacing:"0.6px",textTransform:"uppercase",color:"#f4efe0",textShadow:"0 1px 0 rgba(0,0,0,0.45)" },
+    displayBigTitle:{ fontFamily:displayFont,fontSize:"34px",lineHeight:"1.05",letterSpacing:"0.8px",textTransform:"uppercase",color:"#f4efe0",textShadow:"0 1px 0 rgba(0,0,0,0.45), 0 0 20px rgba(212,175,55,0.06)" },
   };
 
   const statusColor = draftStatus==="blocked"?"#f87171":draftStatus==="cursed"?"#fbbf24":draftStatus==="favored"?"#c4b5fd":draftStatus==="hot_streak"?"#fb923c":"#4ade80";
@@ -514,6 +539,7 @@ export default function MettlePrototype() {
   const writPoolCount = WRIT_POOL.filter(w=>!w.trial).length;
   const questCapeLandmark = LANDMARK_WRITS.find(lm => lm.id === "landmark_quest_cape");
   const canTriggerQuestCape = !!questCapeLandmark && !completedLandmarks.includes(questCapeLandmark.id);
+  const showQuestCapePrompt = canTriggerQuestCape && (mettleLevel >= 80 || assignedPath || completedLandmarks.length > 0);
   const tierCounts = TIER_ORDER.map(t=>({
     tier:t, color:TIER_COLORS[t],
     count:WRIT_POOL.filter(w=>w.tier===t&&!w.trial).length,
@@ -599,13 +625,14 @@ export default function MettlePrototype() {
       <div style={s.header}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
-            <div style={{fontSize:"32px",fontWeight:"700",letterSpacing:"10px",color:"#fff",margin:0}}>METTLE</div>
-            <div style={{fontSize:"10px",color:"#555",letterSpacing:"4px",marginTop:"4px"}}>WRIT SKILL — PROTOTYPE v1.0</div>
+            <div style={{...s.displayHero,margin:0}}>METTLE</div>
+            <div style={{fontSize:"10px",color:"#7b6a32",letterSpacing:"4px",marginTop:"6px"}}>WRIT SKILL — PROTOTYPE v1.0</div>
           </div>
           <div style={{textAlign:"right"}}>
-            <div style={{fontSize:"28px",fontWeight:"700",color:"#fff"}}>
+            <div style={{fontSize:"10px",color:"#666",letterSpacing:"4px",marginBottom:"6px"}}>CURRENT STANDING</div>
+            <div style={s.displayValue}>
               LVL {String(mettleLevel).padStart(2,"0")}
-              <span style={{fontSize:"14px",color:"#444",marginLeft:"6px"}}>/99</span>
+              <span style={{fontSize:"16px",color:"#675a34",marginLeft:"6px",fontFamily:"'Courier New', monospace"}}>/99</span>
             </div>
             <div style={{fontSize:"11px",color:"#666",marginTop:"2px"}}>
               {mettleXP.toLocaleString()} XP · {mettleLevel<99?`${xpToNext.toLocaleString()} to next`:"MAX"}
@@ -741,11 +768,11 @@ export default function MettlePrototype() {
               <div style={{...s.secHead,color:"#a855f7"}}>
                 ⚡ RECKONING — {reckoningWrits.length} ACTIVE · MUST CLEAR TO DRAW OR ADVANCE
               </div>
-              {reckoningWrits.map((rw, i) => (
+          {reckoningWrits.map((rw, i) => (
                 <div key={i} style={s.reckoningCard}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"8px"}}>
                     <div>
-                      <div style={{color:"#a855f7",fontSize:"14px",fontWeight:"700"}}>⚡ {rw.title}</div>
+                      <div style={{...s.displayCardTitle,fontSize:"18px",color:"#d8b4fe"}}>⚡ {rw.title}</div>
                       <div style={{fontSize:"10px",color:"#666",marginTop:"2px"}}>
                         <span style={s.tag("#a855f7")}>RECKONING #{rw.reckoningCount}</span>
                         <span style={s.tag(DIFF_COLORS[rw.difficulty])}>{rw.difficulty.toUpperCase()}</span>
@@ -790,23 +817,11 @@ export default function MettlePrototype() {
             </div>
           )}
 
-          {canTriggerQuestCape && !activeWrit && !trialPhase && currentDraft.length === 0 && !activeFork && !activeLandmark && (
-            <div style={{border:"1px solid #1e3a5f",padding:"10px 16px",background:"#0d1117",marginBottom:"12px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px"}}>
-              <div>
-                <div style={{fontSize:"10px",letterSpacing:"3px",color:"#93c5fd",marginBottom:"4px"}}>MANUAL LANDMARK</div>
-                <div style={{fontSize:"11px",color:"#64748b"}}>Quest Cape cannot be read from Wise Old Man, so mark it manually when earned.</div>
-              </div>
-              <button style={s.btn(false,"#172554","#93c5fd")} onClick={triggerQuestCapeLandmark}>
-                MARK QUEST CAPE
-              </button>
-            </div>
-          )}
-
           {/* ═══ FORK PRESENTATION ═══ */}
           {forkPhase === "presenting" && activeFork && (
             <div style={{animation:"trialRevealIn 0.6s ease-out, forkPulse 3s infinite",textAlign:"center",padding:"48px 20px",border:"2px solid #dc2626",background:"radial-gradient(circle at top, rgba(220,38,38,0.12) 0%, rgba(12,12,12,1) 40%)",marginBottom:"20px"}}>
               <div style={{fontSize:"10px",letterSpacing:"6px",color:"#dc2626",marginBottom:"16px"}}>⚡ FORK WRIT ⚡</div>
-              <div style={{fontSize:"26px",fontWeight:"700",color:"#fff",marginBottom:"10px"}}>{activeFork.title}</div>
+              <div style={{...s.displayBigTitle,color:"#fff",marginBottom:"10px"}}>{activeFork.title}</div>
               <div style={{fontSize:"12px",color:"#666",marginBottom:"32px",maxWidth:"500px",margin:"0 auto 32px",lineHeight:"1.6"}}>
                 Two paths diverge. You must choose one. The other vanishes permanently.
               </div>
@@ -816,7 +831,7 @@ export default function MettlePrototype() {
                   onMouseLeave={e=>e.currentTarget.style.borderColor="#444"}
                   onClick={()=>chooseForkOption(activeFork,"a")}>
                   <div style={{fontSize:"10px",letterSpacing:"3px",color:"#dc2626",marginBottom:"8px"}}>OPTION A</div>
-                  <div style={{fontSize:"18px",fontWeight:"700",color:"#fff",marginBottom:"8px"}}>{activeFork.optionA.label}</div>
+                  <div style={{...s.displayCardTitle,fontSize:"18px",marginBottom:"8px"}}>{activeFork.optionA.label}</div>
                   <div style={{fontSize:"12px",color:"#888",lineHeight:"1.5"}}>{activeFork.optionA.objective}</div>
                   <div style={{marginTop:"12px",fontSize:"11px",color:"#555"}}>{activeFork.xp} XP</div>
                 </div>
@@ -825,7 +840,7 @@ export default function MettlePrototype() {
                   onMouseLeave={e=>e.currentTarget.style.borderColor="#444"}
                   onClick={()=>chooseForkOption(activeFork,"b")}>
                   <div style={{fontSize:"10px",letterSpacing:"3px",color:"#dc2626",marginBottom:"8px"}}>OPTION B</div>
-                  <div style={{fontSize:"18px",fontWeight:"700",color:"#fff",marginBottom:"8px"}}>{activeFork.optionB.label}</div>
+                  <div style={{...s.displayCardTitle,fontSize:"18px",marginBottom:"8px"}}>{activeFork.optionB.label}</div>
                   <div style={{fontSize:"12px",color:"#888",lineHeight:"1.5"}}>{activeFork.optionB.objective}</div>
                   <div style={{marginTop:"12px",fontSize:"11px",color:"#555"}}>{activeFork.xp} XP</div>
                 </div>
@@ -840,7 +855,7 @@ export default function MettlePrototype() {
               <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:"80px",height:"80px",border:"1px solid rgba(59,130,246,0.55)",borderRadius:"999px",marginBottom:"16px",boxShadow:"0 0 30px rgba(59,130,246,0.18)"}}>
                 <div style={{fontSize:"32px",color:"#93c5fd",lineHeight:1}}>★</div>
               </div>
-              <div style={{fontSize:"26px",fontWeight:"700",color:"#fff",marginBottom:"10px"}}>{activeLandmark.title}</div>
+              <div style={{...s.displayBigTitle,color:"#f4efe0",marginBottom:"10px"}}>{activeLandmark.title}</div>
               <div style={{fontSize:"14px",color:"#93c5fd",marginBottom:"6px",letterSpacing:"2px"}}>{activeLandmark.category.toUpperCase()}</div>
               <div style={{fontSize:"13px",color:"#999",marginBottom:"32px",maxWidth:"500px",margin:"0 auto 32px",lineHeight:"1.6"}}>
                 {activeLandmark.objective}
@@ -912,7 +927,7 @@ export default function MettlePrototype() {
                 </div>
 
                 <div className={trialCeremonyStep >= 3 ? "trial-stage-live" : "trial-stage-hidden"} style={{fontSize:"30px",fontWeight:"700",color:"#fff",marginBottom:"12px",lineHeight:"1.2",textWrap:"balance"}}>
-                  {pendingTrialData.title}
+                  <span style={s.displayBigTitle}>{pendingTrialData.title}</span>
                 </div>
 
                 <div className={trialCeremonyStep >= 3 ? "trial-stage-live" : "trial-stage-hidden"} style={{fontSize:"12px",letterSpacing:"2px",color:"#8c7a44",marginBottom:"16px",textTransform:"uppercase"}}>
@@ -960,7 +975,7 @@ export default function MettlePrototype() {
                     <span style={s.tag("#e5e7eb")}>{writXp(activeWrit)} XP</span>
                     {modifierXpBonus(activeWrit) > 0 && <span style={s.tag("#fb923c")}>+{modifierXpBonus(activeWrit)} MOD BONUS</span>}
                   </div>
-                  <div style={{fontSize:"34px",fontWeight:"700",color:"#fff",marginBottom:"12px",lineHeight:"1.15",textWrap:"balance"}}>{activeWrit.title}</div>
+                  <div style={{...s.displayBigTitle,marginBottom:"12px",textWrap:"balance"}}>{activeWrit.title}</div>
                   <div style={{fontSize:"12px",letterSpacing:"2px",color:"#8c7a44",marginBottom:"18px",textTransform:"uppercase"}}>{activeTrialPrompt(activeWrit)}</div>
                   <div style={{margin:"0 auto 18px",maxWidth:"680px",border:"1px solid rgba(212,175,55,0.18)",background:"linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.00) 100%)",padding:"18px 18px 16px"}}>
                     <div style={{fontSize:"10px",letterSpacing:"4px",color:"#a3a3a3",marginBottom:"10px",textTransform:"uppercase"}}>Objective</div>
@@ -997,7 +1012,7 @@ export default function MettlePrototype() {
                   <span style={s.tag("#555")}>{writXp(activeWrit)} XP</span>
                   {modifierXpBonus(activeWrit) > 0 && <span style={s.tag("#fb923c")}>+{modifierXpBonus(activeWrit)} MOD BONUS</span>}
                 </div>
-                <div style={{fontSize:"22px",fontWeight:"700",color:"#fff",marginBottom:"8px"}}>{activeWrit.title}</div>
+                <div style={{...s.displayCardTitle,marginBottom:"8px"}}>{activeWrit.title}</div>
                 <div style={{fontSize:"13px",color:"#999",marginBottom: (activeWrit.modifier || activeWrit.trialModifier) ? "8px" : "20px"}}>{activeWrit.objective}</div>
                 {activeWrit.modifier && (
                   <div style={{display:"flex",gap:"8px",marginBottom:"12px",flexWrap:"wrap"}}>
@@ -1048,6 +1063,7 @@ export default function MettlePrototype() {
                           : `${draftStatus.toUpperCase()} · ${draftSizeFromStatus(draftStatus)} OPTIONS · UNCHOSEN WRITS GONE PERMANENTLY`}
                       </div>
                       <button style={{...s.btn(true),padding:"14px 48px",fontSize:"14px",letterSpacing:"4px",
+                        fontFamily:displayFont,
                         ...(pendingTrial ? {background:"#d4af37",color:"#000",borderColor:"#d4af37"} : {})
                       }} onClick={drawWrits}>
                         {pendingTrial ? "⚔ FACE THE TRIAL" : "DRAW WRITS"}
@@ -1086,7 +1102,7 @@ export default function MettlePrototype() {
                           {draftMode === "final_trial" && <span style={s.tag("#d4af37")}>FINAL TRIAL</span>}
                           {w.modifier && <span style={s.tag("#fb923c")}>⚡ MODIFIED</span>}
                         </div>
-                        <div style={{fontSize:"16px",fontWeight:"700",color:"#fff",marginBottom:"8px"}}>{w.title}</div>
+                        <div style={{...s.displayCardTitle,fontSize:"18px",marginBottom:"8px"}}>{w.title}</div>
                         <div style={{fontSize:"12px",color:"#888",marginBottom:w.modifier?"6px":"14px",lineHeight:"1.5"}}>{w.objective}</div>
                         {w.modifier && (
                           <div style={{fontSize:"11px",color:"#fb923c",marginBottom:"10px",padding:"4px 8px",background:"#1a1008",border:"1px solid #3d2a08"}}>
@@ -1152,6 +1168,23 @@ export default function MettlePrototype() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {showQuestCapePrompt && !activeWrit && !trialPhase && currentDraft.length === 0 && !activeFork && !activeLandmark && (
+            <div style={{border:"1px solid #1e3a5f",background:"#0d1117",padding:"12px 14px",marginBottom:"20px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
+                <div>
+                  <div style={{fontSize:"11px",color:"#93c5fd",letterSpacing:"2px",marginBottom:"6px"}}>LATE-GAME LANDMARK</div>
+                  <div style={{fontSize:"13px",color:"#fff",fontWeight:"700",marginBottom:"4px"}}>Quest Cape</div>
+                  <div style={{fontSize:"11px",color:"#64748b",maxWidth:"460px"}}>
+                    Wise Old Man can&apos;t confirm full quest completion, so this milestone is marked manually once you&apos;ve actually earned it.
+                  </div>
+                </div>
+                <button style={s.btn(false,"#172554","#93c5fd")} onClick={triggerQuestCapeLandmark}>
+                  MARK QUEST CAPE
+                </button>
+              </div>
             </div>
           )}
 

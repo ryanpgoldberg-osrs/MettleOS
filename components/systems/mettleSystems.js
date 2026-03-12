@@ -1,4 +1,6 @@
 import {
+  KEY_BOSSES,
+  MAX_METTLE_XP,
   METTLE_UNLOCKS,
   RECKONING_CATEGORIES,
   TIER_GATES,
@@ -40,7 +42,7 @@ export function xpToLevel(xp) {
 
 export function xpForLevel(level) {
   if (level <= 1) return 0;
-  if (level >= 99) return 67000;
+  if (level >= 99) return MAX_METTLE_XP;
   for (let i = 1; i < XP_BREAKPOINTS.length; i++) {
     const prev = XP_BREAKPOINTS[i - 1];
     const curr = XP_BREAKPOINTS[i];
@@ -49,7 +51,7 @@ export function xpForLevel(level) {
       return Math.floor(prev.xp + t * (curr.xp - prev.xp));
     }
   }
-  return 67000;
+  return MAX_METTLE_XP;
 }
 
 export function levelProgressPct(xp) {
@@ -144,6 +146,10 @@ function computeWeight(writ, skillLevels, bossKC, completedIds, suppressedIds, m
   const gaps = gapScores(skillLevels);
   const maxGap = Math.max(...Object.values(gaps));
   const combatAvg = (skillLevels.attack + skillLevels.strength + skillLevels.defence) / 3;
+  const touchedBosses = KEY_BOSSES.filter(boss => (bossKC[boss] ?? 0) > 0).length;
+  const totalBossKC = KEY_BOSSES.reduce((sum, boss) => sum + (bossKC[boss] ?? 0), 0);
+  const freshBossingAccount = touchedBosses === 0;
+  const earlyBossingAccount = touchedBosses > 0 && touchedBosses <= 4;
 
   let weight = 1;
   if (writ.category === "Skill Gap" && maxGap > 0.10) weight *= 2 + maxGap * 5;
@@ -151,6 +157,21 @@ function computeWeight(writ, skillLevels, bossKC, completedIds, suppressedIds, m
   if (writ.category === "Quest") weight *= 2;
   if (writ.category === "Endurance") weight *= 1.2;
   if (writ.category === "Economic") weight *= 0.8;
+
+  if (writ.category === "PvM Intro" || writ.category === "PvM Endurance") {
+    if (freshBossingAccount) {
+      weight *= writ.category === "PvM Intro" ? 3 : 0.35;
+      if (writ.difficulty === "Hard") weight *= 0.75;
+      if (writ.difficulty === "Elite") weight *= 0.55;
+    } else if (earlyBossingAccount) {
+      weight *= writ.category === "PvM Intro" ? 1.8 : 0.75;
+    } else if (touchedBosses >= 12) {
+      weight *= writ.category === "PvM Endurance" ? 1.25 : 0.9;
+    }
+
+    if (combatAvg < 70 && writ.tier !== "Guthix") weight *= 0.8;
+    if (totalBossKC >= 100 && writ.category === "PvM Endurance") weight *= 1.15;
+  }
 
   const bossMap = { g_pvm_2: "obor", g_pvm_3: "bryophyta" };
   if (bossMap[writ.id]) {
@@ -164,6 +185,11 @@ function computeWeight(writ, skillLevels, bossKC, completedIds, suppressedIds, m
     if (kc === 0) weight *= 3;
     else if (kc <= 5) weight *= 2;
     else if (kc > 20) weight *= 0.5;
+  }
+  if (writ.id === "z_pvm_14") {
+    const untouchedBosses = KEY_BOSSES.filter(boss => (bossKC[boss] ?? 0) === 0).length;
+    if (untouchedBosses > 0) weight *= 1.6 + Math.min(untouchedBosses / 40, 0.8);
+    if (freshBossingAccount) weight *= 0.8;
   }
   return Math.max(0.1, weight);
 }
