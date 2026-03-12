@@ -1,923 +1,44 @@
 "use client";
-import { useState, useEffect } from "react";
-
-const SKILLS = [
-  "attack","strength","defence","ranged","magic","prayer",
-  "runecrafting","construction","hitpoints","agility","herblore",
-  "thieving","crafting","fletching","slayer","hunter","mining",
-  "smithing","fishing","cooking","firemaking","woodcutting","farming","sailing"
-];
-
-const KEY_BOSSES = [
-  "abyssal_sire","alchemical_hydra","amoxliatl","araxxor","artio",
-  "barrows_chests","brutus","bryophyta","callisto","calvarion",
-  "cerberus","chambers_of_xeric","chambers_of_xeric_challenge_mode",
-  "chaos_elemental","chaos_fanatic","commander_zilyana","corporeal_beast",
-  "crazy_archaeologist","dagannoth_prime","dagannoth_rex","dagannoth_supreme",
-  "deranged_archaeologist","doom_of_mokhaiotl","duke_sucellus","general_graardor",
-  "giant_mole","grotesque_guardians","hespori","kalphite_queen",
-  "king_black_dragon","kraken","kreearra","kril_tsutsaroth","lunar_chests",
-  "mimic","nex","nightmare","phosanis_nightmare","obor","phantom_muspah",
-  "sarachnis","scorpia","scurrius","shellbane_gryphon","skotizo","sol_heredit",
-  "spindel","tempoross","the_corrupted_gauntlet","the_gauntlet","the_hueycoatl",
-  "the_leviathan","the_royal_titans","the_whisperer","theatre_of_blood",
-  "theatre_of_blood_hard_mode","thermonuclear_smoke_devil","tombs_of_amascut",
-  "tombs_of_amascut_expert","tzkal_zuk","tztok_jad","vardorvis","venenatis",
-  "vetion","vorkath","wintertodt","yama","zalcano","zulrah"
-];
-
-const GUTHIX_BOSSES = ["obor","bryophyta","giant_mole","sarachnis","barrows_chests","chaos_fanatic","crazy_archaeologist","scorpia"];
-const SKILLING = ["runecrafting","construction","agility","herblore","thieving","crafting","fletching","hunter","mining","smithing","fishing","cooking","firemaking","woodcutting","farming","sailing"];
-const PRODUCTION = ["herblore","crafting","fletching","smithing","cooking","firemaking"];
-
-// Bosses ranked by difficulty (hardest first) for dynamic trial resolution
-const BOSS_BANDS = [
-  ["tzkal_zuk","sol_heredit","the_whisperer"],
-  ["the_leviathan","duke_sucellus","vardorvis"],
-  ["nex","nightmare","phosanis_nightmare"],
-  ["the_corrupted_gauntlet","the_gauntlet"],
-  ["tombs_of_amascut_expert","tombs_of_amascut"],
-  ["theatre_of_blood_hard_mode","theatre_of_blood"],
-  ["chambers_of_xeric_challenge_mode","chambers_of_xeric"],
-  ["alchemical_hydra","cerberus","grotesque_guardians","thermonuclear_smoke_devil"],
-  ["vorkath","zulrah","araxxor","phantom_muspah"],
-  ["corporeal_beast","kalphite_queen","commander_zilyana","general_graardor","kreearra","kril_tsutsaroth"],
-  ["dagannoth_prime","dagannoth_rex","dagannoth_supreme"],
-  ["sarachnis","giant_mole","barrows_chests","obor","bryophyta"]
-];
-
-// Returns the hardest untouched boss within a randomized difficulty band
-function hardestUntouchedBoss(bossKC) {
-  for (const band of BOSS_BANDS) {
-    const untouched = band.filter(b => (bossKC[b] ?? 0) === 0);
-    if (untouched.length > 0) return untouched[Math.floor(Math.random() * untouched.length)];
-  }
-  return BOSS_BANDS[0][0];
-}
-
-// Roll a modifier for a writ during draft (30-40% chance)
-function rollModifier(writ) {
-  if (Math.random() > 0.35) return null; // ~35% chance
-  let pool;
-  if (["PvM Intro","PvM Endurance"].includes(writ.category)) pool = COMBAT_MODIFIERS;
-  else if (["Skill Gap","Economic"].includes(writ.category)) pool = SKILLING_MODIFIERS;
-  else if (["Endurance"].includes(writ.category)) pool = [...SKILLING_MODIFIERS, ...ACCOUNT_MODIFIERS];
-  else if (["Quest","Exploration"].includes(writ.category)) pool = ACCOUNT_MODIFIERS;
-  else pool = ACCOUNT_MODIFIERS;
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-const XP_BREAKPOINTS = [
-  { xp:0,     level:1  },
-  { xp:2000,  level:20 },
-  { xp:7000,  level:40 },
-  { xp:17000, level:60 },
-  { xp:37000, level:80 },
-  { xp:67000, level:99 },
-];
-
-// ─────────────────────────────────────────────
-// MODIFIER POOLS (for Reckoning Writs)
-// ─────────────────────────────────────────────
-const COMBAT_MODIFIERS = ["No food","No overhead prayers","Gear cap (max Rune)","Inventory limit (16 slots)","Time limit (15 min)","No potions","No special attacks","Protection prayers disabled","No safespots","Weapon locked after entering fight","Must equip one cosmetic item","Max 1 teleport item"];
-const SKILLING_MODIFIERS = ["No teleporting","No banking","Ironman-style gathering","Limited inventory (16 slots)","Tool downgrade (steel tier)","No stamina potions","Must process gathered resources","Randomized resource order"];
-const ACCOUNT_MODIFIERS = ["Must complete in one session","Must stream the attempt","Viewer-chosen gear","Hardcore attempt (fail = reset)","Complete within 2 hours","Random equipment slot locked"];
-
-const REMOVE_MODIFIER_COST = 3;
-const REROLL_COST = 2;
-const EXTRA_CHOICE_COST = 5;
-
-const METTLE_UNLOCKS = [
-  { level: 10, unlock: "Trials" },
-  { level: 20, unlock: "Draft (3 options)" },
-  { level: 40, unlock: "Endurance Writs" },
-  { level: 60, unlock: "Elite modifiers" },
-  { level: 80, unlock: "Mythic pressure" },
-];
-
-const TIER_SEAL_REWARDS = { Guthix: 1, Saradomin: 2, Bandos: 3, Zamorak: 4, Zaros: 5 };
-
-function getModifierForCategory(category, severity) {
-  let pool;
-  if (["PvM Intro","PvM Endurance"].includes(category)) pool = COMBAT_MODIFIERS;
-  else if (["Skill Gap","Economic"].includes(category)) pool = SKILLING_MODIFIERS;
-  else if (["Endurance"].includes(category)) pool = [...SKILLING_MODIFIERS, ...ACCOUNT_MODIFIERS];
-  else pool = [...ACCOUNT_MODIFIERS, ...SKILLING_MODIFIERS];
-
-  // Higher severity = pick from harder end of pool
-  const idx = Math.min(Math.floor(severity * pool.length * 0.6), pool.length - 1);
-  return pool[idx];
-}
-
-function sealsForWrit(writ) {
-  return TIER_SEAL_REWARDS[writ?.tier] ?? 1;
-}
-
-function modifierXpBonus(writ) {
-  if (!writ) return 0;
-  const modifierCount = (writ.modifier ? 1 : 0) + (writ.trialModifier ? 1 : 0);
-  if (modifierCount === 0) return 0;
-  return Math.max(25, Math.round((writ.xp ?? 0) * 0.25 * modifierCount));
-}
-
-function writXp(writ) {
-  return (writ?.xp ?? 0) + modifierXpBonus(writ);
-}
-
-function streakSealBonus(streak) {
-  if (streak > 0 && streak % 10 === 0) return 5;
-  if (streak > 0 && streak % 5 === 0) return 2;
-  if (streak > 0 && streak % 3 === 0) return 1;
-  return 0;
-}
-
-function unlockedFeatures(level) {
-  return METTLE_UNLOCKS.filter(x => level >= x.level);
-}
-
-// ─────────────────────────────────────────────
-// DYNAMIC OBJECTIVE HELPERS
-// ─────────────────────────────────────────────
-
-function lowestSkill(skillLevels, exclude = []) {
-  return [...SKILLS]
-    .filter(s => !exclude.includes(s))
-    .sort((a,b) => skillLevels[a] - skillLevels[b])[0];
-}
-
-function lowestNSkills(skillLevels, n, onlySkilling = false) {
-  const pool = onlySkilling ? SKILLING : SKILLS;
-  return [...pool].sort((a,b) => skillLevels[a] - skillLevels[b]).slice(0, n);
-}
-
-function lowestProductionSkill(skillLevels) {
-  return [...PRODUCTION].sort((a,b) => skillLevels[a] - skillLevels[b])[0];
-}
-
-function lowestKCBoss(bossKC, eligibleBosses) {
-  const zeroes = eligibleBosses.filter(b => (bossKC[b] ?? 0) === 0);
-  if (zeroes.length > 0) return zeroes[Math.floor(Math.random() * zeroes.length)];
-  return eligibleBosses.sort((a,b) => (bossKC[a]??0) - (bossKC[b]??0))[0];
-}
-
-function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-function bossLabel(b) { return b.replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase()); }
-function skillLabel(s) { return cap(s); }
-
-function resolveObjective(writ, skillLevels, bossKC) {
-  if (writ.objectiveFn) return writ.objectiveFn(skillLevels, bossKC);
-  return writ.objective;
-}
-
-function resolveTitle(writ, skillLevels, bossKC) {
-  if (writ.titleFn) return writ.titleFn(skillLevels, bossKC);
-  return writ.title;
-}
-
-function meetsRequirements(writ, skillLevels, bossKC) {
-  if (writ.requiresFn) return writ.requiresFn(skillLevels, bossKC);
-  return true;
-}
-
-// ─────────────────────────────────────────────
-// WRIT POOL — all 5 tiers
-// ─────────────────────────────────────────────
-const WRIT_POOL = [
-
-  // ══════════════ GUTHIX ══════════════
-
-  // Trials — dynamically resolved against account state
-  { id:"trial_10", category:"Trial", tier:"Guthix", triggerLevel:10, difficulty:"Hard", xp:500, repeatable:false, trial:true,
-    trialPool: ["obor","bryophyta","scurrius","giant_mole"],
-    titleFn: (_s, kc) => { const pool=["obor","bryophyta","scurrius","giant_mole"]; const target=pool.filter(b=>(kc[b]??0)===0); const boss=target.length>0?target[Math.floor(Math.random()*target.length)]:pool[0]; return `Trial of Mettle: ${bossLabel(boss)}`; },
-    title:"Trial of Mettle: First Real Boss",
-    objectiveFn: (_s, kc) => { const pool=["obor","bryophyta","scurrius","giant_mole"]; const target=pool.filter(b=>(kc[b]??0)===0); const boss=target.length>0?target[Math.floor(Math.random()*target.length)]:pool[0]; return `Defeat ${bossLabel(boss)} — your first real boss test. ${(kc[boss]??0)} KC. Non-skippable.`; },
-    objective:"Defeat an entry-level boss. Non-skippable." },
-  { id:"trial_20", category:"Trial", tier:"Guthix", triggerLevel:20, difficulty:"Hard", xp:600, repeatable:false, trial:true,
-    titleFn: (_s, kc) => { const pool=GUTHIX_BOSSES; const sorted=[...pool].sort((a,b)=>(kc[a]??0)-(kc[b]??0)); return `Trial of Mettle: ${bossLabel(sorted[0])}`; },
-    title:"Trial of Mettle: Guthix Endurance",
-    objectiveFn: (_s, kc) => { const pool=GUTHIX_BOSSES; const sorted=[...pool].sort((a,b)=>(kc[a]??0)-(kc[b]??0)); const boss=sorted[0]; return `Kill ${bossLabel(boss)} 3 times — your lowest KC Guthix boss at ${kc[boss]??0} KC. Non-skippable.`; },
-    objective:"Endurance test against your weakest Guthix-tier boss. Non-skippable." },
-
-  // PvM Intro (8)
-  { id:"g_pvm_1", title:"Barrows Initiate",  category:"PvM Intro", tier:"Guthix", difficulty:"Medium", xp:200, repeatable:false,
-    requiresFn: (_s, kc) => (kc.barrows_chests ?? 0) === 0,
-    objective:"Complete one full Barrows run" },
-  { id:"g_pvm_2", title:"Giant's Awakening", category:"PvM Intro", tier:"Guthix", difficulty:"Medium", xp:150, repeatable:false,
-    requiresFn: (_s, kc) => (kc.obor ?? 0) === 0,
-    objective:"Defeat Obor" },
-  { id:"g_pvm_3", title:"Mossbreaker",        category:"PvM Intro", tier:"Guthix", difficulty:"Medium", xp:150, repeatable:false,
-    requiresFn: (_s, kc) => (kc.bryophyta ?? 0) === 0,
-    objective:"Defeat Bryophyta" },
-  { id:"g_pvm_4", title:"Dungeon Descent",    category:"PvM Intro", tier:"Guthix", difficulty:"Easy",   xp:100, repeatable:false, objective:"Kill a boss inside Taverley Dungeon" },
-  { id:"g_pvm_5", title:"First Slayer Boss",  category:"PvM Intro", tier:"Guthix", difficulty:"Easy",   xp:75,  repeatable:false, objective:"Defeat any Slayer boss once" },
-  { id:"g_pvm_6", title:"Giant Slayer",        category:"PvM Intro", tier:"Guthix", difficulty:"Easy",   xp:75,  repeatable:true,  objective:"Kill 50 hill giants or moss giants" },
-  { id:"g_pvm_7", title:"Barrows Endurance",  category:"PvM Endurance", tier:"Guthix", difficulty:"Hard", xp:400, repeatable:true, objective:"Complete three Barrows runs" },
-  { id:"g_pvm_8",
-    titleFn: (_s, kc) => { const b = lowestKCBoss(kc, GUTHIX_BOSSES); return `First Blood: ${bossLabel(b)}`; },
-    title:"Boss Hunter",
-    category:"PvM Intro", tier:"Guthix", difficulty:"Medium", xp:200, repeatable:true,
-    objectiveFn: (_s, kc) => { const b = lowestKCBoss(kc, GUTHIX_BOSSES); return `Kill ${bossLabel(b)} — you have 0 KC. Face it.`; },
-    objective:"Kill any boss you have 0 KC on" },
-
-  // Quest (7)
-  { id:"g_q_1", title:"The Forgotten Path",  category:"Quest", tier:"Guthix", difficulty:"Medium", xp:200, repeatable:true,  objective:"Complete 3 unfinished quests" },
-  { id:"g_q_2", title:"Knowledge Seeker",    category:"Quest", tier:"Guthix", difficulty:"Easy",   xp:100, repeatable:true,  objective:"Gain 10 quest points" },
-  { id:"g_q_3", title:"Guild Access",         category:"Exploration", tier:"Guthix", difficulty:"Easy", xp:75, repeatable:false, objective:"Unlock a new guild" },
-  { id:"g_q_4", title:"Ancient Knowledge",   category:"Quest", tier:"Guthix", difficulty:"Medium", xp:200, repeatable:false, objective:"Complete a quest that unlocks a spellbook" },
-  { id:"g_q_5", title:"Mastery of Travel",   category:"Quest", tier:"Guthix", difficulty:"Easy",   xp:100, repeatable:false, objective:"Complete a quest that unlocks a major teleport method" },
-  { id:"g_q_6", title:"Story of Balance",    category:"Quest", tier:"Guthix", difficulty:"Medium", xp:150, repeatable:false, objective:"Complete a Guthix-aligned quest" },
-  { id:"g_q_7", title:"Unfinished Business", category:"Quest", tier:"Guthix", difficulty:"Easy",   xp:75,  repeatable:false, objective:"Complete the oldest incomplete quest on your account" },
-
-  // Skill Gap (10)
-  { id:"g_sk_1",
-    titleFn: (s) => `Weakest Link: ${skillLabel(lowestSkill(s))}`,
-    title:"Weakest Link",
-    category:"Skill Gap", tier:"Guthix", difficulty:"Easy", xp:75, repeatable:true,
-    objectiveFn: (s) => { const sk = lowestSkill(s); return `Gain 3 levels in ${skillLabel(sk)} (your lowest skill at ${s[sk]})`; },
-    objective:"Gain 3 levels in your lowest skill" },
-
-  { id:"g_sk_2",
-    titleFn: (s) => { const skills = lowestNSkills(s, 5); return `Balanced Growth: ${skills.map(skillLabel).join(", ")}`; },
-    title:"Balanced Growth",
-    category:"Skill Gap", tier:"Guthix", difficulty:"Easy", xp:100, repeatable:true,
-    objectiveFn: (s) => { const skills = lowestNSkills(s, 5); return `Gain 1 level in each: ${skills.map(k => `${skillLabel(k)} (${s[k]})`).join(", ")}`; },
-    objective:"Gain 1 level in five different skills" },
-
-  { id:"g_sk_3",
-    titleFn: (s) => `Artisan's Trial: ${skillLabel(lowestProductionSkill(s))}`,
-    title:"Artisan's Trial",
-    category:"Skill Gap", tier:"Guthix", difficulty:"Medium", xp:150, repeatable:true,
-    objectiveFn: (s) => { const sk = lowestProductionSkill(s); return `Gain 5 levels in ${skillLabel(sk)} — your lowest production skill at ${s[sk]}`; },
-    objective:"Gain 5 levels in any production skill" },
-
-  { id:"g_sk_4",  title:"Gatherer's Path",      category:"Skill Gap", tier:"Guthix", difficulty:"Easy",   xp:75,  repeatable:true,  objective:"Collect 500 of any raw resource" },
-  { id:"g_sk_5",  title:"The Grind Begins",     category:"Endurance", tier:"Guthix", difficulty:"Easy",   xp:75,  repeatable:true,  objective:"Train any skill for one continuous hour" },
-  { id:"g_sk_6",  title:"Tool Upgrade",          category:"Skill Gap", tier:"Guthix", difficulty:"Easy",   xp:75,  repeatable:false, objective:"Craft or acquire an upgraded skilling tool" },
-  { id:"g_sk_7",  title:"Artisan Contract",     category:"Skill Gap", tier:"Guthix", difficulty:"Easy",   xp:100, repeatable:true,  objective:"Produce 100 items of any craftable" },
-
-  { id:"g_sk_8",
-    titleFn: (s) => `Skill Breakthrough: ${skillLabel(lowestSkill(s))}`,
-    title:"Skill Breakthrough",
-    category:"Skill Gap", tier:"Guthix", difficulty:"Medium", xp:150, repeatable:true,
-    objectiveFn: (s) => { const sk = lowestSkill(s); const avg = accountAverage(s); return `Raise ${skillLabel(sk)} above your account average (currently ${s[sk]} vs avg ${avg.toFixed(0)})`; },
-    objective:"Raise a skill above your account average" },
-
-  { id:"g_sk_9",
-    titleFn: (s) => { const sk = lowestSkill(s, ["attack","strength","defence","hitpoints","ranged","magic","prayer","slayer"]); return `Neglected: ${skillLabel(sk)}`; },
-    title:"Neglected Discipline",
-    category:"Skill Gap", tier:"Guthix", difficulty:"Medium", xp:150, repeatable:true,
-    objectiveFn: (s) => { const sk = lowestSkill(s, ["attack","strength","defence","hitpoints","ranged","magic","prayer","slayer"]); return `Train ${skillLabel(sk)} by 5 levels — your lowest non-combat skill at ${s[sk]}`; },
-    objective:"Train your lowest non-combat skill by 5 levels" },
-
-  { id:"g_sk_10", title:"Economic Insight", category:"Economic", tier:"Guthix", difficulty:"Easy", xp:100, repeatable:true, objective:"Earn 250k GP from skilling" },
-
-  // Exploration (5)
-  { id:"g_ex_1", title:"The Deep",         category:"Exploration", tier:"Guthix", difficulty:"Easy",   xp:75,  repeatable:false, objective:"Enter Kalphite Lair" },
-  { id:"g_ex_2", title:"Frozen Frontier",  category:"Exploration", tier:"Guthix", difficulty:"Easy",   xp:75,  repeatable:false, objective:"Reach God Wars Dungeon" },
-  { id:"g_ex_3", title:"Ancient Treasure", category:"Exploration", tier:"Guthix", difficulty:"Medium", xp:150, repeatable:true,  objective:"Open 5 clue scroll caskets" },
-  { id:"g_ex_4", title:"The Unknown",      category:"Exploration", tier:"Guthix", difficulty:"Easy",   xp:75,  repeatable:true,  objective:"Visit three areas you have never entered before" },
-  { id:"g_ex_5", title:"Merchant's Trial", category:"Economic",   tier:"Guthix", difficulty:"Easy",   xp:100, repeatable:true,  objective:"Flip or trade items for profit" },
-
-  // Endurance (5)
-  { id:"g_en_1", title:"Slayer's Commitment", category:"Endurance", tier:"Guthix", difficulty:"Easy",   xp:100, repeatable:true, objective:"Complete two Slayer tasks in a row" },
-  { id:"g_en_2", title:"Dungeon Marathon",    category:"Endurance", tier:"Guthix", difficulty:"Medium", xp:200, repeatable:true, objective:"Kill 200 monsters in a single dungeon" },
-  { id:"g_en_3", title:"Focused Training",    category:"Endurance", tier:"Guthix", difficulty:"Medium", xp:150, repeatable:true, objective:"Train one skill for 90 uninterrupted minutes" },
-  { id:"g_en_4", title:"Resource Run",        category:"Endurance", tier:"Guthix", difficulty:"Medium", xp:150, repeatable:true, objective:"Gather 1000 resources of any type" },
-  { id:"g_en_5", title:"Hunter's Path",       category:"Endurance", tier:"Guthix", difficulty:"Medium", xp:200, repeatable:true, objective:"Kill 300 monsters without leaving an area" },
-
-  // ══════════════ SARADOMIN ══════════════
-
-  { id:"trial_30", category:"Trial", tier:"Saradomin", triggerLevel:30, difficulty:"Hard", xp:700, repeatable:false, trial:true,
-    titleFn: (_s, kc) => { const pool=["tztok_jad","barrows_chests","scorpia","chaos_fanatic"]; const zero=pool.filter(b=>(kc[b]??0)===0); if(zero.includes("tztok_jad")) return "Trial of Mettle: The Fire Cape"; const boss=zero.length>0?zero[0]:pool[0]; return `Trial of Mettle: ${bossLabel(boss)}`; },
-    title:"Trial of Mettle: Saradomin Proving",
-    objectiveFn: (_s, kc) => { const pool=["tztok_jad","barrows_chests","scorpia","chaos_fanatic"]; const zero=pool.filter(b=>(kc[b]??0)===0); if(zero.includes("tztok_jad")) return "Obtain the Fire Cape from TzTok-Jad. Non-skippable."; const boss=zero.length>0?zero[0]:pool[0]; return `Defeat ${bossLabel(boss)} — untouched at ${kc[boss]??0} KC. Non-skippable.`; },
-    objective:"A Saradomin-tier proving. Non-skippable." },
-  { id:"trial_40", category:"Trial", tier:"Saradomin", triggerLevel:40, difficulty:"Hard", xp:800, repeatable:false, trial:true,
-    titleFn: (_s, kc) => { const pool=["zulrah","dagannoth_rex","dagannoth_prime","dagannoth_supreme","sarachnis"]; const zero=pool.filter(b=>(kc[b]??0)===0); if(zero.includes("zulrah")) return "Trial of Mettle: First Zulrah Kill"; const boss=zero.length>0?zero[0]:pool[0]; return `Trial of Mettle: ${bossLabel(boss)}`; },
-    title:"Trial of Mettle: Mechanical Boss",
-    objectiveFn: (_s, kc) => { const pool=["zulrah","dagannoth_rex","dagannoth_prime","dagannoth_supreme","sarachnis"]; const zero=pool.filter(b=>(kc[b]??0)===0); if(zero.includes("zulrah")) return "Kill Zulrah for the first time. Non-skippable."; const boss=zero.length>0?zero[0]:pool[0]; return `Kill ${bossLabel(boss)} — ${kc[boss]??0} KC. Non-skippable.`; },
-    objective:"Mechanical boss introduction. Non-skippable." },
-
-  { id:"s_pvm_1",  title:"The Gauntlet Begins",     category:"PvM Intro",     tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, requiresFn:(_,kc)=>(kc.barrows_chests??0)<5, objective:"Complete 5 Barrows runs total" },
-  { id:"s_pvm_2",  title:"First Blood (Dagannoth)",  category:"PvM Intro",     tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, requiresFn:(_,kc)=>(kc.dagannoth_rex??0)===0||(kc.dagannoth_prime??0)===0||(kc.dagannoth_supreme??0)===0, objective:"Kill a Dagannoth Rex, Prime, or Supreme" },
-  { id:"s_pvm_3",  title:"Sarachnis Awakens",        category:"PvM Intro",     tier:"Saradomin", difficulty:"Medium", xp:200, repeatable:false, requiresFn:(_,kc)=>(kc.sarachnis??0)===0, objective:"Defeat Sarachnis" },
-  { id:"s_pvm_4",  title:"Mole Hunter",               category:"PvM Intro",     tier:"Saradomin", difficulty:"Easy",   xp:150, repeatable:false, requiresFn:(_,kc)=>(kc.giant_mole??0)===0, objective:"Defeat the Giant Mole" },
-  { id:"s_pvm_5",  title:"Scorpia's Domain",          category:"PvM Intro",     tier:"Saradomin", difficulty:"Medium", xp:200, repeatable:false, requiresFn:(_,kc)=>(kc.scorpia??0)===0, objective:"Defeat Scorpia" },
-  { id:"s_pvm_6",  title:"Chaos Fanatic",              category:"PvM Intro",     tier:"Saradomin", difficulty:"Easy",   xp:150, repeatable:false, requiresFn:(_,kc)=>(kc.chaos_fanatic??0)===0, objective:"Defeat the Chaos Fanatic" },
-  { id:"s_pvm_7",  title:"Crazy Archaeologist",        category:"PvM Intro",     tier:"Saradomin", difficulty:"Easy",   xp:150, repeatable:false, requiresFn:(_,kc)=>(kc.crazy_archaeologist??0)===0, objective:"Defeat the Crazy Archaeologist" },
-  { id:"s_pvm_8",  title:"Slayer Escalation",          category:"PvM Endurance", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true,  objective:"Complete 5 Slayer tasks in a row without skipping" },
-  { id:"s_pvm_9",  title:"The King's Court",           category:"PvM Intro",     tier:"Saradomin", difficulty:"Hard",   xp:400, repeatable:false, objective:"Obtain any Barrows item" },
-  { id:"s_pvm_10", title:"Wilderness Contract",        category:"PvM Intro",     tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:true,  objective:"Kill any wilderness boss once" },
-
-  { id:"s_q_1", title:"The Long Road",        category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:false, objective:"Reach 200 quest points" },
-  { id:"s_q_2", title:"Dragon Slayer",         category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, objective:"Complete Dragon Slayer I" },
-  { id:"s_q_3", title:"Legends Bound",         category:"Quest", tier:"Saradomin", difficulty:"Hard",   xp:400, repeatable:false, objective:"Complete Legends' Quest" },
-  { id:"s_q_4", title:"Piety Unlocked",        category:"Quest", tier:"Saradomin", difficulty:"Hard",   xp:400, repeatable:false, objective:"Complete the quest chain to unlock Piety" },
-  { id:"s_q_5", title:"Desert Treasure I",     category:"Quest", tier:"Saradomin", difficulty:"Hard",   xp:450, repeatable:false, objective:"Complete Desert Treasure I" },
-  { id:"s_q_6", title:"The Last Wish",         category:"Quest", tier:"Saradomin", difficulty:"Hard",   xp:400, repeatable:true,  objective:"Complete a quest with a Master difficulty rating" },
-  { id:"s_q_7", title:"Story of Order",        category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, objective:"Complete a Saradomin-aligned quest" },
-  { id:"s_q_8", title:"Breadth of Knowledge", category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true,  objective:"Complete 5 quests you have never attempted" },
-
-  { id:"s_sk_1",
-    titleFn: (s) => { const skills = lowestNSkills(s,2,true); return `Close the Gap: ${skills.map(skillLabel).join(" & ")}`; },
-    title:"Closing the Distance",
-    category:"Skill Gap", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true,
-    objectiveFn: (s) => { const avg = accountAverage(s); const skills = lowestNSkills(s,2,true); return `Raise ${skills.map(k=>`${skillLabel(k)} (${s[k]})`).join(" and ")} above your account average of ${avg.toFixed(0)}`; },
-    objective:"Raise two skills above your account average" },
-
-  { id:"s_sk_2",
-    titleFn: (s) => { const sk = lowestSkill(s); return `The Long Grind: ${skillLabel(sk)}`; },
-    title:"The Long Grind",
-    category:"Skill Gap", tier:"Saradomin", difficulty:"Hard", xp:400, repeatable:true,
-    objectiveFn: (s) => { const sk = [...SKILLS].filter(x=>s[x]<70).sort((a,b)=>s[a]-s[b])[0] || lowestSkill(s); return `Reach level 70 in ${skillLabel(sk)} (currently ${s[sk]})`; },
-    requiresFn: (s) => SKILLS.some(sk => s[sk] < 70),
-    objective:"Reach level 70 in any skill currently below 70" },
-
-  { id:"s_sk_3",  title:"Artisan's Discipline",   category:"Skill Gap", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true,  objective:"Gain 10 levels across production skills in one session" },
-  { id:"s_sk_4",  title:"Fisher's Trial",         category:"Skill Gap", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, requiresFn:(s)=>s.fishing<65, objective:"Reach 65 Fishing" },
-  { id:"s_sk_5",  title:"The Alchemist",          category:"Economic",  tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:true,  objective:"Earn 500k GP from any non-combat skilling method" },
-  { id:"s_sk_6",  title:"Runecraft Reckoning",    category:"Skill Gap", tier:"Saradomin", difficulty:"Hard",   xp:400, repeatable:false, requiresFn:(s)=>s.runecrafting<50, objective:"Gain 5 Runecrafting levels" },
-  { id:"s_sk_7",  title:"Farmer's Debt",          category:"Skill Gap", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, requiresFn:(s)=>s.farming<65,      objective:"Reach 65 Farming" },
-  { id:"s_sk_8",  title:"Forged in Fire",         category:"Skill Gap", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:false, requiresFn:(s)=>s.smithing<70,     objective:"Reach 70 Smithing" },
-  { id:"s_sk_9",  title:"The Disciplined Mind",   category:"Endurance", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:true,  objective:"Train the same skill 3 sessions in a row" },
-
-  { id:"s_sk_10",
-    titleFn: (s) => { const skills = lowestNSkills(s,3,true); return `Convergence: ${skills.map(skillLabel).join(", ")}`; },
-    title:"Skill Convergence",
-    category:"Skill Gap", tier:"Saradomin", difficulty:"Hard", xp:400, repeatable:true,
-    objectiveFn: (s) => { const skills = lowestNSkills(s,3,true); return `Bring ${skills.map(k=>`${skillLabel(k)} (${s[k]})`).join(", ")} within 10 levels of each other`; },
-    objective:"Bring your three lowest skills within 10 levels of each other" },
-
-  { id:"s_en_1", title:"The Long Watch",       category:"Endurance", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true, objective:"Complete a 2-hour uninterrupted grind session" },
-  { id:"s_en_2", title:"Slayer Marathon",      category:"Endurance", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true, objective:"Complete 10 Slayer tasks total" },
-  { id:"s_en_3", title:"Boss Endurance",       category:"Endurance", tier:"Saradomin", difficulty:"Hard",   xp:400, repeatable:true, objective:"Kill the same boss 10 times in one session" },
-  { id:"s_en_4", title:"The Sustained Effort", category:"Endurance", tier:"Saradomin", difficulty:"Hard",   xp:450, repeatable:true, objective:"Earn 1M GP in a single session without dying" },
-  { id:"s_en_5", title:"Resource Hoarder",     category:"Endurance", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true, objective:"Gather 5000 resources of any single type" },
-  { id:"s_en_6", title:"Dungeon Delve",        category:"Endurance", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true, objective:"Kill 500 monsters in dungeons total" },
-  { id:"s_en_7", title:"The Unflinching",      category:"Endurance", tier:"Saradomin", difficulty:"Hard",   xp:450, repeatable:true, objective:"Complete any boss 3 times in a row without dying" },
-
-  { id:"s_ex_1", title:"The Ancestral Path", category:"Exploration", tier:"Saradomin", difficulty:"Hard",   xp:450, repeatable:false, objective:"Complete Desert Treasure I to unlock Ancient Magicks" },
-  { id:"s_ex_2", title:"Raid Recon",          category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, requiresFn:(_,kc)=>(kc.chambers_of_xeric??0)===0, objective:"Enter the Chambers of Xeric for the first time" },
-  { id:"s_ex_3", title:"Fairy Network",       category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, objective:"Complete the quest chain to unlock the fairy ring network" },
-  { id:"s_ex_4", title:"The God Wars",        category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, objective:"Enter God Wars Dungeon and kill any enemy inside" },
-  { id:"s_ex_5", title:"Spirit Realm",        category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, objective:"Complete the quest chain to unlock the Spirit Tree network" },
-
-  // ══════════════ BANDOS ══════════════
-
-  { id:"trial_50", category:"Trial", tier:"Bandos", triggerLevel:50, difficulty:"Hard", xp:900, repeatable:false, trial:true,
-    titleFn: (s, kc) => { const pool=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana"]; const zero=pool.filter(b=>(kc[b]??0)===0); if(zero.length>0) return `Trial of Mettle: ${bossLabel(zero[0])}`; return "Trial of Mettle: Dragon Slayer II"; },
-    title:"Trial of Mettle: Bandos Proving",
-    objectiveFn: (s, kc) => { const pool=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana"]; const zero=pool.filter(b=>(kc[b]??0)===0); if(zero.length>0) return `Kill ${bossLabel(zero[0])} for the first time — the God Wars demand your presence. Non-skippable.`; return "Complete Dragon Slayer II. Non-skippable."; },
-    objective:"A Bandos-tier proving. Non-skippable." },
-  { id:"trial_60", category:"Trial", tier:"Bandos", triggerLevel:60, difficulty:"Elite", xp:1000, repeatable:false, trial:true,
-    titleFn: (_s, kc) => { if((kc.chambers_of_xeric??0)===0) return "Trial of Mettle: First Raid"; const gwd=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana"]; const low=[...gwd].sort((a,b)=>(kc[a]??0)-(kc[b]??0))[0]; return `Trial of Mettle: ${bossLabel(low)} Endurance`; },
-    title:"Trial of Mettle: First Raid",
-    objectiveFn: (_s, kc) => { if((kc.chambers_of_xeric??0)===0) return "Complete Chambers of Xeric. Your first full raid. Non-skippable."; const gwd=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana"]; const low=[...gwd].sort((a,b)=>(kc[a]??0)-(kc[b]??0))[0]; return `Kill ${bossLabel(low)} 10 times in one session (${kc[low]??0} KC). Non-skippable.`; },
-    objective:"First raid or GWD endurance. Non-skippable." },
-
-  { id:"b_pvm_1",  title:"Dagannoth Dynasty",   category:"PvM Intro",     tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, requiresFn:(_,kc)=>(kc.dagannoth_rex??0)<3, objective:"Kill all three Dagannoth Kings" },
-  { id:"b_pvm_2",  title:"The Spider's Web",    category:"PvM Endurance", tier:"Bandos", difficulty:"Medium", xp:350, repeatable:true,  objective:"Kill Sarachnis 10 times" },
-  { id:"b_pvm_3",  title:"Mole Infestation",    category:"PvM Endurance", tier:"Bandos", difficulty:"Easy",   xp:250, repeatable:true,  objective:"Kill the Giant Mole 5 times" },
-  { id:"b_pvm_4",  title:"Bandos Foothold",     category:"PvM Intro",     tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, requiresFn:(_,kc)=>(kc.general_graardor??0)===0, objective:"Get your first kill at General Graardor" },
-  { id:"b_pvm_5",  title:"Armadyl Rising",      category:"PvM Intro",     tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, requiresFn:(_,kc)=>(kc.kreearra??0)===0, objective:"Get your first kill at Kree'arra" },
-  { id:"b_pvm_6",  title:"Zamorak's General",   category:"PvM Intro",     tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, requiresFn:(_,kc)=>(kc.kril_tsutsaroth??0)===0, objective:"Get your first kill at K'ril Tsutsaroth" },
-  { id:"b_pvm_7",  title:"Saradomin's Champion",category:"PvM Intro",     tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, requiresFn:(_,kc)=>(kc.commander_zilyana??0)===0, objective:"Get your first kill at Commander Zilyana" },
-  { id:"b_pvm_8",  title:"Barrows Regular",     category:"PvM Endurance", tier:"Bandos", difficulty:"Medium", xp:350, repeatable:true,  objective:"Complete 10 Barrows runs total" },
-  { id:"b_pvm_9",  title:"Wilderness Warlord",  category:"PvM Intro",     tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:true,  objective:"Kill 3 different wilderness bosses (mandatory from Bandos tier)" },
-  { id:"b_pvm_10", title:"Slayer Milestone",    category:"PvM Endurance", tier:"Bandos", difficulty:"Medium", xp:350, repeatable:false, objective:"Reach 500 total Slayer kills" },
-  { id:"b_pvm_11", title:"The Nightmare Begins",category:"PvM Intro",     tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, requiresFn:(_,kc)=>(kc.zulrah??0)===0, objective:"Attempt Zulrah for the first time if not yet done" },
-  { id:"b_pvm_12", title:"Sustained Assault",   category:"PvM Endurance", tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:true,
-    titleFn:(_,kc)=>{ const gwd=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana"]; const target=[...gwd].sort((a,b)=>(kc[a]??0)-(kc[b]??0))[0]; return `Sustained Assault: ${bossLabel(target)}`; },
-    objectiveFn:(_,kc)=>{ const gwd=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana"]; const target=[...gwd].sort((a,b)=>(kc[a]??0)-(kc[b]??0))[0]; return `Kill ${bossLabel(target)} 5 times in one session (${kc[target]??0} KC)`; },
-    objective:"Kill any GWD boss 5 times in one session" },
-
-  { id:"b_q_1", title:"Monkey See",          category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, objective:"Complete Monkey Madness I or II" },
-  { id:"b_q_2", title:"Recipe for Disaster", category:"Quest", tier:"Bandos", difficulty:"Elite",  xp:700, repeatable:false, objective:"Complete Recipe for Disaster" },
-  { id:"b_q_3", title:"The Fremennik",       category:"Quest", tier:"Bandos", difficulty:"Medium", xp:350, repeatable:false, objective:"Complete The Fremennik Trials" },
-  // FIX: removed incorrect requiresFn that was checking prayer level against QP value
-  { id:"b_q_4", title:"225 Quest Points",    category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, objective:"Reach 225 quest points" },
-  { id:"b_q_5", title:"The Grand History",   category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:true,  objective:"Complete 3 Master-difficulty quests" },
-  { id:"b_q_6", title:"Bandos Allegiance",   category:"Quest", tier:"Bandos", difficulty:"Medium", xp:350, repeatable:false, objective:"Complete a quest tied to Bandos lore" },
-  { id:"b_q_7", title:"The Slayer Codex",    category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, requiresFn:(s)=>s.slayer<80, objective:"Reach 80 Slayer" },
-  { id:"b_q_8", title:"Master of Chains",    category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:true,  objective:"Complete an entire quest series from start to finish" },
-
-  { id:"b_sk_1",  title:"Combat Ready",
-    category:"Skill Gap", tier:"Bandos", difficulty:"Hard", xp:500, repeatable:false,
-    titleFn:(s)=>{ const combatSkills=["attack","strength","defence","ranged","magic"]; const low=[...combatSkills].sort((a,b)=>s[a]-s[b])[0]; return `Combat Ready: ${skillLabel(low)}`; },
-    objectiveFn:(s)=>{ const combatSkills=["attack","strength","defence","ranged","magic"]; const low=[...combatSkills].sort((a,b)=>s[a]-s[b])[0]; return `Reach 90 in ${skillLabel(low)} (currently ${s[low]})`; },
-    requiresFn:(s)=>["attack","strength","defence","ranged","magic"].some(sk=>s[sk]<90),
-    objective:"Reach 90 in any combat stat" },
-  { id:"b_sk_2",  title:"The Disciplined Crafter", category:"Skill Gap", tier:"Bandos", difficulty:"Medium", xp:350, repeatable:false,
-    titleFn:(s)=>{ const sk=lowestProductionSkill(s); return `Disciplined: ${skillLabel(sk)}`; },
-    objectiveFn:(s)=>{ const sk=lowestProductionSkill(s); return `Reach 75 in ${skillLabel(sk)} — your lowest production skill at ${s[sk]}`; },
-    requiresFn:(s)=>PRODUCTION.some(sk=>s[sk]<75), objective:"Reach 75 in any production skill" },
-  { id:"b_sk_3",  title:"Runecraft Reckoning II", category:"Skill Gap", tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, requiresFn:(s)=>s.runecrafting<65, objective:"Reach 65 Runecrafting" },
-  { id:"b_sk_4",  title:"Fisher King",           category:"Skill Gap", tier:"Bandos", difficulty:"Medium", xp:350, repeatable:false, requiresFn:(s)=>s.fishing<76,      objective:"Reach 76 Fishing" },
-  { id:"b_sk_5",  title:"The Sustained Miner",   category:"Endurance", tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:true,  objective:"Mine 2000 ore total" },
-  { id:"b_sk_6",  title:"Smith or Die",          category:"Skill Gap", tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:true,  objective:"Smith 500 bars total" },
-  { id:"b_sk_7",  title:"Herblore Discipline",   category:"Skill Gap", tier:"Bandos", difficulty:"Medium", xp:350, repeatable:false, requiresFn:(s)=>s.herblore<70, objective:"Reach 70 Herblore" },
-  { id:"b_sk_8",  title:"Woodcutter's Burden",   category:"Skill Gap", tier:"Bandos", difficulty:"Medium", xp:350, repeatable:false, requiresFn:(s)=>s.woodcutting<75, objective:"Reach 75 Woodcutting" },
-  { id:"b_sk_9",  title:"Economic Discipline",   category:"Economic",  tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:true,  objective:"Earn 2M GP through non-combat methods" },
-  { id:"b_sk_10", title:"Skill Mastery",
-    category:"Skill Gap", tier:"Bandos", difficulty:"Hard", xp:500, repeatable:true,
-    titleFn:(s)=>{ const sk=[...SKILLS].filter(x=>s[x]<80).sort((a,b)=>s[a]-s[b])[0]; return sk?`Skill Mastery: ${skillLabel(sk)}`:"Skill Mastery"; },
-    objectiveFn:(s)=>{ const sk=[...SKILLS].filter(x=>s[x]<80).sort((a,b)=>s[a]-s[b])[0]; return sk?`Reach level 80 in ${skillLabel(sk)} (currently ${s[sk]})`:"Reach level 80 in any skill currently below 80"; },
-    requiresFn:(s)=>SKILLS.some(sk=>s[sk]<80), objective:"Reach level 80 in any skill currently below 80" },
-
-  { id:"b_en_1", title:"The Iron Will",       category:"Endurance", tier:"Bandos", difficulty:"Hard",  xp:500, repeatable:true, objective:"Complete a 3-hour uninterrupted grind session" },
-  { id:"b_en_2", title:"Slayer Dedicated",    category:"Endurance", tier:"Bandos", difficulty:"Medium",xp:350, repeatable:true, objective:"Complete 25 Slayer tasks total" },
-  { id:"b_en_3", title:"Boss Marathon",       category:"Endurance", tier:"Bandos", difficulty:"Hard",  xp:500, repeatable:true, objective:"Kill the same boss 20 times in one session" },
-  { id:"b_en_4", title:"The Grind Never Stops",category:"Endurance",tier:"Bandos", difficulty:"Hard",  xp:500, repeatable:true, objective:"Train any skill for 5 hours total across sessions" },
-  { id:"b_en_5", title:"Wilderness Survivor", category:"Endurance", tier:"Bandos", difficulty:"Hard",  xp:500, repeatable:true, objective:"Kill 3 wilderness bosses without dying" },
-  { id:"b_en_6", title:"Sustained Bossing",   category:"Endurance", tier:"Bandos", difficulty:"Hard",  xp:500, repeatable:true, objective:"Kill 3 different bosses in a single session" },
-  { id:"b_en_7", title:"The Unbroken",        category:"Endurance", tier:"Bandos", difficulty:"Hard",  xp:500, repeatable:true, objective:"Complete 5 writs in a row without deferring" },
-
-  { id:"b_ex_1", title:"The Gauntlet Awaits", category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, requiresFn:(_,kc)=>(kc.the_gauntlet??0)===0, objective:"Unlock and enter The Gauntlet" },
-  { id:"b_ex_2", title:"Ancient Arsenal",     category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, objective:"Unlock Ancient Magicks and cast 100 spells" },
-  { id:"b_ex_3", title:"The Slayer Ascent",   category:"Exploration", tier:"Bandos", difficulty:"Medium", xp:350, repeatable:false, objective:"Unlock a new Slayer master" },
-
-  // ══════════════ ZAMORAK ══════════════
-
-  { id:"trial_70", category:"Trial", tier:"Zamorak", triggerLevel:70, difficulty:"Elite", xp:1000, repeatable:false, trial:true,
-    titleFn: (_s, kc) => { const pool=["vorkath","zulrah","cerberus","alchemical_hydra","grotesque_guardians"]; const zero=pool.filter(b=>(kc[b]??0)===0); const boss=zero.length>0?zero[0]:pool[0]; return `Trial of Mettle: ${bossLabel(boss)}`; },
-    title:"Trial of Mettle: Zamorak Proving",
-    trialModifier:"Inventory limit (16 slots)",
-    objectiveFn: (_s, kc) => { const pool=["vorkath","zulrah","cerberus","alchemical_hydra","grotesque_guardians"]; const zero=pool.filter(b=>(kc[b]??0)===0); const boss=zero.length>0?zero[0]:pool[0]; return `Defeat ${bossLabel(boss)} with modifier: Inventory limit (16 slots). ${kc[boss]??0} KC. Non-skippable.`; },
-    objective:"Defeat a Zamorak-tier boss with modifier. Non-skippable." },
-  { id:"trial_80", category:"Trial", tier:"Zamorak", triggerLevel:80, difficulty:"Elite", xp:1200, repeatable:false, trial:true,
-    titleFn:(_,kc)=>{ const b=hardestUntouchedBoss(kc); return `Trial of Mettle: ${bossLabel(b)}`; },
-    title:"Trial of Mettle: Endgame Boss",
-    objectiveFn:(_,kc)=>{ const b=hardestUntouchedBoss(kc); return `Kill ${bossLabel(b)} — the hardest boss you've never touched. ${(kc[b]??0)} KC. Non-skippable.`; },
-    objective:"Hardest uncompleted boss. Non-skippable." },
-
-  { id:"z_pvm_1",  title:"Zulrah Tamed",          category:"PvM Endurance", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Kill Zulrah 10 times" },
-  { id:"z_pvm_2",  title:"Vorkath's Debt",         category:"PvM Intro",     tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:false, requiresFn:(_,kc)=>(kc.vorkath??0)===0, objective:"Kill Vorkath for the first time" },
-  { id:"z_pvm_3",  title:"Vorkath Committed",      category:"PvM Endurance", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Kill Vorkath 10 times" },
-  { id:"z_pvm_4",  title:"Theatre Initiate",       category:"PvM Intro",     tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:false, requiresFn:(_,kc)=>(kc.theatre_of_blood??0)===0, objective:"Complete Theatre of Blood entry mode" },
-  { id:"z_pvm_5",  title:"Chambers Regular",       category:"PvM Endurance", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Complete 5 Chambers of Xeric runs" },
-  { id:"z_pvm_6",  title:"The Grotesque",          category:"PvM Endurance", tier:"Zamorak", difficulty:"Medium", xp:450, repeatable:true,  objective:"Kill Grotesque Guardians 10 times" },
-  { id:"z_pvm_7",  title:"Cerberus Unleashed",     category:"PvM Intro",     tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:false, requiresFn:(_,kc)=>(kc.cerberus??0)===0, objective:"Kill Cerberus for the first time" },
-  { id:"z_pvm_8",  title:"Thermonuclear Trial",    category:"PvM Endurance", tier:"Zamorak", difficulty:"Medium", xp:450, repeatable:true,  objective:"Kill Thermonuclear Smoke Devil 10 times" },
-  { id:"z_pvm_9",  title:"Alchemical Hydra",       category:"PvM Intro",     tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:false, requiresFn:(_,kc)=>(kc.alchemical_hydra??0)===0, objective:"Kill the Alchemical Hydra for the first time" },
-  { id:"z_pvm_10", title:"Zamorak's Wrath",        category:"PvM Endurance", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Kill K'ril Tsutsaroth 20 times" },
-  { id:"z_pvm_11", title:"Wilderness Domination",  category:"PvM Endurance", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Kill 5 different wilderness bosses total" },
-  { id:"z_pvm_12", title:"Modified Combat",        category:"PvM Endurance", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:true,
-    titleFn:(_,kc)=>{ const gwd=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana","vorkath","zulrah","cerberus"]; const target=[...gwd].sort((a,b)=>(kc[a]??0)-(kc[b]??0))[0]; return `Modified Combat: ${bossLabel(target)}`; },
-    objectiveFn:(_,kc)=>{ const gwd=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana","vorkath","zulrah","cerberus"]; const target=[...gwd].sort((a,b)=>(kc[a]??0)-(kc[b]??0))[0]; return `Kill ${bossLabel(target)} with a modifier active (${kc[target]??0} KC)`; },
-    objective:"Complete any hard boss with a modifier active" },
-  { id:"z_pvm_13", title:"The Sustained Killer",   category:"PvM Endurance", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,
-    titleFn:(_,kc)=>{ const gwd=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana"]; const target=[...gwd].sort((a,b)=>(kc[a]??0)-(kc[b]??0))[0]; return `Sustained: ${bossLabel(target)}`; },
-    objectiveFn:(_,kc)=>{ const gwd=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana"]; const target=[...gwd].sort((a,b)=>(kc[a]??0)-(kc[b]??0))[0]; return `Kill ${bossLabel(target)} 3 times in one session (${kc[target]??0} KC)`; },
-    objective:"Kill any GWD boss 3 times in one session" },
-
-  { id:"z_q_1", title:"275 Quest Points",    category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:false, objective:"Reach 275 QP" },
-  { id:"z_q_2", title:"The Grand Library",   category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Complete 5 quests that each unlock a new area or spellbook" },
-  { id:"z_q_3", title:"Zamorak's Path",      category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:false, objective:"Complete a Zamorak-aligned quest chain" },
-  { id:"z_q_4", title:"Recipe Mastered",     category:"Quest", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, objective:"Complete Recipe for Disaster if not already done" },
-  { id:"z_q_5", title:"The Slayer Codex II", category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:false, requiresFn:(s)=>s.slayer<85, objective:"Reach 85 Slayer" },
-  { id:"z_q_6", title:"Master of Quests",    category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Complete every quest in a single skill quest chain" },
-  { id:"z_q_7", title:"The Zamorak Codex",  category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Complete a quest chain with a Zamorak-aligned NPC" },
-  { id:"z_q_8", title:"Master of Quests",    category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Complete every quest in a single skill quest chain" },
-
-  { id:"z_sk_1",
-    titleFn:(s)=>{ const sk=[...SKILLS].filter(x=>s[x]<85).sort((a,b)=>s[a]-s[b])[0]; return sk?`The 85 Club: ${skillLabel(sk)}`:"The 85 Club"; },
-    title:"The 85 Club", category:"Skill Gap", tier:"Zamorak", difficulty:"Hard", xp:600, repeatable:true,
-    objectiveFn:(s)=>{ const sk=[...SKILLS].filter(x=>s[x]<85).sort((a,b)=>s[a]-s[b])[0]; return sk?`Reach 85 in ${skillLabel(sk)} (currently ${s[sk]})`:"Reach 85 in any skill currently below 85"; },
-    requiresFn:(s)=>SKILLS.some(sk=>s[sk]<85), objective:"Reach 85 in any skill currently below 85" },
-  { id:"z_sk_2",  title:"Runecraft Mastery",     category:"Skill Gap", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, requiresFn:(s)=>s.runecrafting<77, objective:"Reach 77 Runecrafting (Blood runes unlocked)" },
-  { id:"z_sk_3",  title:"Herblore Advanced",     category:"Skill Gap", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, requiresFn:(s)=>s.herblore<90,     objective:"Reach 90 Herblore" },
-  { id:"z_sk_4",  title:"Agility Discipline",    category:"Skill Gap", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:false, requiresFn:(s)=>s.agility<80,      objective:"Reach 80 Agility" },
-  { id:"z_sk_5",  title:"The Relentless Grinder",category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Gain 10 levels in a single skill in one week" },
-  { id:"z_sk_6",  title:"Construction Push",     category:"Skill Gap", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, requiresFn:(s)=>s.construction<83, objective:"Reach 83 Construction" },
-  { id:"z_sk_7",  title:"Thieving Mastery",      category:"Skill Gap", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:false, requiresFn:(s)=>s.thieving<85,     objective:"Reach 85 Thieving" },
-  { id:"z_sk_8",  title:"Hunter's Mark",         category:"Skill Gap", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:false, requiresFn:(s)=>s.hunter<80,       objective:"Reach 80 Hunter" },
-  { id:"z_sk_9",
-    title:"Skill Reckoning", category:"Skill Gap", tier:"Zamorak", difficulty:"Elite", xp:800, repeatable:true,
-    objectiveFn:(s)=>{ const below=SKILLS.filter(sk=>s[sk]<70); return below.length>0?`Bring every skill above 70 — still below: ${below.map(skillLabel).join(", ")}`:"Bring every skill above 70"; },
-    requiresFn:(s)=>SKILLS.some(sk=>s[sk]<70), objective:"Bring every skill above 70" },
-  { id:"z_sk_10",
-    titleFn:(s)=>{ const sk=lowestSkill(s); return `Final Gap: ${skillLabel(sk)}`; },
-    title:"The Final Gap", category:"Skill Gap", tier:"Zamorak", difficulty:"Elite", xp:800, repeatable:true,
-    objectiveFn:(s)=>{ const sk=lowestSkill(s); const avg=accountAverage(s); return `Close the largest remaining gap — ${skillLabel(sk)} at ${s[sk]} vs account average ${avg.toFixed(0)}`; },
-    objective:"Close the largest remaining skill gap on your account" },
-
-  { id:"z_en_1", title:"The Long Campaign",    category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true, objective:"Complete 50 Slayer tasks total" },
-  { id:"z_en_2", title:"Chaos Endurance",      category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true, objective:"Kill any Zamorak-aligned boss 30 times total" },
-  { id:"z_en_3", title:"Modified Grind",       category:"Endurance", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:true, objective:"Complete 3 writs with modifiers in a row" },
-  { id:"z_en_4", title:"The Unrelenting",      category:"Endurance", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:true, objective:"Complete a 5-hour grind session" },
-  { id:"z_en_5", title:"Raid Regularity",      category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true, objective:"Complete 10 raids total across any type" },
-  { id:"z_en_6", title:"Wilderness Veteran",   category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true, objective:"Survive 10 wilderness boss kills without dying" },
-  { id:"z_en_7", title:"The Defer Collector",  category:"Endurance", tier:"Zamorak", difficulty:"Medium", xp:450, repeatable:true, objective:"Clear all deferred writs within a single tier" },
-  { id:"z_en_8", title:"Streak Master",        category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true, objective:"Complete 7 writs in a row without deferring" },
-
-  { id:"z_ex_1", title:"Theatre Unlocked",       category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, objective:"Complete Theatre of Blood entry mode with a modifier" },
-  { id:"z_ex_2", title:"Tombs of Amascut",       category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, requiresFn:(_,kc)=>(kc.tombs_of_amascut??0)===0, objective:"Enter and complete Tombs of Amascut for the first time" },
-  { id:"z_ex_3", title:"Slayer Dungeon Deep",    category:"Exploration", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Complete a Slayer task in every major dungeon" },
-  { id:"z_ex_4", title:"Ancient Curses",         category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, objective:"Complete the quest chain to unlock Ancient Curses" },
-  { id:"z_ex_5", title:"Farming Mastery",        category:"Exploration", tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:false, objective:"Unlock the Farming Guild" },
-  { id:"z_ex_6", title:"The Grand Exchange Gamble",category:"Economic",  tier:"Zamorak", difficulty:"Hard",   xp:600, repeatable:true,  objective:"Earn 5M GP through merching or flipping" },
-
-  // ══════════════ ZAROS ══════════════
-
-  { id:"trial_90", category:"Trial", tier:"Zaros", triggerLevel:90, difficulty:"Elite", xp:1500, repeatable:false, trial:true,
-    titleFn:(_,kc)=>{ const b=hardestUntouchedBoss(kc); return `Trial of Mettle: ${bossLabel(b)}`; },
-    title:"Trial of Mettle: Elite Challenge",
-    objectiveFn:(_,kc)=>{ const b=hardestUntouchedBoss(kc); return `Kill ${bossLabel(b)} — the board has spoken. ${(kc[b]??0)} KC. Non-skippable.`; },
-    objective:"Highest-difficulty uncompleted boss. Non-skippable." },
-  { id:"trial_99", title:"The Final Trial", category:"Trial", tier:"Zaros", triggerLevel:99, difficulty:"Elite", xp:2000, repeatable:false, trial:true, finalTrial:true, objective:"The series finale. Your Path is revealed. Five writs drawn. You choose one." },
-
-  { id:"zr_pvm_1",  title:"Vorkath Mastered",    category:"PvM Endurance", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Kill Vorkath 50 times total" },
-  { id:"zr_pvm_2",  title:"Zulrah Mastered",     category:"PvM Endurance", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Kill Zulrah 50 times total" },
-  { id:"zr_pvm_3",  title:"The Nightmare",       category:"PvM Intro",     tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:false, requiresFn:(_,kc)=>(kc.nightmare??0)===0, objective:"Kill the Nightmare for the first time" },
-  { id:"zr_pvm_4",  title:"Nex Awakened",        category:"PvM Intro",     tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:false, requiresFn:(_,kc)=>(kc.nex??0)===0, objective:"Kill Nex for the first time" },
-  { id:"zr_pvm_5",  title:"Phantom Muspah",      category:"PvM Endurance", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Kill Phantom Muspah 10 times" },
-  { id:"zr_pvm_6",  title:"One DT2 Boss",        category:"PvM Endurance", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,
-    titleFn:(_,kc)=>{ const dt2=["vardorvis","duke_sucellus","the_leviathan","the_whisperer"]; const low=[...dt2].sort((a,b)=>(kc[a]??0)-(kc[b]??0))[0]; return `DT2: ${bossLabel(low)}`; },
-    objectiveFn:(_,kc)=>{ const dt2=["vardorvis","duke_sucellus","the_leviathan","the_whisperer"]; const low=[...dt2].sort((a,b)=>(kc[a]??0)-(kc[b]??0))[0]; return `Kill ${bossLabel(low)} 20 times (currently ${kc[low]??0} KC)`; },
-    objective:"Kill any single DT2 boss 20 times (player's choice)" },
-  { id:"zr_pvm_7",  title:"Chambers Master",     category:"PvM Endurance", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Complete Chambers of Xeric 20 times" },
-  { id:"zr_pvm_8",  title:"Theatre Master",      category:"PvM Endurance", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Complete Theatre of Blood 10 times" },
-  { id:"zr_pvm_9",  title:"The Gauntlet",        category:"PvM Endurance", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Complete the Gauntlet or Corrupted Gauntlet" },
-  { id:"zr_pvm_10", title:"Colosseum",           category:"PvM Intro",     tier:"Zaros", difficulty:"Elite",  xp:1200, repeatable:false, requiresFn:(_,kc)=>(kc.sol_heredit??0)===0, objective:"Attempt the Fortis Colosseum" },
-
-  { id:"zr_q_3", title:"The Last Chapter",   category:"Quest",       tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Complete the final quest in any major quest chain" },
-  { id:"zr_q_4", title:"Zaros Ascendant",    category:"Quest",       tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:false, objective:"Complete a quest that unlocks Zaros-aligned content" },
-  { id:"zr_q_5", title:"Quest Cape",         category:"Quest",       tier:"Zaros", difficulty:"Elite",  xp:1500, repeatable:false, landmark:true, objective:"Complete all quests" },
-
-  { id:"zr_sk_1", title:"The 90 Club",
-    category:"Skill Gap", tier:"Zaros", difficulty:"Elite", xp:1000, repeatable:false,
-    titleFn:(s)=>{ const combatSkills=["attack","strength","defence","ranged","magic"]; const low=[...combatSkills].filter(x=>s[x]<90).sort((a,b)=>s[a]-s[b])[0]; return low?`The 90 Club: ${skillLabel(low)}`:"The 90 Club"; },
-    objectiveFn:(s)=>{ const combatSkills=["attack","strength","defence","ranged","magic"]; const below=[...combatSkills].filter(x=>s[x]<90); return below.length>0?`Reach 90 in every combat stat — still below: ${below.map(k=>`${skillLabel(k)} (${s[k]})`).join(", ")}`:"Reach 90 in every combat stat"; },
-    requiresFn:(s)=>["attack","strength","defence","ranged","magic"].some(sk=>s[sk]<90), objective:"Reach 90 in every combat stat" },
-  { id:"zr_sk_2", title:"Completionist's Path", category:"Skill Gap", tier:"Zaros", difficulty:"Elite", xp:1200, repeatable:true,
-    titleFn:(s)=>{ const sk=[...SKILLS].filter(x=>s[x]<99).sort((a,b)=>s[a]-s[b])[0]; return sk?`First 99: ${skillLabel(sk)}`:"First 99"; },
-    objectiveFn:(s)=>{ const sk=[...SKILLS].filter(x=>s[x]<99).sort((a,b)=>s[a]-s[b])[0]; return sk?`Reach level 99 in ${skillLabel(sk)} (currently ${s[sk]})`:"Reach level 99 in any skill"; },
-    objective:"Reach level 99 in any skill" },
-  { id:"zr_sk_3", title:"The Final Discipline",
-    category:"Skill Gap", tier:"Zaros", difficulty:"Elite", xp:1000, repeatable:true,
-    objectiveFn:(s)=>{ const below=SKILLS.filter(sk=>s[sk]<80); return below.length>0?`Raise every skill above 80 — still below: ${below.map(skillLabel).join(", ")}`:"Raise every skill above 80"; },
-    requiresFn:(s)=>SKILLS.some(sk=>s[sk]<80), objective:"Raise every skill above 80" },
-  { id:"zr_sk_4", title:"Runecraft Pinnacle",   category:"Skill Gap", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:false, requiresFn:(s)=>s.runecrafting<91, objective:"Reach 91 Runecrafting" },
-  { id:"zr_sk_5", title:"Herblore Pinnacle",    category:"Skill Gap", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:false, requiresFn:(s)=>s.herblore<94,     objective:"Reach 94 Herblore" },
-  { id:"zr_sk_6", title:"Total Mastery",        category:"Skill Gap", tier:"Zaros", difficulty:"Elite",  xp:1200, repeatable:false, objective:"Reach 1900 total level" },
-  { id:"zr_sk_7", title:"The Last Gap",
-    titleFn:(s)=>{ const sk=lowestSkill(s); return `Last Gap: ${skillLabel(sk)}`; },
-    category:"Skill Gap", tier:"Zaros", difficulty:"Elite", xp:1000, repeatable:true,
-    objectiveFn:(s)=>{ const sk=lowestSkill(s); return `Eliminate the largest remaining gap — ${skillLabel(sk)} at ${s[sk]}`; },
-    objective:"Eliminate the single largest remaining skill gap" },
-
-  { id:"zr_en_1", title:"The Final Campaign",     category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1200, repeatable:true, objective:"Complete 100 Slayer tasks total" },
-  { id:"zr_en_2", title:"Elite Endurance",        category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1200, repeatable:true, objective:"Complete the Corrupted Gauntlet 5 times" },
-  { id:"zr_en_3", title:"Mastery Under Pressure", category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1200, repeatable:true, objective:"Complete 3 hard boss writs with modifiers in a row" },
-  { id:"zr_en_4", title:"The Unbreakable",        category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1200, repeatable:true, objective:"Complete 10 writs in a row without deferring" },
-  { id:"zr_en_5", title:"Raid Veteran",           category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1200, repeatable:true, objective:"Complete 50 raids total" },
-
-  { id:"zr_ex_1", title:"The Wilderness Throne", category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Kill Artio, Spindel, and Calvar'ion at least once each" },
-  { id:"zr_ex_2", title:"Elite Diary",           category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Complete any elite achievement diary" },
-  { id:"zr_ex_3", title:"The Final Frontier",    category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Unlock and enter every major endgame area" },
-];
-
-// ─────────────────────────────────────────────
-// FORK WRITS — standalone events, not in draft pool
-// ─────────────────────────────────────────────
-const FORK_WRITS = [
-  { id:"fork_ancient_path", title:"The Ancient Path", tier:"Zamorak", triggerLevel:65, difficulty:"Elite", xp:900, category:"Fork",
-    optionA: { label:"Desert Treasure II", objective:"Complete Desert Treasure II", questId:"dt2" },
-    optionB: { label:"Dragon Slayer II", objective:"Complete Dragon Slayer II", questId:"ds2" },
-  },
-  { id:"fork_elven_choice", title:"The Elven Choice", tier:"Zamorak", triggerLevel:75, difficulty:"Elite", xp:900, category:"Fork",
-    optionA: { label:"Song of the Elves", objective:"Complete Song of the Elves", questId:"sote" },
-    optionB: { label:"Sins of the Father", objective:"Complete Sins of the Father", questId:"sotf" },
-  },
-  { id:"fork_endgame", title:"The Endgame", tier:"Zaros", triggerLevel:85, difficulty:"Elite", xp:1200, category:"Fork",
-    optionA: { label:"Tombs of Amascut (Full)", objective:"Complete Tombs of Amascut in full", questId:"toa" },
-    optionB: { label:"Theatre of Blood (Full)", objective:"Complete Theatre of Blood in full", questId:"tob" },
-  },
-  { id:"fork_final_reckoning", title:"The Final Reckoning", tier:"Zaros", triggerLevel:92, difficulty:"Elite", xp:1500, category:"Fork",
-    optionA: { label:"The Inferno", objective:"Attempt and complete the Inferno", questId:"inferno" },
-    optionB: { label:"The Nightmare", objective:"Kill the Nightmare", questId:"nightmare" },
-  },
-];
-
-function getPendingFork(mettleLevel, completedForks, completedIds) {
-  for (const fork of FORK_WRITS) {
-    if (mettleLevel >= fork.triggerLevel && !completedForks[fork.id]) {
-      return fork;
-    }
-  }
-  return null;
-}
-
-// ─────────────────────────────────────────────
-// LANDMARK WRITS — auto-trigger on condition
-// ─────────────────────────────────────────────
-const LANDMARK_WRITS = [
-  { id:"landmark_first_99", title:"First Level 99", category:"Landmark", tier:"Zaros", difficulty:"Elite", xp:1000,
-    conditionFn: (skills, _kc) => SKILLS.some(s => skills[s] >= 99),
-    objectiveFn: (skills) => { const maxed = SKILLS.filter(s => skills[s] >= 99); return `You have reached 99 in ${maxed.map(skillLabel).join(", ")}. The board acknowledges mastery.`; },
-    objective:"Reach level 99 in any skill." },
-  { id:"landmark_quest_cape", title:"Quest Cape", category:"Landmark", tier:"Zaros", difficulty:"Elite", xp:1500, landmark:true,
-    conditionFn: () => false, // Manual trigger — we can't detect quest completion from WOM API skill data alone
-    objective:"Complete all quests. One of the defining moments of any OSRS account." },
-  { id:"landmark_total_1900", title:"Total Level 1900", category:"Landmark", tier:"Zaros", difficulty:"Elite", xp:1000,
-    conditionFn: (skills) => { const total = Object.values(skills).reduce((a,b) => a+b, 0); return total >= 1900; },
-    objectiveFn: (skills) => { const total = Object.values(skills).reduce((a,b) => a+b, 0); return `Total level ${total} — you've reached the 1900 milestone. The board marks this moment.`; },
-    objective:"Reach 1900 total level." },
-  { id:"landmark_first_raid", title:"First Raid Completion", category:"Landmark", tier:"Bandos", difficulty:"Hard", xp:800,
-    conditionFn: (_s, kc) => (kc.chambers_of_xeric??0) > 0 || (kc.theatre_of_blood??0) > 0 || (kc.tombs_of_amascut??0) > 0,
-    objective:"Complete any raid for the first time. A defining account moment." },
-];
-
-function getPendingLandmark(skillLevels, bossKC, completedLandmarks) {
-  for (const lm of LANDMARK_WRITS) {
-    if (completedLandmarks.includes(lm.id)) continue;
-    if (lm.conditionFn && lm.conditionFn(skillLevels, bossKC)) {
-      return {
-        ...lm,
-        objective: lm.objectiveFn ? lm.objectiveFn(skillLevels, bossKC) : lm.objective,
-      };
-    }
-  }
-  return null;
-}
-
-// ─────────────────────────────────────────────
-// FINAL TRIAL PATH SYSTEM (Level 99)
-// ─────────────────────────────────────────────
-function computePath(history) {
-  const cats = { pvm:0, scholar:0, survivor:0 };
-  for (const h of history) {
-    if (h.category === "PvM Intro" || h.category === "PvM Endurance") cats.pvm++;
-    else if (h.category === "Quest" || h.category === "Skill Gap") cats.scholar++;
-    else if (h.category === "Endurance" || h.category === "Exploration") cats.survivor++;
-  }
-  const max = Math.max(cats.pvm, cats.scholar, cats.survivor);
-  if (max === 0) return "Balanced";
-  const dominant = Object.entries(cats).filter(([_,v]) => v === max);
-  if (dominant.length > 1) return "Balanced";
-  if (dominant[0][0] === "pvm") return "Warrior";
-  if (dominant[0][0] === "scholar") return "Scholar";
-  return "Survivor";
-}
-
-const FINAL_TRIAL_POOLS = {
-  Warrior: [
-    { id:"ft_w1", title:"Inferno Bound",     objective:"Complete the Inferno (attempts allowed)", xp:2000 },
-    { id:"ft_w2", title:"Nex Undying",        objective:"Kill Nex 5 times", xp:1800 },
-    { id:"ft_w3", title:"Solo Raid",           objective:"Complete Chambers of Xeric solo", xp:2000 },
-    { id:"ft_w4", title:"DT2 Sweep",          objective:"Kill all four DT2 bosses in one session", xp:1800 },
-    { id:"ft_w5", title:"Theatre Veteran",     objective:"Complete Theatre of Blood regular mode", xp:1600 },
-    { id:"ft_w6", title:"Vorkath Capped",      objective:"Kill Vorkath 10 times with a gear cap modifier", xp:1500 },
-    { id:"ft_w7", title:"Colosseum Final",     objective:"Complete the Fortis Colosseum", xp:2000 },
-    { id:"ft_w8", title:"GWD Legacy",          objective:"Kill any GWD boss 50 times total", xp:1500 },
-  ],
-  Scholar: [
-    { id:"ft_s1", title:"Quest Cape",          objective:"Achieve Quest Cape (if not already a Landmark)", xp:2000 },
-    { id:"ft_s2", title:"Elite Region",        objective:"Complete all elite achievement diaries in one region", xp:1800 },
-    { id:"ft_s3", title:"Skill Pinnacle",      objective:"Reach level 99 in your lowest skill at Guthix tier", xp:2000 },
-    { id:"ft_s4", title:"Modified Mastery",    objective:"Complete every quest in a major quest chain with a modifier", xp:1800 },
-    { id:"ft_s5", title:"Total 1900",          objective:"Reach 1900 total level (if not yet done)", xp:1600 },
-    { id:"ft_s6", title:"Ancient Complete",    objective:"Complete both DT2 and DS2", xp:1500 },
-    { id:"ft_s7", title:"The Long Arc",        objective:"Max any skill that was below account average when the series began", xp:1800 },
-    { id:"ft_s8", title:"Five Masters",        objective:"Complete 5 Master-difficulty quests total", xp:1500 },
-  ],
-  Survivor: [
-    { id:"ft_sv1", title:"Slayer Century",      objective:"Complete 100 Slayer tasks total", xp:1800 },
-    { id:"ft_sv2", title:"Wilderness Clean",    objective:"Kill 10 wilderness bosses without dying in a single session", xp:2000 },
-    { id:"ft_sv3", title:"Gauntlet Mastered",   objective:"Complete the Corrupted Gauntlet (attempts allowed)", xp:2000 },
-    { id:"ft_sv4", title:"Raid Half-Century",   objective:"Complete 50 raids total", xp:1800 },
-    { id:"ft_sv5", title:"Modified Streak",     objective:"Complete any hard boss 20 times with a modifier across the run", xp:1500 },
-    { id:"ft_sv6", title:"Elite Wilderness",    objective:"Complete an elite diary in a wilderness-adjacent region", xp:1600 },
-    { id:"ft_sv7", title:"Wilderness Sweep",    objective:"Kill every wilderness boss at least once", xp:1800 },
-    { id:"ft_sv8", title:"Flawless Ten",        objective:"Complete 10 writs in a row without failure or debt", xp:1500 },
-  ],
-  Balanced: [
-    { id:"ft_b1", title:"Warrior's Remnant",    objective:"Highest-weight uncompleted PvM writ on the account", xp:1800 },
-    { id:"ft_b2", title:"Scholar's Remnant",    objective:"Highest-weight uncompleted Quest/Skill writ on the account", xp:1800 },
-    { id:"ft_b3", title:"Survivor's Remnant",   objective:"Highest-weight uncompleted Endurance writ on the account", xp:1800 },
-    { id:"ft_b4", title:"The Wildcard I",       objective:"Highest remaining skill gap — algorithmically identified", xp:1600 },
-    { id:"ft_b5", title:"The Wildcard II",      objective:"Hardest untouched boss on the account — algorithmically identified", xp:2000 },
-    { id:"ft_b6", title:"The Long Debt",        objective:"Clear any remaining debt writs from the entire run", xp:1500 },
-    { id:"ft_b7", title:"The Open Road",        objective:"Complete any 3 writs from any tier pool", xp:1500 },
-    { id:"ft_b8", title:"The Reckoning",        objective:"Complete any 1 writ from each of the other three pools", xp:1800 },
-  ],
-};
-
-function generateFinalTrialDraft(path) {
-  const pool = [...(FINAL_TRIAL_POOLS[path] || FINAL_TRIAL_POOLS.Balanced)];
-  const selected = [];
-  for (let i = 0; i < 5 && pool.length > 0; i++) {
-    const idx = Math.floor(Math.random() * pool.length);
-    selected.push({ ...pool[idx], category:"Final Trial", tier:"Zaros", difficulty:"Elite", trial:true, finalTrial:true });
-    pool.splice(idx, 1);
-  }
-  return selected;
-}
-// ─────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────
-function accountAverage(skillLevels) {
-  const vals = Object.values(skillLevels);
-  return vals.reduce((a,b) => a+b, 0) / vals.length;
-}
-function xpToLevel(xp) {
-  for (let i = 1; i < XP_BREAKPOINTS.length; i++) {
-    const prev = XP_BREAKPOINTS[i-1], curr = XP_BREAKPOINTS[i];
-    if (xp < curr.xp) { const t=(xp-prev.xp)/(curr.xp-prev.xp); return Math.floor(prev.level+t*(curr.level-prev.level)); }
-  }
-  return 99;
-}
-function xpForLevel(level) {
-  if (level<=1) return 0; if (level>=99) return 67000;
-  for (let i=1; i<XP_BREAKPOINTS.length; i++) {
-    const prev=XP_BREAKPOINTS[i-1], curr=XP_BREAKPOINTS[i];
-    if (level>=prev.level&&level<=curr.level) { const t=(level-prev.level)/(curr.level-prev.level); return Math.floor(prev.xp+t*(curr.xp-prev.xp)); }
-  }
-  return 67000;
-}
-function levelProgressPct(xp) {
-  const level=xpToLevel(xp); if(level>=99) return 100;
-  const cur=xpForLevel(level),next=xpForLevel(level+1);
-  return Math.round(((xp-cur)/(next-cur))*100);
-}
-function tierForLevel(l) {
-  if(l<=20) return "Guthix"; if(l<=40) return "Saradomin";
-  if(l<=60) return "Bandos"; if(l<=80) return "Zamorak"; return "Zaros";
-}
-const TIER_ORDER = ["Guthix","Saradomin","Bandos","Zamorak","Zaros"];
-const TIER_GATES = [20, 40, 60, 80]; // levels where defer + reckoning must be cleared
-
-function gapScores(skillLevels) {
-  const avg=accountAverage(skillLevels); const scores={};
-  Object.entries(skillLevels).forEach(([s,l])=>{ scores[s]=Math.max(0,(avg-l)/avg); });
-  return scores;
-}
-
-// ─── DRAFT STATUS
-function getDebtStatus(debtWrits, mustClearAll, streak, favoredDrawsRemaining) {
-  if (mustClearAll) return "blocked";
-  if (debtWrits.length >= 1) return "cursed";
-  if ((favoredDrawsRemaining ?? 0) > 0) return "favored";
-  if (streak >= 15) return "hot_streak";
-  return "normal";
-}
-function draftSizeFromStatus(status) {
-  if (status === "cursed") return 2;
-  if (status === "favored") return 5;
-  if (status === "hot_streak") return 4;
-  return 3;
-}
-
-// ─── TRIAL CHECK: returns the next trial that should auto-trigger, or null
-function getPendingTrial(mettleLevel, completedIds) {
-  const trials = WRIT_POOL.filter(w => w.trial);
-  // Find the lowest-level uncompleted trial that we've reached or passed
-  for (const t of trials.sort((a,b) => a.triggerLevel - b.triggerLevel)) {
-    if (mettleLevel >= t.triggerLevel && !completedIds.includes(t.id)) {
-      return t;
-    }
-  }
-  return null;
-}
-
-// ─── RECKONING: generate a reckoning writ for a category
-const RECKONING_CATEGORIES = ["PvM Intro","PvM Endurance","Quest","Skill Gap","Endurance","Exploration","Economic"];
-
-function generateReckoningWrit(category, reckoningCount, mettleLevel, skillLevels, bossKC) {
-  // Find a writ from that category in or below the current tier to base the reckoning on
-  const currentTier = tierForLevel(mettleLevel);
-  const eligible = WRIT_POOL.filter(w =>
-    !w.trial && (w.category === category || (category === "PvM Intro" && w.category === "PvM Endurance") || (category === "PvM Endurance" && w.category === "PvM Intro")) &&
-    TIER_ORDER.indexOf(w.tier) <= TIER_ORDER.indexOf(currentTier) &&
-    meetsRequirements(w, skillLevels, bossKC)
-  );
-
-  // Pick highest-weight eligible writ as the base
-  let baseWrit = eligible[0];
-  if (eligible.length > 1) {
-    const idx = Math.floor(Math.random() * Math.min(3, eligible.length));
-    baseWrit = eligible[idx];
-  }
-
-  const severity = Math.min(reckoningCount, 3); // 1, 2, or 3+
-  const xpMultiplier = severity === 1 ? 1.5 : severity === 2 ? 2 : 3;
-  const modifier = getModifierForCategory(category, (severity - 1) / 2);
-  const baseXP = baseWrit ? baseWrit.xp : 300;
-  const baseObjective = baseWrit ? resolveObjective(baseWrit, skillLevels, bossKC) : `Complete a ${category} challenge`;
-
-  return {
-    id: `reckoning_${category}_${Date.now()}`,
-    title: `Reckoning: ${category}`,
-    category,
-    tier: currentTier,
-    difficulty: severity >= 3 ? "Elite" : severity >= 2 ? "Hard" : "Medium",
-    xp: Math.round(baseXP * xpMultiplier),
-    modifier,
-    reckoning: true,
-    reckoningCount: severity,
-    objective: `${baseObjective} — MODIFIER: ${modifier}`,
-  };
-}
-
-// ─── WEIGHTING
-function computeWeight(writ, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel) {
-  if (writ.trial) return 0;
-  if (!writ.repeatable && completedIds.includes(writ.id)) return 0;
-  if (suppressedIds.includes(writ.id)) return 0;
-  if (!meetsRequirements(writ, skillLevels, bossKC)) return 0;
-
-  if (TIER_ORDER.indexOf(writ.tier) > TIER_ORDER.indexOf(tierForLevel(mettleLevel))) return 0;
-
-  const gaps = gapScores(skillLevels);
-  const maxGap = Math.max(...Object.values(gaps));
-  const combatAvg = (skillLevels.attack+skillLevels.strength+skillLevels.defence)/3;
-
-  let w = 1;
-  if (writ.category==="Skill Gap" && maxGap>0.10) w *= (2 + maxGap * 5);
-  if ((writ.category==="PvM Intro"||writ.category==="PvM Endurance") && combatAvg>85) w *= 3;
-  if (writ.category==="Quest")     w *= 2;
-  if (writ.category==="Endurance") w *= 1.2;
-  if (writ.category==="Economic")  w *= 0.8;
-
-  const bossMap = { g_pvm_2:"obor", g_pvm_3:"bryophyta" };
-  if (bossMap[writ.id]) {
-    const kc=bossKC[bossMap[writ.id]]??0;
-    if(kc===0) w*=3; else if(kc<=5) w*=2; else if(kc>20) w*=0.5;
-  }
-  if (writ.id==="g_pvm_1"||writ.id==="g_pvm_7") {
-    const kc=bossKC.barrows_chests??0;
-    if(kc===0) w*=3; else if(kc<=5) w*=2; else if(kc>20) w*=0.5;
-  }
-  return Math.max(0.1, w);
-}
-
-function generateDraft(skillLevels, bossKC, completedIds, recentDraftHistory, debtWrits, mettleLevel, requestedSize = null, streak = 0, favoredDrawsRemaining = 0) {
-  const status = getDebtStatus(debtWrits, false, streak, favoredDrawsRemaining);
-  const draftSize = requestedSize ?? draftSizeFromStatus(status);
-  const suppressedIds = recentDraftHistory.flat();
-
-  const weighted = WRIT_POOL
-    .filter(w => !w.trial)
-    .map(w => ({ ...w, weight: computeWeight(w, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel) }))
-    .filter(w => w.weight > 0);
-
-  if (weighted.length===0) return [];
-  const pool=[...weighted]; const selected=[]; const seenObjectives=new Set();
-  for (let i=0; i<Math.min(draftSize,pool.length); i++) {
-    const total=pool.reduce((s,c)=>s+c.weight,0);
-    let rand=Math.random()*total; let idx=0;
-    for(idx=0;idx<pool.length;idx++){rand-=pool[idx].weight;if(rand<=0)break;}
-    idx=Math.min(idx,pool.length-1);
-    const w=pool[idx];
-    const resolved = {
-      ...w,
-      title:    resolveTitle(w, skillLevels, bossKC),
-      objective:resolveObjective(w, skillLevels, bossKC),
-    };
-    // Deduplicate: if two dynamic writs resolve to the same objective, skip and try next
-    if (seenObjectives.has(resolved.objective)) {
-      pool.splice(idx,1);
-      i--; // retry this slot
-      continue;
-    }
-    // Roll modifier (~35% chance on non-trial writs)
-    const mod = rollModifier(w);
-    if (mod) {
-      resolved.modifier = mod;
-      resolved.objective = `${resolved.objective} — MODIFIER: ${mod}`;
-    }
-    seenObjectives.add(resolved.objective);
-    selected.push(resolved);
-    pool.splice(idx,1);
-  }
-  return selected;
-}
-
-// ─────────────────────────────────────────────
-// PERSISTENCE
-// ─────────────────────────────────────────────
-const SAVE_KEY = "mettle_run_v7";
-function loadSave() {
-  if (typeof window==="undefined") return null;
-  try { const raw=localStorage.getItem(SAVE_KEY); return raw?JSON.parse(raw):null; } catch { return null; }
-}
-function writeSave(data) {
-  if (typeof window==="undefined") return;
-  try { localStorage.setItem(SAVE_KEY,JSON.stringify(data)); } catch {}
-}
-
-const DEFAULT_SKILLS = Object.fromEntries(SKILLS.map(s=>[s,1]));
-const DEFAULT_KC     = Object.fromEntries(KEY_BOSSES.map(b=>[b,0]));
-
-const DIFF_COLORS = { Easy:"#4ade80",Medium:"#fbbf24",Hard:"#fb923c",Elite:"#f87171" };
-const TIER_COLORS = { Guthix:"#6ee7b7",Saradomin:"#93c5fd",Bandos:"#fb923c",Zamorak:"#f87171",Zaros:"#d8b4fe" };
-const CAT_COLORS  = {
-  "PvM Intro":"#93c5fd","PvM Endurance":"#818cf8","Quest":"#d8b4fe",
-  "Skill Gap":"#6ee7b7","Endurance":"#fcd34d","Exploration":"#7dd3fc","Economic":"#a3e635",
-  "Fork":"#dc2626","Landmark":"#3b82f6","Final Trial":"#d8b4fe",
-};
-
+import { useEffect, useState } from "react";
+import {
+  CAT_COLORS,
+  DEFAULT_KC,
+  DEFAULT_SKILLS,
+  DIFF_COLORS,
+  EXTRA_CHOICE_COST,
+  
+  KEY_BOSSES,
+  
+  METTLE_UNLOCKS,
+  RECKONING_CATEGORIES,
+  REMOVE_MODIFIER_COST,
+  REROLL_COST,
+  SKILLS,
+  TIER_COLORS,
+  TIER_ORDER,
+  TIER_GATES,
+} from "./data/constants.js";
+import { FORK_WRITS, getPendingFork } from "./data/forkDefs.js";
+import { LANDMARK_WRITS, getPendingLandmark } from "./data/landmarkDefs.js";
+import { WRIT_POOL } from "./data/writPool.js";
+import {
+  computePath,
+  draftSizeFromStatus,
+  generateDraft,
+  generateFinalTrialDraft,
+  generateReckoningWrit,
+  getDebtStatus,
+  getPendingTrial,
+  levelProgressPct,
+  materializeWrit,
+  tierForLevel,
+  unlockedFeatures,
+  xpForLevel,
+  xpToLevel,
+} from "./systems/mettleSystems.js";
+import { modifierXpBonus, sealsForWrit, streakSealBonus, writXp } from "./utils/modifiers.js";
+import { loadSave, SAVE_KEY, writeSave } from "./utils/persistence.js";
+import { accountAverage } from "./utils/skillHelpers.js";
 
 function trialFlavorLine(trial) {
   if (!trial) return "The board has made its judgment.";
@@ -953,6 +74,7 @@ function activeTrialPrompt(trial) {
 // ─────────────────────────────────────────────
 // COMPONENT
 // ─────────────────────────────────────────────
+
 export default function MettlePrototype() {
   const [inputMode,    setInputMode]    = useState("manual");
   const [rsn,          setRsn]          = useState("");
@@ -1121,8 +243,7 @@ export default function MettlePrototype() {
       if (!trialPhase) {
         const resolved = {
           ...pendingTrial,
-          title: resolveTitle(pendingTrial, skillLevels, bossKC),
-          objective: resolveObjective(pendingTrial, skillLevels, bossKC),
+          ...materializeWrit(pendingTrial, skillLevels, bossKC),
         };
         setPendingTrialData(resolved);
         setTrialPhase("approaching");
@@ -1231,7 +352,7 @@ export default function MettlePrototype() {
     });
   }
 
-  function resolveWrit(result) {
+  function resolveActiveWrit(result) {
     if (!activeWrit) return;
     if (activeWrit.trial && result === "defer") return;
     let xpGained=0;
@@ -1626,7 +747,7 @@ export default function MettlePrototype() {
 
           {/* ═══ FORK PRESENTATION ═══ */}
           {forkPhase === "presenting" && activeFork && (
-            <div style={{animation:"trialRevealIn 0.6s ease-out",textAlign:"center",padding:"48px 20px",border:"2px solid #dc2626",background:"radial-gradient(circle at top, rgba(220,38,38,0.12) 0%, rgba(12,12,12,1) 40%)",marginBottom:"20px",animation:"forkPulse 3s infinite"}}>
+            <div style={{animation:"trialRevealIn 0.6s ease-out, forkPulse 3s infinite",textAlign:"center",padding:"48px 20px",border:"2px solid #dc2626",background:"radial-gradient(circle at top, rgba(220,38,38,0.12) 0%, rgba(12,12,12,1) 40%)",marginBottom:"20px"}}>
               <div style={{fontSize:"10px",letterSpacing:"6px",color:"#dc2626",marginBottom:"16px"}}>⚡ FORK WRIT ⚡</div>
               <div style={{fontSize:"26px",fontWeight:"700",color:"#fff",marginBottom:"10px"}}>{activeFork.title}</div>
               <div style={{fontSize:"12px",color:"#666",marginBottom:"32px",maxWidth:"500px",margin:"0 auto 32px",lineHeight:"1.6"}}>
@@ -1657,7 +778,7 @@ export default function MettlePrototype() {
 
           {/* ═══ LANDMARK REVEAL ═══ */}
           {landmarkPhase === "revealed" && activeLandmark && (
-            <div style={{animation:"trialRevealIn 0.6s ease-out",textAlign:"center",padding:"48px 20px",border:"2px solid #3b82f6",background:"radial-gradient(circle at top, rgba(59,130,246,0.12) 0%, rgba(12,12,12,1) 40%)",marginBottom:"20px",animation:"landmarkGlow 3s infinite"}}>
+            <div style={{animation:"trialRevealIn 0.6s ease-out, landmarkGlow 3s infinite",textAlign:"center",padding:"48px 20px",border:"2px solid #3b82f6",background:"radial-gradient(circle at top, rgba(59,130,246,0.12) 0%, rgba(12,12,12,1) 40%)",marginBottom:"20px"}}>
               <div style={{fontSize:"10px",letterSpacing:"6px",color:"#3b82f6",marginBottom:"16px"}}>★ LANDMARK ★</div>
               <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:"80px",height:"80px",border:"1px solid rgba(59,130,246,0.55)",borderRadius:"999px",marginBottom:"16px",boxShadow:"0 0 30px rgba(59,130,246,0.18)"}}>
                 <div style={{fontSize:"32px",color:"#93c5fd",lineHeight:1}}>★</div>
@@ -1698,7 +819,7 @@ export default function MettlePrototype() {
 
           {/* ═══ TRIAL REVEAL SEQUENCE ═══ */}
           {trialPhase === "approaching" && pendingTrialData && (
-            <div style={{animation:"trialRevealIn 0.6s ease-out",textAlign:"center",padding:"60px 20px",border:"1px solid #d4af37",background:"linear-gradient(180deg, #141008 0%, #0c0c0c 100%)",marginBottom:"20px",animation:"trialGlow 2.5s infinite"}}>
+            <div style={{animation:"trialRevealIn 0.6s ease-out, trialGlow 2.5s infinite",textAlign:"center",padding:"60px 20px",border:"1px solid #d4af37",background:"linear-gradient(180deg, #141008 0%, #0c0c0c 100%)",marginBottom:"20px"}}>
               <div style={{fontSize:"10px",letterSpacing:"6px",color:"#d4af37",marginBottom:"24px"}}>⚔ TRIAL OF METTLE ⚔</div>
               <div style={{fontSize:"14px",letterSpacing:"4px",color:"#fbbf24",marginBottom:"12px"}}>LEVEL {pendingTrialData.triggerLevel}</div>
               <div style={{fontSize:"11px",color:"#666",marginBottom:"32px",maxWidth:"400px",margin:"0 auto 32px",lineHeight:"1.6"}}>
@@ -1803,7 +924,7 @@ export default function MettlePrototype() {
                   )}
                   <div style={{width:"180px",height:"1px",margin:"24px auto 0",background:"linear-gradient(90deg, rgba(212,175,55,0) 0%, rgba(212,175,55,0.9) 50%, rgba(212,175,55,0) 100%)"}} />
                   <div style={{display:"flex",justifyContent:"center",gap:"12px",flexWrap:"wrap",marginTop:"28px"}}>
-                    <button style={{...s.btn(false,"#14380f","#4ade80"),padding:"14px 36px",fontSize:"14px",letterSpacing:"3px"}} onClick={()=>resolveWrit("complete")}>
+                    <button style={{...s.btn(false,"#14380f","#4ade80"),padding:"14px 36px",fontSize:"14px",letterSpacing:"3px"}} onClick={()=>resolveActiveWrit("complete")}>
                       ✓ CLEAR TRIAL (+{writXp(activeWrit)} XP)
                     </button>
                   </div>
@@ -1834,10 +955,10 @@ export default function MettlePrototype() {
                   </div>
                 )}
                 <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
-                  <button style={s.btn(false,"#14380f","#4ade80")} onClick={()=>resolveWrit("complete")}>
+                  <button style={s.btn(false,"#14380f","#4ade80")} onClick={()=>resolveActiveWrit("complete")}>
                     ✓ COMPLETE (+{writXp(activeWrit)} XP)
                   </button>
-                  <button style={s.btn(false,"#1a1a0a","#fbbf24")} onClick={()=>resolveWrit("defer")}
+                  <button style={s.btn(false,"#1a1a0a","#fbbf24")} onClick={()=>resolveActiveWrit("defer")}
                     disabled={debtWrits.length>=3}>
                     ⏸ DEFER ({debtWrits.length}/3{debtWrits.length>=3?" — FULL":""})
                     {!activeWrit.trial && categoryDeferCounts[activeWrit.category] >= 2 && " ⚠ RECKONING"}
