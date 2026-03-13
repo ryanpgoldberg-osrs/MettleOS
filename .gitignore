@@ -19,10 +19,15 @@
 
 # production
 /build
+/runelite-plugin/build
+/runelite-plugin/.gradle
+/runelite-plugin/.gradle-home
+/runelite-plugin/.gradle-local
 
 # misc
 .DS_Store
 *.pem
+*.iml
 
 # debug
 npm-debug.log*

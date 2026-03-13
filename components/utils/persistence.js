@@ -1,5 +1,8 @@
+import { createEmptyDiaryState, normalizeDiaryState } from "./accountSync.js";
+import { createEmptyQuestState, normalizeQuestState } from "./questSync.js";
+
 export const SAVE_KEY = "mettle_run_v8";
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 4;
 export const EXPORT_FORMAT_VERSION = 1;
 
 function toInternalSaveShape(parsed) {
@@ -13,6 +16,8 @@ function toInternalSaveShape(parsed) {
     reckoningWrits: parsed.reckoningWrits ?? parsed.reckoningTasks ?? [],
     activeWrit: parsed.activeWrit ?? parsed.activeTask ?? null,
     pendingTrialData: parsed.pendingTrialData ?? parsed.pendingTrialTask ?? null,
+    questState: normalizeQuestState(parsed.questState ?? parsed.questLedger ?? createEmptyQuestState()),
+    diaryState: normalizeDiaryState(parsed.diaryState ?? parsed.achievementDiaryState ?? createEmptyDiaryState()),
   };
 }
 
@@ -79,10 +84,36 @@ function migrateSave(parsed) {
       forkPhase: typeof migrated.forkPhase === "string" ? migrated.forkPhase : null,
       activeLandmark: migrated.activeLandmark ?? null,
       landmarkPhase: typeof migrated.landmarkPhase === "string" ? migrated.landmarkPhase : null,
+      questState: normalizeQuestState(migrated.questState),
+      diaryState: normalizeDiaryState(migrated.diaryState),
     };
   }
 
-  return migrated;
+  if (migrated.saveVersion < 3) {
+    return {
+      ...migrated,
+      saveVersion: SAVE_VERSION,
+      updatedAt: migrated.updatedAt || Date.now(),
+      questState: normalizeQuestState(migrated.questState),
+      diaryState: normalizeDiaryState(migrated.diaryState),
+    };
+  }
+
+  if (migrated.saveVersion < 4) {
+    return {
+      ...migrated,
+      saveVersion: SAVE_VERSION,
+      updatedAt: migrated.updatedAt || Date.now(),
+      questState: normalizeQuestState(migrated.questState),
+      diaryState: normalizeDiaryState(migrated.diaryState),
+    };
+  }
+
+  return {
+    ...migrated,
+    questState: normalizeQuestState(migrated.questState),
+    diaryState: normalizeDiaryState(migrated.diaryState),
+  };
 }
 
 function isLikelyMettleSave(parsed) {
@@ -209,6 +240,8 @@ export function exportSaveData(save) {
     forkPhase,
     activeLandmark,
     landmarkPhase,
+    questState,
+    diaryState,
   } = storedSave;
 
   return {
@@ -257,6 +290,8 @@ export function exportSaveData(save) {
       pendingTrialTask: pendingTrialTask || null,
       activeFork: activeFork || null,
       activeLandmark: activeLandmark || null,
+      questState: questState || createEmptyQuestState(),
+      diaryState: diaryState || createEmptyDiaryState(),
     },
     save: storedSave,
   };

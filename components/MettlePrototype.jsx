@@ -36,9 +36,16 @@ import {
   xpForLevel,
   xpToLevel,
 } from "./systems/mettleSystems.js";
+import {
+  createEmptyDiaryState,
+  parseAccountSyncText,
+  summarizeDiaryState,
+} from "./utils/accountSync.js";
 import { modifierXpBonus, sealsForWrit, streakSealBonus, writXp } from "./utils/modifiers.js";
 import { clearSave, exportSaveData, importSaveText, loadSave, writeSave } from "./utils/persistence.js";
+import { createEmptyQuestState, parseQuestSyncText, summarizeQuestState } from "./utils/questSync.js";
 import { accountAverage } from "./utils/skillHelpers.js";
+import { fetchPlayerSnapshotByRsn } from "./utils/womImport.js";
 
 function trialFlavorLine(trial) {
   if (!trial) return "The ledger has picked the next pressure point.";
@@ -99,6 +106,8 @@ function hasOwn(save, key) {
  *   initialSkillLevels?: Record<string, number> | null,
  *   initialBossKC?: Record<string, number> | null,
  *   initialRsn?: string,
+ *   initialQuestState?: Record<string, unknown> | null,
+ *   initialDiaryState?: Record<string, unknown> | null,
  *   onResetToEntry?: (() => void) | null,
  * }} [props]
  */
@@ -106,6 +115,8 @@ export default function MettlePrototype({
   initialSkillLevels = null,
   initialBossKC = null,
   initialRsn = "",
+  initialQuestState = null,
+  initialDiaryState = null,
   onResetToEntry = null,
 } = {}) {
   const hasInitialStats = Boolean(initialSkillLevels && initialBossKC);
@@ -145,6 +156,7 @@ export default function MettlePrototype({
   const [confirmReset, setConfirmReset] = useState(false);
   const [saveFileMessage, setSaveFileMessage] = useState("");
   const importInputRef = useRef(null);
+  const questSyncInputRef = useRef(null);
 
   // ── RECKONING STATE
   const [categoryDeferCounts, setCategoryDeferCounts] = useState({}); // { "PvM Intro": 2, "Quest": 1 }
@@ -167,6 +179,8 @@ export default function MettlePrototype({
   // ── FINAL TRIAL PATH STATE
   const [assignedPath, setAssignedPath]             = useState(null); // "Warrior" | "Scholar" | "Survivor" | "Balanced"
   const [pathRevealed, setPathRevealed]             = useState(false);
+  const [questState, setQuestState]                 = useState(initialQuestState ?? createEmptyQuestState());
+  const [diaryState, setDiaryState]                 = useState(initialDiaryState ?? createEmptyDiaryState());
 
   // ── LOAD
   useEffect(() => {
@@ -204,15 +218,17 @@ export default function MettlePrototype({
     if(hasOwn(save, "landmarkPhase"))       setLandmarkPhase(save.landmarkPhase);
     if(hasOwn(save, "assignedPath"))        setAssignedPath(save.assignedPath);
     if(hasOwn(save, "pathRevealed"))        setPathRevealed(save.pathRevealed);
+    if(hasOwn(save, "questState"))          setQuestState(save.questState);
+    if(hasOwn(save, "diaryState"))          setDiaryState(save.diaryState);
   }, [hasInitialStats]);
 
   // ── SAVE
   useEffect(() => {
     if(!statsLoaded) return;
     writeSave({
-      skillLevels,bossKC,mettleXP,mettleSeals,streak,completedIds,history,debtWrits,mustClearAll,draftHistory,currentDraft,draftMode,activeWrit,activeView,statsLoaded,rsn,trialPhase,pendingTrialData,categoryDeferCounts,reckoningWrits,reckoningTotals,favoredDrawsRemaining,completedForks,activeFork,forkPhase,completedLandmarks,activeLandmark,landmarkPhase,assignedPath,pathRevealed,
+      skillLevels,bossKC,mettleXP,mettleSeals,streak,completedIds,history,debtWrits,mustClearAll,draftHistory,currentDraft,draftMode,activeWrit,activeView,statsLoaded,rsn,trialPhase,pendingTrialData,categoryDeferCounts,reckoningWrits,reckoningTotals,favoredDrawsRemaining,completedForks,activeFork,forkPhase,completedLandmarks,activeLandmark,landmarkPhase,assignedPath,pathRevealed,questState,diaryState,
     });
-  }, [skillLevels,bossKC,mettleXP,mettleSeals,streak,completedIds,history,debtWrits,mustClearAll,draftHistory,currentDraft,draftMode,activeWrit,activeView,statsLoaded,rsn,trialPhase,pendingTrialData,categoryDeferCounts,reckoningWrits,reckoningTotals,favoredDrawsRemaining,completedForks,activeFork,forkPhase,completedLandmarks,activeLandmark,landmarkPhase,assignedPath,pathRevealed]);
+  }, [skillLevels,bossKC,mettleXP,mettleSeals,streak,completedIds,history,debtWrits,mustClearAll,draftHistory,currentDraft,draftMode,activeWrit,activeView,statsLoaded,rsn,trialPhase,pendingTrialData,categoryDeferCounts,reckoningWrits,reckoningTotals,favoredDrawsRemaining,completedForks,activeFork,forkPhase,completedLandmarks,activeLandmark,landmarkPhase,assignedPath,pathRevealed,questState,diaryState]);
 
   const mettleLevel = xpToLevel(mettleXP);
   const currentTier = tierForLevel(mettleLevel);
@@ -255,6 +271,53 @@ export default function MettlePrototype({
     const timeout = setTimeout(() => setSaveFileMessage(""), 3000);
     return () => clearTimeout(timeout);
   }, [saveFileMessage]);
+
+  function openQuestSyncPicker() {
+    setSaveFileMessage("");
+    questSyncInputRef.current?.click();
+  }
+
+  async function importQuestSyncFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const rawText = await file.text();
+      const sync = parseAccountSyncText(rawText, { expectedRsn: rsn });
+      let mergedBosses = sync.bosses;
+      let resolvedRsn = sync.player.rsn;
+
+      try {
+        const womData = await fetchPlayerSnapshotByRsn(sync.player.rsn);
+        const kc = {};
+        KEY_BOSSES.forEach((boss) => {
+          kc[boss] = womData?.bosses?.[boss] ?? sync.bosses?.[boss] ?? 0;
+        });
+        mergedBosses = kc;
+        resolvedRsn = womData?.rsn ?? sync.player.rsn;
+      } catch {
+        setSaveFileMessage("Account sync imported. Wise Old Man boss sync was unavailable.");
+      }
+
+      setSkillLevels(sync.skills);
+      setManualSkills(sync.skills);
+      setBossKC(mergedBosses);
+      setManualKC(mergedBosses);
+      setQuestState(sync.questState);
+      setDiaryState(sync.diaryState);
+      setRsn(resolvedRsn);
+      setSaveFileMessage(prev => prev || "Account sync imported.");
+    } catch {
+      try {
+        const rawText = await file.text();
+        const nextQuestState = parseQuestSyncText(rawText, { expectedRsn: rsn });
+        setQuestState(nextQuestState);
+        setSaveFileMessage("Quest-only sync imported.");
+      } catch (error) {
+        setSaveFileMessage(error instanceof Error ? error.message : "Account sync could not be imported.");
+      }
+    }
+  }
 
   function confirmManualStats() { setSkillLevels({...manualSkills}); setBossKC({...manualKC}); setStatsLoaded(true); setFetchError(""); }
 
@@ -605,6 +668,8 @@ export default function MettlePrototype({
     setCompletedForks({}); setActiveFork(null); setForkPhase(null);
     setCompletedLandmarks([]); setActiveLandmark(null); setLandmarkPhase(null);
     setAssignedPath(null); setPathRevealed(false);
+    setQuestState(createEmptyQuestState());
+    setDiaryState(createEmptyDiaryState());
     setConfirmReset(false);
     clearSave();
     onResetToEntry?.();
@@ -656,6 +721,8 @@ export default function MettlePrototype({
   const questCapeLandmark = LANDMARK_WRITS.find(lm => lm.id === "landmark_quest_cape");
   const canTriggerQuestCape = !!questCapeLandmark && !completedLandmarks.includes(questCapeLandmark.id);
   const showQuestCapePrompt = canTriggerQuestCape && (mettleLevel >= 80 || assignedPath || completedLandmarks.length > 0);
+  const questSummary = summarizeQuestState(questState);
+  const diarySummary = summarizeDiaryState(diaryState);
   const viewLabels = { board: "LEDGER", stats: "STATS", history: "HISTORY" };
   const tierCounts = TIER_ORDER.map(t=>({
     tier:t, color:TIER_COLORS[t],
@@ -683,6 +750,13 @@ export default function MettlePrototype({
         accept="application/json,.json"
         style={{ display: "none" }}
         onChange={importSaveFile}
+      />
+      <input
+        ref={questSyncInputRef}
+        type="file"
+        accept="application/json,.json"
+        style={{ display: "none" }}
+        onChange={importQuestSyncFile}
       />
       <style>{`
         @keyframes xpFloat {
@@ -1437,6 +1511,27 @@ export default function MettlePrototype({
                   LVL {u.level} {u.unlock.toUpperCase()}
                 </span>
               ))}
+            </div>
+          </div>
+
+          <div style={{...s.dataPanel,borderColor:"#3b2f10",background:"#0f0d08"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
+              <div>
+                <div style={{fontSize:"11px",color:"#d4af37",letterSpacing:"2px",marginBottom:"8px"}}>ACCOUNT SYNC</div>
+                <div style={{fontSize:"12px",color:"#d1d5db",marginBottom:"6px"}}>
+                  {questSummary.hasSyncData || diarySummary.hasSyncData
+                    ? `${questSummary.completedCount} quests complete · ${questSummary.startedCount} quest starts${questSummary.questPoints !== null ? ` · ${questSummary.questPoints} quest points` : ""}${diarySummary.hasSyncData ? ` · ${diarySummary.completedTaskCount} diary tasks` : ""}`
+                    : "No account sync imported yet."}
+                </div>
+                <div style={{fontSize:"11px",color:"#78716c",maxWidth:"560px",lineHeight:"1.7"}}>
+                  {questSummary.hasSyncData || diarySummary.hasSyncData
+                    ? `Source: ${questSummary.sourceLabel}${questState.syncSourceRsn ? ` · ${questState.syncSourceRsn}` : ""} · ${questSummary.lastUpdatedLabel}${questSummary.questCapeDetected ? " · Quest Cape detected" : ""}${diarySummary.hasSyncData ? ` · ${diarySummary.completedTierCount} diary tiers complete` : ""}`
+                    : "Import a Mettle account sync file to load plugin data, then refresh boss KC automatically through Wise Old Man using the same RSN."}
+                </div>
+              </div>
+              <button style={s.btn(false,"#2b2110","#f0e0ad")} onClick={openQuestSyncPicker}>
+                IMPORT ACCOUNT SYNC
+              </button>
             </div>
           </div>
 

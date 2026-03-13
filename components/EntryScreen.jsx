@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DEFAULT_KC, DEFAULT_SKILLS, KEY_BOSSES, SKILLS } from "./data/constants.js";
+import { parseAccountSyncText } from "./utils/accountSync.js";
 import { importSaveText, loadSave } from "./utils/persistence.js";
+import { fetchPlayerSnapshotByRsn } from "./utils/womImport.js";
 
 export default function EntryScreen({ onComplete }) {
   const [phase, setPhase] = useState("landing");
@@ -11,9 +13,11 @@ export default function EntryScreen({ onComplete }) {
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
   const [importError, setImportError] = useState("");
+  const [syncError, setSyncError] = useState("");
   const [manualSkills, setManualSkills] = useState(DEFAULT_SKILLS);
   const [manualKC, setManualKC] = useState(DEFAULT_KC);
   const importInputRef = useRef(null);
+  const accountSyncInputRef = useRef(null);
   const displayFont = "'RuneScape UF', 'Silkscreen', 'Arial Black', 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif";
 
   useEffect(() => {
@@ -41,7 +45,7 @@ export default function EntryScreen({ onComplete }) {
       KEY_BOSSES.forEach((boss) => {
         kc[boss] = data?.bosses?.[boss] ?? 0;
       });
-      onComplete(levels, kc, data?.rsn ?? trimmed);
+      onComplete(levels, kc, data?.rsn ?? trimmed, undefined, undefined);
     } catch {
       setFetchError("Couldn't load that player. Check the RSN or switch to manual entry.");
     } finally {
@@ -50,12 +54,17 @@ export default function EntryScreen({ onComplete }) {
   }
 
   function confirmManualStats() {
-    onComplete({ ...manualSkills }, { ...manualKC }, rsn.trim());
+    onComplete({ ...manualSkills }, { ...manualKC }, rsn.trim(), undefined, undefined);
   }
 
   function openImportPicker() {
     setImportError("");
     importInputRef.current?.click();
+  }
+
+  function openAccountSyncPicker() {
+    setSyncError("");
+    accountSyncInputRef.current?.click();
   }
 
   async function importSaveFile(event) {
@@ -68,6 +77,35 @@ export default function EntryScreen({ onComplete }) {
       onComplete(null, null, null);
     } catch (error) {
       setImportError(error instanceof Error ? error.message : "That save file could not be imported.");
+    }
+  }
+
+  async function importAccountSyncFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const rawText = await file.text();
+      const sync = parseAccountSyncText(rawText);
+      let mergedBosses = sync.bosses;
+      let resolvedRsn = sync.player.rsn;
+
+      try {
+        const womData = await fetchPlayerSnapshotByRsn(sync.player.rsn);
+        const kc = {};
+        KEY_BOSSES.forEach((boss) => {
+          kc[boss] = womData?.bosses?.[boss] ?? sync.bosses?.[boss] ?? 0;
+        });
+        mergedBosses = kc;
+        resolvedRsn = womData?.rsn ?? sync.player.rsn;
+        setSyncError("");
+      } catch {
+        setSyncError("Account sync imported, but Wise Old Man boss sync was unavailable.");
+      }
+
+      onComplete(sync.skills, mergedBosses, resolvedRsn, sync.questState, sync.diaryState);
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : "That account sync file could not be imported.");
     }
   }
 
@@ -369,6 +407,12 @@ export default function EntryScreen({ onComplete }) {
       color: "#555",
       fontSize: "11px",
     },
+    syncHelper: {
+      marginTop: "12px",
+      color: "#8d7836",
+      fontSize: "11px",
+      lineHeight: "1.8",
+    },
     link: {
       background: "none",
       border: "none",
@@ -443,6 +487,13 @@ export default function EntryScreen({ onComplete }) {
 
   return (
     <div style={s.root}>
+      <input
+        ref={accountSyncInputRef}
+        type="file"
+        accept="application/json,.json"
+        style={{ display: "none" }}
+        onChange={importAccountSyncFile}
+      />
       <style>{`
         @keyframes entrySigilPulse {
           0%, 100% { transform: scale(1); opacity: 0.82; }
@@ -521,8 +572,8 @@ export default function EntryScreen({ onComplete }) {
                   <div style={s.ledgerRow}>
                     <div style={s.ledgerIndex}>01 / IMPORT STATS</div>
                     <div style={s.ledgerBody}>
-                      Use Wise Old Man for a quick import, or enter skills and boss killcount
-                      manually.
+                      Import a Mettle sync file for quests and diaries, then let Wise Old Man
+                      refresh boss KC automatically from the same RSN.
                     </div>
                   </div>
                   <div style={s.ledgerRow}>
@@ -545,10 +596,14 @@ export default function EntryScreen({ onComplete }) {
                   <button style={s.cta} onClick={() => setPhase("input")}>
                     GENERATE LEDGER
                   </button>
+                  <button type="button" style={s.secondaryCta} onClick={openAccountSyncPicker}>
+                    IMPORT ACCOUNT SYNC
+                  </button>
                   <button type="button" style={s.secondaryCta} onClick={openImportPicker}>
                     IMPORT SAVE FILE
                   </button>
                   <div style={s.ctaNote}>ENTER YOUR RSN · FREE · NO SIGN-UP</div>
+                  {syncError && <div style={s.noteBox}>⚠ {syncError}</div>}
                   {importError && <div style={s.noteBox}>⚠ {importError}</div>}
                 </div>
               </div>
@@ -561,10 +616,12 @@ export default function EntryScreen({ onComplete }) {
                 <div style={s.inputLabel}>RUN SETUP</div>
                 <div style={s.inputTitle}>Start with your RuneScape name.</div>
                 <div style={s.inputCopy}>
-                  Import public stats through Wise Old Man, or switch to manual entry if you want
-                  full control over the starting data.
+                  Import a full Mettle sync file from the plugin for skills, quests, and diaries.
+                  Mettle will then use the same RSN to refresh boss KC through Wise Old Man
+                  automatically.
                 </div>
-                <div style={s.inputStat}>SOURCE / Wise Old Man API</div>
+                <div style={s.inputStat}>PRIMARY / Mettle plugin account sync</div>
+                <div style={s.inputStat}>BOSS KC / Wise Old Man refresh after sync import</div>
                 <div style={s.inputStat}>FALLBACK / Manual stats and boss killcount</div>
                 <div style={s.inputStat}>STORAGE / Saved in this browser only</div>
               </div>
@@ -590,7 +647,11 @@ export default function EntryScreen({ onComplete }) {
                     </form>
                     {fetchError && <div style={s.error}>⚠ {fetchError}</div>}
                     <div style={s.helper}>
-                      Imports public stats from Wise Old Man ·{" "}
+                      Imports public stats from Wise Old Man only ·{" "}
+                      <button type="button" style={s.link} onClick={openAccountSyncPicker}>
+                        import full Mettle account sync
+                      </button>{" "}
+                      ·{" "}
                       <button
                         type="button"
                         style={s.link}
@@ -602,6 +663,7 @@ export default function EntryScreen({ onComplete }) {
                         enter stats manually
                       </button>
                     </div>
+                    {syncError && <div style={s.syncHelper}>⚠ {syncError}</div>}
                   </>
                 ) : (
                   <>

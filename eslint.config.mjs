@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "runelite-plugin/.gradle/**",
+    "runelite-plugin/.gradle-home/**",
+    "runelite-plugin/.gradle-local/**",
   ]),
 ]);
 

@@ -1,0 +1,56 @@
+{
+  "format": "mettle-account-sync",
+  "version": 1,
+  "source": "mettle-runelite-plugin",
+  "syncedAt": "2026-03-13T18:30:00.000Z",
+  "player": {
+    "rsn": "Example Player",
+    "accountType": "STANDARD"
+  },
+  "skills": {
+    "attack": 82,
+    "strength": 89,
+    "defence": 80,
+    "ranged": 92,
+    "magic": 95,
+    "prayer": 77,
+    "runecrafting": 72,
+    "construction": 83,
+    "hitpoints": 92,
+    "agility": 74,
+    "herblore": 78,
+    "thieving": 76,
+    "crafting": 84,
+    "fletching": 80,
+    "slayer": 87,
+    "hunter": 75,
+    "mining": 73,
+    "smithing": 71,
+    "fishing": 78,
+    "cooking": 86,
+    "firemaking": 79,
+    "woodcutting": 77,
+    "farming": 83,
+    "sailing": 1
+  },
+  "bosses": {
+    "barrows_chests": 34,
+    "obor": 1,
+    "bryophyta": 0,
+    "vorkath": 88,
+    "zulrah": 13,
+    "theatre_of_blood": 0,
+    "tombs_of_amascut": 2
+  },
+  "quests": {
+    "completedQuestIds": ["cook_s_assistant", "dragon_slayer_i", "recipe_for_disaster"],
+    "startedQuestIds": ["desert_treasure_ii"],
+    "questPoints": 205,
+    "questCapeDetected": false
+  },
+  "achievementDiaries": {
+    "completedTaskIds": ["ardougne_easy_01", "ardougne_easy_02", "desert_medium_03"],
+    "completedTierIds": ["ardougne_easy"],
+    "totalCompletedTasks": 21
+  }
+}

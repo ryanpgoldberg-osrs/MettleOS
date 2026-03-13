@@ -3,12 +3,16 @@
 import { useState, useSyncExternalStore } from "react";
 import EntryScreen from "@/components/EntryScreen";
 import MettlePrototype from "@/components/MettlePrototype";
+import type { createEmptyDiaryState } from "@/components/utils/accountSync.js";
+import type { createEmptyQuestState } from "@/components/utils/questSync.js";
 import { loadSave } from "@/components/utils/persistence.js";
 
 type EntryData = {
   skillLevels: Record<string, number>;
   bossKC: Record<string, number>;
   rsn: string;
+  questState?: ReturnType<typeof createEmptyQuestState>;
+  diaryState?: ReturnType<typeof createEmptyDiaryState>;
 };
 
 function subscribe() {
@@ -25,10 +29,12 @@ export default function Home() {
   function handleEntryComplete(
     skillLevels: Record<string, number> | null,
     bossKC: Record<string, number> | null,
-    rsn: string | null
+    rsn: string | null,
+    questState: EntryData["questState"] = undefined,
+    diaryState: EntryData["diaryState"] = undefined
   ) {
     if (skillLevels && bossKC) {
-      setEntryData({ skillLevels, bossKC, rsn: rsn ?? "" });
+      setEntryData({ skillLevels, bossKC, rsn: rsn ?? "", questState, diaryState });
       setForceEntry(false);
       return;
     }
@@ -52,6 +58,8 @@ export default function Home() {
         initialSkillLevels={entryData?.skillLevels ?? null}
         initialBossKC={entryData?.bossKC ?? null}
         initialRsn={entryData?.rsn ?? ""}
+        initialQuestState={entryData?.questState ?? null}
+        initialDiaryState={entryData?.diaryState ?? null}
         onResetToEntry={handleResetToEntry}
       />
     );

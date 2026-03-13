@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mettleos.app/sync-contract/mettle-account-sync-v1.schema.json",
+  "title": "Mettle Account Sync v1",
+  "type": "object",
+  "required": ["format", "version", "player", "skills", "bosses"],
+  "properties": {
+    "format": {
+      "const": "mettle-account-sync"
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "source": {
+      "type": "string"
+    },
+    "syncedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "player": {
+      "type": "object",
+      "required": ["rsn"],
+      "properties": {
+        "rsn": {
+          "type": "string",
+          "minLength": 1
+        },
+        "accountType": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "skills": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "bosses": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "quests": {
+      "type": "object",
+      "properties": {
+        "completedQuestIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "startedQuestIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "questPoints": {
+          "type": "number"
+        },
+        "questCapeDetected": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "achievementDiaries": {
+      "type": "object",
+      "properties": {
+        "completedTaskIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "completedTierIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "totalCompletedTasks": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
