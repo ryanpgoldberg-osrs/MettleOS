@@ -40,6 +40,27 @@ env JAVA_HOME=/opt/homebrew/opt/openjdk@17 GRADLE_USER_HOME=/path/to/local/.grad
 
 If `JAVA_HOME` is not set, macOS may fall back to the system Java shim instead of the brewed JDK.
 
+## Test In RuneLite
+
+Use RuneLite's standard development launcher flow:
+
+```bash
+env JAVA_HOME=/opt/homebrew/opt/openjdk@17 GRADLE_USER_HOME=/path/to/local/.gradle-home ./gradlew run
+```
+
+That launches a developer-mode RuneLite client with `Mettle Sync` loaded as a built-in dev plugin. Once the client opens:
+
+1. Log into your account.
+2. Open the `Mettle Sync` sidebar panel.
+3. Click `Export snapshot`.
+4. Import the exported JSON into the Mettle web app.
+
+If you want a standalone all-in-one jar for local experimentation, build:
+
+```bash
+env JAVA_HOME=/opt/homebrew/opt/openjdk@17 GRADLE_USER_HOME=/path/to/local/.gradle-home ./gradlew shadowJar
+```
+
 ## Local Flow
 
 1. Build and run the plugin locally.
