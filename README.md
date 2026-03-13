@@ -1,179 +1,263 @@
 # METTLE — The OSRS Contract Skill
 
-> *Your account has been avoiding things. Mettle finds them, names them, and makes you face them publicly.*
+> *Your account has been avoiding things. Mettle finds them, names them, and makes you face them.*
 
-Mettle is a custom skill layered on top of Old School RuneScape. It is both a **YouTube/streaming series** and a **playable web tool** for other players. A personalized contract board generates challenges weighted against your specific account gaps — the things your stats say you should be able to do, but haven't.
+Mettle is a custom skill layered on top of Old School RuneScape. It is both a YouTube/streaming format and a playable web tool that generates account-specific writs from your actual stats and boss history.
+
+The core idea is simple: your account already tells a story about what you delay, ignore, and avoid. Mettle turns that story into a ledger.
 
 ---
 
 ## What Is Mettle?
 
-You enter your RSN. The tool pulls your stats via the [Wise Old Man API](https://docs.wiseoldman.net/api). It calculates your account's gaps — skills neglected, bosses untouched, quests avoided — and generates a **Contract Board** of personalized challenges.
+You enter your RSN. The app pulls your account through the Wise Old Man API, maps your skills and boss KC into a local account model, and drafts personalized writs based on account gaps, untouched bosses, progression state, and recent history.
 
-You draft from three contracts. You choose one. The others are gone permanently. You complete it, fail it, or partially complete it. Fail too many and you go into **Debt**. Accumulate enough and you become **Cursed** — your drafts get worse. Clear your debt and earn **Favor** — your drafts improve.
+You draft from a small set of writs and choose one. The unchosen writs fall out of the current draw and can return later. The chosen writ becomes active. Complete it cleanly and you gain full rewards. Defer too many and you build debt. Push that too far and reckoning pressure begins to form around the categories you keep dodging.
 
-The skill tracks your progress as **Mettle XP**, structured through five deity-named tiers toward level 99. The series finale is determined by a Final Trial that chooses your path.
+Mettle tracks its own progression as **Mettle XP** across five deity tiers toward level 99. Along the way it introduces Trials, Forks, Landmarks, debt pressure, and finally a path-based Final Trial.
+
+The app now calls the main surface the **ledger**, not the board.
+
+---
+
+## Current Product Flow
+
+1. Fresh visit: cold open landing -> RSN input or manual entry -> ledger.
+2. Returning visit: saved run detected in `localStorage` -> ledger opens immediately.
+3. Reset run: saved state is cleared and the app returns to the entry screen.
+
+Current save key:
+
+- `mettle_run_v8`
 
 ---
 
 ## The Skill
 
-Mettle is framed as a custom 24th skill. Every OSRS player immediately understands the stakes.
+Mettle is framed as a custom 24th OSRS skill.
+
+The live account model currently tracks:
+
+- `24` skills
+- `69` bosses
 
 ### Tier Structure
 
-| Tier | Levels | Contracts | Theme |
-|---|---|---|---|
-| Guthix | 1–20 | ~35 | Foundation — awakening the account |
-| Saradomin | 21–40 | ~40 | Discipline — first real trials |
-| Bandos | 41–60 | ~40 | Strength — combat escalation |
-| Zamorak | 61–80 | ~45 | Chaos — difficult modifiers |
-| Zaros | 81–99 | ~30 | Mastery — elite content, series finale |
+| Tier | Levels | Current Pool | Theme |
+|---|---:|---:|---|
+| Guthix | 1–20 | 35 writs | Foundation, first avoidance patterns |
+| Saradomin | 21–40 | 40 writs | Discipline, structure, first larger asks |
+| Bandos | 41–60 | 40 writs | Combat escalation, account force |
+| Zamorak | 61–80 | 46 writs | Chaos, punishment, pressure systems |
+| Zaros | 81–99 | 28 writs | Mastery, pathing, endgame pressure |
 
-**Total pool: 190 contracts. ~67,000 XP to reach level 99.**  
-A given run will see 80–120 contracts. Two players with different accounts will have meaningfully different series.
+Total live pool:
 
-### XP Structure
+- `189` non-trial writs
+- `10` Trials
 
-| Difficulty | XP Reward | Seal Color |
-|---|---|---|
-| Easy | 50–100 XP | Bronze |
-| Medium | 150–300 XP | Silver |
-| Hard | 400–700 XP | Gold |
-| Elite | 1,000+ XP | Black |
+### Mettle XP Curve
 
-### Completion States
+| Level | XP |
+|---|---:|
+| 1 | 0 |
+| 20 | 2,500 |
+| 40 | 9,000 |
+| 60 | 22,000 |
+| 80 | 45,000 |
+| 99 | 85,000 |
 
-| Result | XP | Debt |
-|---|---|---|
-| Full completion | 100% | None |
-| Partial completion | 50% | None |
-| Failure | 0% | Contract enters Debt Queue |
+Tier gates:
+
+- `20`
+- `40`
+- `60`
+- `80`
+
+### Unlocks
+
+| Level | Unlock |
+|---|---|
+| 10 | Trials |
+| 20 | Draft (3 options) |
+| 40 | Endurance Writs |
+| 60 | Elite modifiers |
+| 80 | Mythic pressure |
 
 ---
 
-## Contract System
+## Draft System
 
-### Draft System
-- **Normal:** 3 options (default)
-- **Cursed:** 2 options — active when debt cap (3) is reached
-- **Favored:** 5 options — earned through streaks, Trial completions, or debt clearance
+### Draft Sizes
 
-### Debt System
-- Debt cap: **3 contracts**
-- At cap: player becomes **Cursed**, Favored state blocked
-- Debt must be cleared before advancing to each tier milestone (levels 20 / 40 / 60 / 80)
+| State | Draft Size |
+|---|---:|
+| Normal | 3 |
+| Cursed | 2 |
+| Favored | 4 |
+| Hot Streak | 4 |
+| Final Trial | 5 |
+
+### Important Rules
+
+- Unchosen writs are **not** permanently deleted. They only leave the current draw.
+- Most completed writs leave the pool permanently.
+- Writs marked `repeatable` can return later.
+- Recent draft history is suppressed to reduce repetition.
+- Favored state is currently granted by Trial completion, not by clearing debt.
+
+---
+
+## Debt, Cursed, Reckoning
+
+### Debt
+
+- Deferring a writ moves it into the debt queue.
+- Debt cap is `3`.
+- Hitting the cap forces cleanup before drafting can continue.
+- Tier advancement is blocked at gates if debt or reckoning is unresolved.
+
+### Cursed
+
+- Any debt puts the run into a cursed draft state.
+- Cursed drafts shrink to `2` options.
+- Deferring a writ breaks favored state immediately.
+
+### Reckoning
+
+- Reckoning is category-based pressure triggered by repeated defers.
+- Warning starts at `2` defers in a category.
+- At `3`, a reckoning writ can be created for that category.
+- Reckoning writs must be cleared before drawing or advancing.
+
+### Debt / Reckoning Recovery Rewards
+
+Recovery is intentionally weaker than clean completion:
+
+- Clearing a deferred writ gives **half XP**
+- Completing a reckoning writ gives **half XP**
+- Neither gives seals
+- Neither increases streak
+
+---
+
+## Trials, Forks, Landmarks
 
 ### Trials
-Milestone contracts at every 10–20 levels. Auto-triggered. Cannot be drafted around. Non-skippable. These are the episode tentpoles.
 
-| Level | Trial |
-|---|---|
-| 10 | Obor or Bryophyta — first real boss |
-| 20 | Barrows completion |
-| 30 | First Fire Cape attempt |
-| 40 | First Zulrah kill |
-| 50 | Dragon Slayer II |
-| 60 | First raid — Chambers of Xeric |
-| 70 | Vorkath with modifier |
-| 80 | Endgame boss (account-dependent) |
-| 90 | Elite challenge (account-dependent) |
-| 99 | The Final Trial |
+Trials are milestone writs that auto-trigger and bypass the normal draft.
 
-### Landmark Contracts
-Auto-trigger on condition. Cannot be drafted around. Distinct visual treatment on the board.
+Live trial levels:
 
-| Landmark | Trigger |
-|---|---|
-| First 99 | Reach level 99 in any skill |
-| Quest Cape | Complete all quests |
-| Total Level 1900 | Reach 1900 total level |
-| First Raid Completion | Complete any raid |
+- `10`
+- `20`
+- `30`
+- `40`
+- `50`
+- `60`
+- `70`
+- `80`
+- `90`
+- `99` Final Trial
 
-### Fork Contracts
-Two significant objectives — choose one, the other is permanently gone. Reserved for major quests. ~4 across the entire series. Audience debate moments.
+Trials are dynamic where possible. Early and late trials can resolve against account state, boss history, and untouched content rather than always pointing at one fixed challenge.
+
+### Landmarks
+
+Landmarks auto-trigger when their condition is met, except where manual confirmation is required.
+
+Current landmarks:
+
+- First Level 99
+- Quest Cape
+- Total Level 1900
+- First Raid Completion
+
+Quest Cape is currently manual because WOM data does not let the app verify full quest completion directly.
+
+### Forks
+
+Forks are rare, major choices where one branch is accepted and the other is permanently rejected.
+
+Current fork set:
 
 | Fork | Option A | Option B | Tier |
 |---|---|---|---|
 | The Ancient Path | Desert Treasure II | Dragon Slayer II | Zamorak |
 | The Elven Choice | Song of the Elves | Sins of the Father | Zamorak |
-| The Endgame | Tombs of Amascut | Theatre of Blood | Zaros |
-| The Final Reckoning | Inferno attempt | The Nightmare | Zaros |
+| The Endgame | Tombs of Amascut (Full) | Theatre of Blood (Full) | Zaros |
+| The Final Reckoning | The Inferno | The Nightmare | Zaros |
+
+### Final Trial Paths
+
+At the top end of the run, Mettle assigns a path from account history:
+
+- Warrior
+- Scholar
+- Survivor
+- Balanced
+
+Each path has its own `8`-writ pool, and the Final Trial draws `5` from that pool.
 
 ---
 
-## Contract Generator Logic
-
-### Data Source
-RSN input → [Wise Old Man API](https://docs.wiseoldman.net/api) fetch  
-Pulls: all 23 skill levels, boss KC, total level, combat level, quest points (manual fallback).
-
-### Gap Score Formula
-```
-Skill Gap = (Account Average − Skill Level)
-Weight    = Gap ÷ Account Average
-```
-Scales correctly across different account sizes. A 70 Runecrafting on a 2200 total account is a bigger gap than on a 1400 total.
-
-### Category Weight Multipliers
-
-| Category | Base Weight | Trigger Multiplier |
-|---|---|---|
-| PvM Intro | 1 | ×3 if combat >85 and boss KC = 0 |
-| Quest | 1 | ×2 if QP <250 and total level >1500 |
-| Skilling | 1 | ×2 if skill gap >15 |
-| Endurance | 1 | ×1.5 if streak ≥ 3 |
-| Modifier-heavy | 1 | ×1.5 if Favored status active |
-
-### Boss KC Weighting
-
-| Boss KC | Multiplier |
-|---|---|
-| 0 KC | ×3 |
-| 1–5 KC | ×2 |
-| 6–20 KC | ×1 |
-| 20+ KC | ×0.5 |
-
-### Anti-Repetition Rules
-- Contracts seen in the last 5 drafts: suppressed entirely
-- Contracts completed in the last 10: weight ×0.3
-
-### Draft Generation Pipeline
-1. **Filter** — tier ≤ player tier, requirements met, not completed
-2. **Suppress** — remove recent draft history
-3. **Weight** — apply category weight × boss KC weight per contract
-4. **Select** — weighted random draw for draft size (2, 3, or 5)
-
----
-
-## Contract Categories
+## Writ Categories
 
 | Category | Description |
 |---|---|
-| PvM Intro | First boss interactions, low KC targets, combat milestone unlocks |
-| PvM Endurance | Multi-KC requirements, sustained combat challenges |
-| Quest | Quest completions, QP milestones, story-driven objectives |
-| Skill Gap | Algorithmically targeted — closes distance between account average and low skills |
-| Exploration / Systems | Unlocking areas, guilds, spellbooks, travel methods |
-| Endurance | Time-based or volume-based grinding challenges |
-| Economic | Gold earned through skilling, flipping, or trading |
-| Trials | Milestone contracts every 10–20 levels. Non-skippable. Series tentpoles. |
-| Fork | Choose between two objectives. Rare. Audience engagement moments. |
+| PvM Intro | First boss interactions, low-KC bosses, first real combat asks |
+| PvM Endurance | Sustained KC, harder PvM volume, repeated boss pressure |
+| Quest | Quest completions and major quest-chain asks |
+| Skill Gap | Dynamic skill-gap and account-average pressure |
+| Exploration | Unlocks, access, movement, area and system asks |
+| Endurance | Time-based, volume-based, or streak-based asks |
+| Economic | Profit, production, or trade-centered asks |
+| Trial | Milestone writs that bypass the normal draft |
 
 ---
 
-## The Mettle Crest
+## Generator Logic
 
-The skill icon is a crest that builds visually over the series. At level 1 it is broken and rough. At level 99 it is fully realized. The crest is both the skill icon and the series-long visual payoff.
+### Data Source
 
-| Level | Crest State |
-|---|---|
-| 1 | Broken shield outline — partial, rough |
-| 20 | First crest quadrant forged |
-| 40 | Second quadrant added |
-| 60 | Ornament and engraving appear |
-| 80 | Crest nearly complete |
-| 99 | Finished crest — series finale visual |
+RSN input -> local API route -> Wise Old Man refresh + fetch
+
+Current live pull includes:
+
+- all `24` tracked skills
+- tracked boss KC
+- normalized display name
+
+Manual entry is also supported for skills and boss KC.
+
+### Skill Gap Logic
+
+The app still uses account-average logic, but the writ sizing is now more dynamic than the original pitch.
+
+Notable updates:
+
+- fixed `+5` style level-gain writs were replaced with level-band scaling
+- high-level skill writs can switch from levels to XP chunks
+- gap-closing writs no longer always force a skill all the way to account average
+
+### Weighting
+
+Draft weighting currently considers:
+
+- tier eligibility
+- completion status
+- recent draft suppression
+- account skill gaps
+- combat average
+- touched boss count
+- total boss KC
+- boss-specific low-KC bonuses
+
+Bossing is now more account-aware:
+
+- fresh zero-KC accounts are pushed more toward intro bossing
+- endurance PvM is suppressed early
+- every tracked boss is capable of surfacing over time
 
 ---
 
@@ -182,9 +266,16 @@ The skill icon is a crest that builds visually over the series. At level 1 it is
 | Layer | Technology |
 |---|---|
 | Frontend + Hosting | Next.js on Vercel |
-| Backend / Database | Supabase (PostgreSQL, auto-generated API) |
-| Styling | Tailwind CSS |
+| App Framework | React 19 + App Router |
+| Language | TypeScript + JSX components |
+| Styling | Mostly inline styles |
+| Fonts | Self-hosted display fonts in `public/fonts` |
 | Data Source | Wise Old Man API |
+
+Current note:
+
+- Supabase is **not** part of the current implementation.
+- Tailwind is installed but the main app is styled primarily with inline styles.
 
 ---
 
@@ -197,12 +288,41 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+Useful commands:
+
+```bash
+npm run lint
+npm run build
+```
+
 ### Environment Variables
 
-```env
-NEXT_PUBLIC_WOM_API_BASE=https://api.wiseoldman.net/v2
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+The current app does not require project-level environment variables for the core local flow shown in the repo.
+
+The Wise Old Man calls are made from the app route at:
+
+- `app/api/player/[rsn]/route.ts`
+
+---
+
+## Project Structure
+
+```text
+app/
+  api/player/[rsn]/route.ts   Wise Old Man refresh + normalized player payload
+  layout.tsx                  App shell
+  page.tsx                    Entry gating + main app mount
+
+components/
+  EntryScreen.jsx             Cold open + RSN/manual intake
+  MettlePrototype.jsx         Main ledger experience
+  data/                       Writ pool, tiers, forks, landmarks, final trial pools
+  systems/                    Drafting and progression logic
+  utils/                      Persistence, labels, modifiers, helpers
+
+public/fonts/
+  runescape_uf.*
+  Silkscreen-Regular.ttf
 ```
 
 ---
@@ -211,44 +331,20 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 | Item | Status |
 |---|---|
-| Series name | ✅ METTLE |
-| Core mechanic | ✅ Contract Board with weighted gap scoring |
-| Skill framing | ✅ Custom XP skill — levels, tiers, crest progression |
-| Tier structure | ✅ Deity ranks (Guthix → Zaros) |
-| Draft system | ✅ 3 options default, 2–5 with modifiers |
-| Debt system | ✅ Cap 3, blocks tier milestone at 20/40/60/80 |
-| XP states | ✅ 100% / 50% / 0% + debt |
-| Trials | ✅ Auto-trigger, bypass draft, named milestones |
-| Landmark Contracts | ✅ Quest Cape, First 99, Total 1900, First Raid |
-| Fork Contracts | ✅ 4 defined — major quests only |
-| Final Trial system | ✅ 4 Paths, 8-contract pools, 5-contract draft at 99 |
-| Wilderness rule | ✅ Optional Guthix/Saradomin, mandatory Bandos+ |
-| Difficulty seals | ✅ Bronze / Silver / Gold / Black |
-| Generator logic | ✅ Gap score, category weights, anti-repetition |
-| Guthix contracts | ✅ 35 contracts |
-| Saradomin contracts | ✅ 40 contracts |
-| Bandos contracts | ✅ 40 contracts |
-| Zamorak contracts | ✅ 45 contracts |
-| Zaros contracts | ✅ 30 contracts |
-| Skill icon (final) | 🔲 Refine placeholder, resolve flame/Firemaking overlap |
-| Channel branding | 🔲 Name, logo, color language, typography |
-| First video format | 🔲 TBD |
-| Figma UI design | 🔲 Board, draft screen, profile card, crest states |
-| Web tool MVP build | 🔲 Next.js / Vercel / Supabase |
+| Name and framing | ✅ Live |
+| Entry screen | ✅ Live |
+| Ledger UI | ✅ Live |
+| Wise Old Man intake | ✅ Live |
+| Manual stat fallback | ✅ Live |
+| Debt / cursed / reckoning loop | ✅ Live |
+| Trials | ✅ Live |
+| Forks | ✅ Live |
+| Landmarks | ✅ Live |
+| Final Trial paths | ✅ Live |
+| Dynamic skill-gap balancing | ✅ Live |
+| Mobile pass | ✅ Improved, ongoing |
+| README accuracy | ✅ Updated to current behavior |
 
 ---
 
-## Build Phases
-
-**Phase 1 — MVP**  
-RSN input, contract draft, Mettle level tracker, debt queue. Functional is enough to film.
-
-**Phase 2 — Series**  
-Run the series. Update contract list based on what creates good content. Refine weights.
-
-**Phase 3 — Public Launch**  
-Launch polished public tool alongside the series reaching Saradomin tier. Add shareable profiles, full board visualization, Path reveal animation.
-
----
-
-*METTLE — Ryan Goldberg — March 2026 — Living Document*
+*METTLE — living document, updated for the current app state.*
