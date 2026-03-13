@@ -1,7 +1,6 @@
 package app.mettle.runelite;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import java.io.IOException;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -33,11 +32,12 @@ public class MettleSyncService
     private final BossSyncService bossSyncService;
     private final QuestSyncService questSyncService;
     private final AchievementDiarySyncService achievementDiarySyncService;
-    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    private final Gson gson;
 
     @Inject
     public MettleSyncService(
         Client client,
+        Gson gson,
         MettleSyncConfig config,
         BossSyncService bossSyncService,
         QuestSyncService questSyncService,
@@ -45,6 +45,7 @@ public class MettleSyncService
     )
     {
         this.client = client;
+        this.gson = gson.newBuilder().setPrettyPrinting().create();
         this.config = config;
         this.bossSyncService = bossSyncService;
         this.questSyncService = questSyncService;
