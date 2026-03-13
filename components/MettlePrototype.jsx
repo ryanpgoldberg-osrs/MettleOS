@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CAT_COLORS,
   DEFAULT_KC,
@@ -36,7 +36,7 @@ import {
   xpToLevel,
 } from "./systems/mettleSystems.js";
 import { modifierXpBonus, sealsForWrit, streakSealBonus, writXp } from "./utils/modifiers.js";
-import { clearSave, loadSave, writeSave } from "./utils/persistence.js";
+import { clearSave, exportSaveData, importSaveText, loadSave, writeSave } from "./utils/persistence.js";
 import { accountAverage } from "./utils/skillHelpers.js";
 
 function trialFlavorLine(trial) {
@@ -142,6 +142,8 @@ export default function MettlePrototype({
 
   // ── RESET CONFIRM
   const [confirmReset, setConfirmReset] = useState(false);
+  const [saveFileMessage, setSaveFileMessage] = useState("");
+  const importInputRef = useRef(null);
 
   // ── RECKONING STATE
   const [categoryDeferCounts, setCategoryDeferCounts] = useState({}); // { "PvM Intro": 2, "Quest": 1 }
@@ -247,7 +249,56 @@ export default function MettlePrototype({
     return () => timers.forEach(clearTimeout);
   }, [trialPhase, pendingTrialData]);
 
+  useEffect(() => {
+    if (!saveFileMessage) return;
+    const timeout = setTimeout(() => setSaveFileMessage(""), 3000);
+    return () => clearTimeout(timeout);
+  }, [saveFileMessage]);
+
   function confirmManualStats() { setSkillLevels({...manualSkills}); setBossKC({...manualKC}); setStatsLoaded(true); setFetchError(""); }
+
+  function exportSaveFile() {
+    const snapshot = loadSave();
+    if (!snapshot) {
+      setSaveFileMessage("No save is available to export yet.");
+      return;
+    }
+    const slug = (rsn || "mettle-run")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+    const stamp = new Date().toISOString().slice(0, 10);
+    const exportPayload = exportSaveData(snapshot);
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${slug || "mettle-run"}-${stamp}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setSaveFileMessage("Save file exported.");
+  }
+
+  function openImportPicker() {
+    setSaveFileMessage("");
+    importInputRef.current?.click();
+  }
+
+  async function importSaveFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!window.confirm("Importing a save file will replace the current local run on this browser. Continue?")) {
+      return;
+    }
+    try {
+      const rawText = await file.text();
+      importSaveText(rawText);
+      window.location.reload();
+    } catch (error) {
+      setSaveFileMessage(error instanceof Error ? error.message : "That save file could not be imported.");
+    }
+  }
 
   async function loadPlayerStats() {
     const trimmed=rsn.trim(); if(!trimmed) return;
@@ -603,6 +654,13 @@ export default function MettlePrototype({
 
   return (
     <div style={s.root}>
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json,.json"
+        style={{ display: "none" }}
+        onChange={importSaveFile}
+      />
       <style>{`
         @keyframes xpFloat {
           0%   { opacity:1; transform:translateY(0px) scale(1); }
@@ -923,9 +981,16 @@ export default function MettlePrototype({
           <div className="mettle-info-strip" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"14px",flexWrap:"wrap",width:"100%"}}>
           <span className="mettle-info-primary" style={s.infoPrimary}>✓ {rsn||"Manual stats"} · AVG LVL {Math.round(avg)} · {mettleSeals} SEALS · {streak} STREAK</span>
           <div className="mettle-info-actions" style={s.infoMetaWrap}>
+            <button style={{...s.btn(false),fontSize:"10px",padding:"4px 10px"}} onClick={exportSaveFile}>EXPORT SAVE</button>
+            <button style={{...s.btn(false),fontSize:"10px",padding:"4px 10px"}} onClick={openImportPicker}>IMPORT SAVE</button>
             <button style={{...s.btn(false),fontSize:"10px",padding:"4px 10px"}} onClick={()=>setStatsLoaded(false)}>EDIT STATS</button>
           </div>
           </div>
+          {saveFileMessage && (
+            <div style={{fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",color:saveFileMessage.includes("could not") || saveFileMessage.includes("No save") ? "#f87171" : "#93c5fd",marginTop:"8px"}}>
+              {saveFileMessage}
+            </div>
+          )}
         </div>
       )}
 

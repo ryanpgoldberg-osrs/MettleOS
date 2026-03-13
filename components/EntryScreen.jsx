@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DEFAULT_KC, DEFAULT_SKILLS, KEY_BOSSES, SKILLS } from "./data/constants.js";
-import { loadSave } from "./utils/persistence.js";
+import { importSaveText, loadSave } from "./utils/persistence.js";
 
 export default function EntryScreen({ onComplete }) {
   const [phase, setPhase] = useState("landing");
@@ -10,8 +10,10 @@ export default function EntryScreen({ onComplete }) {
   const [rsn, setRsn] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
+  const [importError, setImportError] = useState("");
   const [manualSkills, setManualSkills] = useState(DEFAULT_SKILLS);
   const [manualKC, setManualKC] = useState(DEFAULT_KC);
+  const importInputRef = useRef(null);
   const displayFont = "'RuneScape UF', 'Silkscreen', 'Arial Black', 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif";
 
   useEffect(() => {
@@ -49,6 +51,24 @@ export default function EntryScreen({ onComplete }) {
 
   function confirmManualStats() {
     onComplete({ ...manualSkills }, { ...manualKC }, rsn.trim());
+  }
+
+  function openImportPicker() {
+    setImportError("");
+    importInputRef.current?.click();
+  }
+
+  async function importSaveFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const rawText = await file.text();
+      importSaveText(rawText);
+      onComplete(null, null, null);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "That save file could not be imported.");
+    }
   }
 
   const s = {
@@ -243,6 +263,26 @@ export default function EntryScreen({ onComplete }) {
       color: "#4b4b4b",
       textAlign: "center",
     },
+    secondaryCta: {
+      width: "100%",
+      marginTop: "10px",
+      background: "transparent",
+      color: "#d4af37",
+      padding: "14px 22px",
+      fontWeight: "700",
+      letterSpacing: "4px",
+      fontFamily: displayFont,
+      border: "1px solid #4b3f18",
+      cursor: "pointer",
+      textAlign: "center",
+      textTransform: "uppercase",
+    },
+    noteBox: {
+      marginTop: "12px",
+      fontSize: "11px",
+      lineHeight: "1.7",
+      color: "#7a7a7a",
+    },
     inputShell: {
       display: "grid",
       gridTemplateColumns: "minmax(260px, 320px) minmax(0, 1fr)",
@@ -429,6 +469,13 @@ export default function EntryScreen({ onComplete }) {
       `}</style>
       <div style={s.atmosphere} />
       <div style={s.veil} />
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json,.json"
+        style={{ display: "none" }}
+        onChange={importSaveFile}
+      />
       <div style={s.shell}>
         {phase === "landing" ? (
           <div style={s.frame}>
@@ -498,7 +545,11 @@ export default function EntryScreen({ onComplete }) {
                   <button style={s.cta} onClick={() => setPhase("input")}>
                     GENERATE LEDGER
                   </button>
+                  <button type="button" style={s.secondaryCta} onClick={openImportPicker}>
+                    IMPORT SAVE FILE
+                  </button>
                   <div style={s.ctaNote}>ENTER YOUR RSN · FREE · NO SIGN-UP</div>
+                  {importError && <div style={s.noteBox}>⚠ {importError}</div>}
                 </div>
               </div>
             </div>
