@@ -84,7 +84,7 @@ export function getDebtStatus(debtWrits, mustClearAll, streak, favoredDrawsRemai
 
 export function draftSizeFromStatus(status) {
   if (status === "cursed") return 2;
-  if (status === "favored") return 5;
+  if (status === "favored") return 4;
   if (status === "hot_streak") return 4;
   return 3;
 }

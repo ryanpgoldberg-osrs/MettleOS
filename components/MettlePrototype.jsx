@@ -70,6 +70,10 @@ function activeTrialPrompt(trial) {
   return "The moment has arrived. Only completion settles the draw.";
 }
 
+function recoveryXpForWrit(writ) {
+  return Math.max(1, Math.round(writXp(writ) / 2));
+}
+
 function makeQueueEntryId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -303,7 +307,7 @@ export default function MettlePrototype({
   }
 
   function buyExtraDraftChoice() {
-    if (currentDraft.length === 0 || currentDraft.length >= 5 || mettleSeals < EXTRA_CHOICE_COST) return;
+    if (currentDraft.length === 0 || currentDraft.length >= 4 || mettleSeals < EXTRA_CHOICE_COST) return;
     const last5 = draftHistory.slice(-5);
     const expanded = generateDraft(skillLevels, bossKC, completedIds, last5, debtWrits, mettleLevel, currentDraft.length + 1);
     setMettleSeals(prev => prev - EXTRA_CHOICE_COST);
@@ -434,6 +438,7 @@ export default function MettlePrototype({
       }
     } else if (result==="defer") {
       nextStreak = 0;
+      setFavoredDrawsRemaining(0);
       const cat = activeWrit.category;
       const newDeferCounts = { ...categoryDeferCounts, [cat]: (categoryDeferCounts[cat] || 0) + 1 };
       setCategoryDeferCounts(newDeferCounts);
@@ -462,33 +467,36 @@ export default function MettlePrototype({
   function clearDebtWrit(queueEntryId) {
     const c=debtWrits.find(x=>x.queueEntryId===queueEntryId); if(!c) return;
     const newDebt=debtWrits.filter(x=>x.queueEntryId!==queueEntryId);
-    const nextStreak = streak + 1;
-    const sealsGained = sealsForWrit(c) + streakSealBonus(nextStreak);
+    const xpGained = recoveryXpForWrit(c);
+    const nextStreak = streak;
+    const sealsGained = 0;
     setDebtWrits(newDebt);
     if (newDebt.length===0) setMustClearAll(false);
-    setMettleXP(prev=>Math.min(MAX_METTLE_XP,prev+writXp(c)));
-    setMettleSeals(prev=>prev+sealsGained);
+    setMettleXP(prev=>Math.min(MAX_METTLE_XP,prev+xpGained));
     setStreak(nextStreak);
     if(!completedIds.includes(c.id)) setCompletedIds(prev=>[...prev,c.id]);
-    setHistory(prev=>[{...c,result:"debt_cleared",xpGained:writXp(c),sealsGained,baseXp:c.xp,modifierXpBonus:modifierXpBonus(c),streakAfter:nextStreak,timestamp:Date.now()},...prev]);
+    setXpDrop({amount:xpGained,id:Date.now()});
+    setTimeout(()=>setXpDrop(null),1800);
+    setHistory(prev=>[{...c,result:"debt_cleared",xpGained,sealsGained,baseXp:c.xp,modifierXpBonus:modifierXpBonus(c),streakAfter:nextStreak,timestamp:Date.now()},...prev]);
   }
 
   function clearReckoningWrit(id) {
     const rw = reckoningWrits.find(x => x.id === id); if (!rw) return;
-    const nextStreak = streak + 1;
-    const sealsGained = sealsForWrit(rw) + streakSealBonus(nextStreak);
+    const xpGained = recoveryXpForWrit(rw);
+    const nextStreak = streak;
+    const sealsGained = 0;
     setReckoningWrits(prev => prev.filter(x => x.id !== id));
-    setMettleXP(prev => Math.min(MAX_METTLE_XP, prev + writXp(rw)));
-    setMettleSeals(prev => prev + sealsGained);
+    setMettleXP(prev => Math.min(MAX_METTLE_XP, prev + xpGained));
     setStreak(nextStreak);
-    setXpDrop({ amount: writXp(rw), id: Date.now() });
+    setXpDrop({ amount: xpGained, id: Date.now() });
     setTimeout(() => setXpDrop(null), 1800);
-    setHistory(prev => [{ ...rw, result: "reckoning_cleared", xpGained: writXp(rw), sealsGained, baseXp:rw.xp, modifierXpBonus:modifierXpBonus(rw), streakAfter: nextStreak, timestamp: Date.now() }, ...prev]);
+    setHistory(prev => [{ ...rw, result: "reckoning_cleared", xpGained, sealsGained, baseXp:rw.xp, modifierXpBonus:modifierXpBonus(rw), streakAfter: nextStreak, timestamp: Date.now() }, ...prev]);
   }
 
   function failReckoningWrit(id) {
     const rw = reckoningWrits.find(x => x.id === id); if (!rw) return;
     setReckoningWrits(prev => prev.filter(x => x.id !== id));
+    setFavoredDrawsRemaining(0);
     const newDebt = [...debtWrits, toDeferredQueueEntry(rw)];
     setDebtWrits(newDebt);
     setStreak(0);
@@ -512,34 +520,53 @@ export default function MettlePrototype({
     onResetToEntry?.();
   }
 
-  const displayFont = "'RuneScape UF', 'Arial Black', 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif";
+  const displayFont = "'RuneScape UF', 'Silkscreen', 'Arial Black', 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif";
   const s = {
-    root:      { fontFamily:"'Courier New', monospace",background:"radial-gradient(circle at top left, rgba(212,175,55,0.08), transparent 26%), radial-gradient(circle at 82% 18%, rgba(122,122,122,0.06), transparent 22%), linear-gradient(180deg, #080808 0%, #0c0c0c 46%, #090909 100%)",color:"#d4d4d4",minHeight:"100vh",padding:"30px 24px 48px",maxWidth:"1040px",margin:"0 auto" },
-    header:    { border:"1px solid #1a1a1a",padding:"24px 24px 18px",marginBottom:"24px",background:"linear-gradient(180deg, rgba(212,175,55,0.05) 0%, rgba(16,16,16,0.98) 20%, rgba(10,10,10,0.98) 100%)",boxShadow:"0 0 0 1px rgba(255,255,255,0.02), inset 0 1px 0 rgba(255,255,255,0.03)" },
+    root:      { fontFamily:"'Courier New', monospace",background:"radial-gradient(circle at 12% 0%, rgba(212,175,55,0.08), transparent 20%), radial-gradient(circle at 88% 14%, rgba(96,165,250,0.05), transparent 20%), linear-gradient(180deg, #060606 0%, #0b0b0b 44%, #090909 100%)",color:"#d4d4d4",minHeight:"100vh",padding:"20px 14px 64px" },
+    shell:     { maxWidth:"1120px",margin:"0 auto",position:"relative" },
+    header:    { border:"1px solid #1f1e1a",padding:"16px 18px",marginBottom:"16px",background:"linear-gradient(180deg, rgba(212,175,55,0.05) 0%, rgba(18,18,16,0.98) 16%, rgba(10,10,10,0.98) 100%)",boxShadow:"0 0 0 1px rgba(255,255,255,0.02), inset 0 1px 0 rgba(255,255,255,0.04)",position:"relative",overflow:"hidden" },
     xpBar:     { height:"4px",background:"#171717",marginTop:"16px" },
     xpFill:    pct=>({height:"100%",background:"linear-gradient(90deg, #b8922c 0%, #f0e0ad 100%)",width:`${pct}%`,transition:"width 0.4s"}),
-    btn:       (active,bg,fg)=>({ padding:"8px 18px",fontFamily:"inherit",fontWeight:"700",fontSize:"12px",letterSpacing:"1px", background:bg||(active?"#161616":"#101010"),color:fg||(active?"#f3e3a3":"#888"),border:`1px solid ${active?"#7a6530":"#2a2a2a"}`,cursor:"pointer",boxShadow:active?"inset 0 1px 0 rgba(255,255,255,0.05), 0 0 18px rgba(212,175,55,0.05)":"none" }),
-    secHead:   { fontSize:"10px",letterSpacing:"3px",color:"#7b6a32",marginBottom:"12px" },
-    activeCard:{ border:"1px solid #3d3421",padding:"20px",background:"linear-gradient(180deg, rgba(212,175,55,0.05) 0%, rgba(18,18,18,0.98) 16%, rgba(11,11,11,0.98) 100%)",marginBottom:"16px",boxShadow:"inset 0 1px 0 rgba(255,255,255,0.03)" },
-    debtCard:  { border:"1px solid #3d1515",padding:"12px 16px",background:"linear-gradient(180deg, rgba(111,25,25,0.10) 0%, rgba(15,8,8,0.96) 100%)",marginBottom:"6px",display:"flex",justifyContent:"space-between",alignItems:"center" },
-    reckoningCard: { border:"1px solid #6b21a8",padding:"12px 16px",background:"linear-gradient(180deg, rgba(107,33,168,0.12) 0%, rgba(15,10,20,0.96) 100%)",marginBottom:"6px" },
-    draftGrid: n=>({ display:"grid",gridTemplateColumns:`repeat(${Math.min(n, 3)}, 1fr)`,gap:"12px" }),
-    draftCard: { border:"1px solid #2b2416",padding:"16px",background:"linear-gradient(180deg, rgba(212,175,55,0.04) 0%, rgba(16,16,16,0.96) 18%, rgba(12,12,12,0.98) 100%)",cursor:"pointer",boxShadow:"inset 0 1px 0 rgba(255,255,255,0.03)" },
-    tag:       color=>({ display:"inline-block",fontSize:"10px",letterSpacing:"1px",color:color||"#555",marginRight:"8px" }),
+    btn:       (active,bg,fg)=>({ padding:"9px 18px",fontFamily:"inherit",fontWeight:"700",fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase",background:bg||(active?"#161616":"#0f0f0f"),color:fg||(active?"#f3e3a3":"#9a9a9a"),border:`1px solid ${active?"#8f7530":"#272727"}`,cursor:"pointer",boxShadow:active?"inset 0 1px 0 rgba(255,255,255,0.05), 0 0 18px rgba(212,175,55,0.05)":"none" }),
+    secHead:   { fontSize:"10px",letterSpacing:"3px",color:"#8d7836",marginBottom:"12px" },
+    activeCard:{ border:"1px solid #2c271d",padding:"24px",background:"linear-gradient(180deg, rgba(212,175,55,0.05) 0%, rgba(18,18,18,0.98) 16%, rgba(11,11,11,0.98) 100%)",marginBottom:"16px",boxShadow:"inset 0 1px 0 rgba(255,255,255,0.03)" },
+    debtCard:  { border:"1px solid #3d1515",padding:"14px 16px",background:"linear-gradient(180deg, rgba(111,25,25,0.12) 0%, rgba(15,8,8,0.96) 100%)",marginBottom:"8px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:"14px" },
+    reckoningCard: { border:"1px solid #6b21a8",padding:"14px 16px",background:"linear-gradient(180deg, rgba(107,33,168,0.14) 0%, rgba(15,10,20,0.96) 100%)",marginBottom:"8px" },
+    draftGrid: n=>({ display:"grid",gridTemplateColumns:`repeat(auto-fit, minmax(${n > 1 ? 220 : 260}px, 1fr))`,gap:"16px" }),
+    draftCard: { border:"1px solid #272117",padding:"18px",background:"linear-gradient(180deg, rgba(212,175,55,0.05) 0%, rgba(16,16,16,0.97) 22%, rgba(12,12,12,0.99) 100%)",cursor:"pointer",boxShadow:"inset 0 1px 0 rgba(255,255,255,0.03)",minHeight:"290px",display:"flex",flexDirection:"column",justifyContent:"space-between",position:"relative" },
+    tag:       color=>({ display:"inline-block",fontSize:"10px",letterSpacing:"2px",color:color||"#555",marginRight:"8px",textTransform:"uppercase" }),
     numInput:  { background:"#0c0c0c",border:"1px solid #2a2a2a",color:"#fff",padding:"2px 6px",fontFamily:"inherit",fontSize:"12px",textAlign:"right" },
-    footer:    { marginTop:"48px",borderTop:"1px solid #1a1a1a",paddingTop:"12px",display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:"8px",fontSize:"10px",color:"#4a4a4a",letterSpacing:"1px" },
-    displayHero:{ fontFamily:displayFont,fontSize:"44px",lineHeight:"0.95",letterSpacing:"1px",textTransform:"uppercase",color:"#f3efe0",textShadow:"0 1px 0 rgba(0,0,0,0.55), 0 0 18px rgba(212,175,55,0.08)" },
+    footer:    { marginTop:"36px",borderTop:"1px solid #171717",paddingTop:"14px",display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:"12px",fontSize:"10px",color:"#565656",letterSpacing:"2px",textTransform:"uppercase" },
+    displayHero:{ fontFamily:displayFont,fontSize:"36px",lineHeight:"0.95",letterSpacing:"1px",textTransform:"uppercase",color:"#f3efe0",textShadow:"0 1px 0 rgba(0,0,0,0.55), 0 0 18px rgba(212,175,55,0.08)" },
     displayValue:{ fontFamily:displayFont,fontSize:"34px",lineHeight:"1",letterSpacing:"1px",color:"#f0e3b3",textShadow:"0 1px 0 rgba(0,0,0,0.5)" },
-    displayCardTitle:{ fontFamily:displayFont,fontSize:"24px",lineHeight:"1.08",letterSpacing:"0.6px",textTransform:"uppercase",color:"#f4efe0",textShadow:"0 1px 0 rgba(0,0,0,0.45)" },
+    displayCardTitle:{ fontFamily:displayFont,fontSize:"22px",lineHeight:"1.08",letterSpacing:"0.6px",textTransform:"uppercase",color:"#f4efe0",textShadow:"0 1px 0 rgba(0,0,0,0.45)" },
     displayBigTitle:{ fontFamily:displayFont,fontSize:"34px",lineHeight:"1.05",letterSpacing:"0.8px",textTransform:"uppercase",color:"#f4efe0",textShadow:"0 1px 0 rgba(0,0,0,0.45), 0 0 20px rgba(212,175,55,0.06)" },
+    heroKicker:{ fontSize:"10px",color:"#8d7836",letterSpacing:"4px",marginBottom:"8px",textTransform:"uppercase" },
+    heroBody:  { fontSize:"12px",color:"#7e7e78",lineHeight:"1.75",maxWidth:"520px",marginTop:"12px" },
+    railPanel: { border:"1px solid #25231b",background:"linear-gradient(180deg, rgba(212,175,55,0.03) 0%, rgba(13,13,13,0.98) 28%, rgba(9,9,9,0.98) 100%)",padding:"14px 16px",display:"flex",flexDirection:"column",justifyContent:"space-between",minHeight:"100%" },
+    railValue:{ fontFamily:displayFont,fontSize:"20px",lineHeight:"1",letterSpacing:"0.8px",textTransform:"uppercase",color:"#f3efe0" },
+    railCopy:  { fontSize:"12px",color:"#808080",lineHeight:"1.75" },
+    railRow:   { display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"8px 0",borderTop:"1px solid #181818",fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase" },
+    infoStrip: { border:"1px solid #1d1d1a",padding:"12px 14px",marginBottom:"16px",background:"linear-gradient(180deg, rgba(255,255,255,0.015) 0%, rgba(10,10,10,0.98) 100%)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:"14px",flexWrap:"wrap" },
+    infoPrimary:{ color:"#4ade80",fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase" },
+    infoMetaWrap:{ display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap",marginLeft:"auto" },
+    infoMeta:  { fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",color:"#a7a7a0",padding:"6px 8px",border:"1px solid #1c1c18",background:"rgba(255,255,255,0.015)" },
+    navShell:  { border:"1px solid #181818",padding:"10px 12px",marginBottom:"16px",background:"rgba(7,7,7,0.86)",display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap" },
+    sectionFrame:{ border:"1px solid #191919",padding:"18px",background:"linear-gradient(180deg, rgba(255,255,255,0.015) 0%, rgba(10,10,10,0.98) 100%)",marginBottom:"16px" },
+    sectionLead:{ fontSize:"12px",color:"#8b8b84",lineHeight:"1.8",maxWidth:"640px" },
+    drawShell: { border:"1px solid #1f1d17",padding:"46px 28px",background:"linear-gradient(180deg, rgba(212,175,55,0.05) 0%, rgba(11,11,11,0.98) 22%, rgba(8,8,8,0.99) 100%)",minHeight:"420px",display:"flex",alignItems:"center",justifyContent:"center",width:"100%" },
+    objectiveBox:{ margin:"0 auto 18px",maxWidth:"680px",border:"1px solid rgba(212,175,55,0.14)",background:"linear-gradient(180deg, rgba(255,255,255,0.018) 0%, rgba(255,255,255,0.00) 100%)",padding:"18px 18px 16px" },
+    dataPanel: { border:"1px solid #1a1a1a",background:"linear-gradient(180deg, rgba(255,255,255,0.015) 0%, rgba(10,10,10,0.98) 100%)",padding:"14px 16px",marginBottom:"16px" },
+    statTile:  { display:"flex",justifyContent:"space-between",padding:"7px 10px",background:"#101010",fontSize:"12px",border:"1px solid #151515" },
+    historyRow:{ padding:"12px 14px",background:"linear-gradient(180deg, rgba(255,255,255,0.015) 0%, rgba(10,10,10,0.98) 100%)",borderBottom:"1px solid #171717" },
   };
 
   const statusColor = draftStatus==="blocked"?"#f87171":draftStatus==="cursed"?"#fbbf24":draftStatus==="favored"?"#c4b5fd":draftStatus==="hot_streak"?"#fb923c":"#4ade80";
-  const tierColor   = TIER_COLORS[currentTier]||"#fff";
   const writPoolCount = WRIT_POOL.filter(w=>!w.trial).length;
   const questCapeLandmark = LANDMARK_WRITS.find(lm => lm.id === "landmark_quest_cape");
   const canTriggerQuestCape = !!questCapeLandmark && !completedLandmarks.includes(questCapeLandmark.id);
   const showQuestCapePrompt = canTriggerQuestCape && (mettleLevel >= 80 || assignedPath || completedLandmarks.length > 0);
+  const viewLabels = { board: "LEDGER", stats: "STATS", history: "HISTORY" };
   const tierCounts = TIER_ORDER.map(t=>({
     tier:t, color:TIER_COLORS[t],
     count:WRIT_POOL.filter(w=>w.tier===t&&!w.trial).length,
@@ -615,61 +642,198 @@ export default function MettlePrototype({
           0%   { opacity:0; transform:scaleX(0.3); }
           100% { opacity:1; transform:scaleX(1); }
         }
+        .mettle-header-grid {
+          display:grid;
+          grid-template-columns:minmax(0, 1.3fr) minmax(260px, 0.85fr);
+          gap:16px;
+          align-items:stretch;
+        }
+        .mettle-summary-grid {
+          display:grid;
+          grid-template-columns:repeat(3, minmax(0, 1fr));
+          gap:10px;
+          margin-top:auto;
+        }
+        .mettle-summary-cell {
+          border:1px solid #1b1b18;
+          background:rgba(255,255,255,0.015);
+          padding:9px 11px;
+        }
+        .mettle-summary-cell strong {
+          display:block;
+          margin-top:5px;
+          color:#f4efe0;
+          font-size:12px;
+          letter-spacing:1px;
+        }
+        .mettle-wordmark {
+          margin:0;
+        }
+        .mettle-tier-strip {
+          display:flex;
+          gap:4px;
+          margin-top:10px;
+        }
+        .mettle-info-strip {
+          display:flex;
+          justify-content:space-between;
+          align-items:center;
+          gap:14px;
+          flex-wrap:wrap;
+        }
+        .mettle-info-primary {
+          min-width:0;
+        }
+        .mettle-info-actions {
+          display:flex;
+          align-items:center;
+          gap:10px;
+          flex-wrap:wrap;
+          margin-left:auto;
+        }
+        .mettle-nav {
+          display:flex;
+          align-items:center;
+          gap:10px;
+          flex-wrap:wrap;
+        }
+        .mettle-nav-spacer {
+          flex:1;
+        }
+        .mettle-draft-actions {
+          display:flex;
+          gap:8px;
+          margin-bottom:16px;
+          flex-wrap:wrap;
+        }
+        @media (max-width: 900px) {
+          .mettle-header-grid {
+            grid-template-columns:1fr;
+          }
+          .mettle-summary-grid {
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+          }
+        }
+        @media (max-width: 640px) {
+          .mettle-wordmark {
+            font-size:30px !important;
+          }
+          .mettle-summary-grid {
+            grid-template-columns:1fr;
+          }
+          .mettle-summary-cell strong {
+            font-size:11px;
+            line-height:1.5;
+          }
+          .mettle-tier-strip {
+            gap:8px;
+          }
+          .mettle-info-strip {
+            align-items:flex-start;
+          }
+          .mettle-info-primary {
+            width:100%;
+            line-height:1.7;
+          }
+          .mettle-info-actions {
+            width:100%;
+            margin-left:0;
+            justify-content:flex-start;
+          }
+          .mettle-nav {
+            display:grid;
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+            gap:8px;
+          }
+          .mettle-nav .mettle-nav-spacer {
+            display:none;
+          }
+          .mettle-nav button {
+            width:100%;
+          }
+          .mettle-draft-actions {
+            display:grid;
+            grid-template-columns:1fr;
+          }
+          .mettle-draft-actions button {
+            width:100%;
+          }
+          .mettle-mobile-stack {
+            flex-direction:column !important;
+            align-items:flex-start !important;
+            grid-template-columns:1fr !important;
+          }
+          .mettle-mobile-stack > * {
+            width:100%;
+          }
+          .mettle-mobile-center {
+            padding:36px 20px !important;
+            min-height:auto !important;
+          }
+          .mettle-mobile-center-title {
+            font-size:24px !important;
+          }
+          .mettle-mobile-card-title {
+            font-size:16px !important;
+          }
+          .mettle-mobile-row {
+            flex-direction:column;
+            align-items:flex-start !important;
+            gap:4px;
+          }
+        }
         .trial-stage-hidden { opacity:0; transform:translateY(10px); }
         .trial-stage-live { animation:trialTextIn 0.55s ease-out both; }
       `}</style>
 
       {xpDrop && <div key={xpDrop.id} className="xp-drop">+{xpDrop.amount.toLocaleString()} XP</div>}
-
+      <div style={s.shell}>
       {/* HEADER */}
       <div style={s.header}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-          <div>
-            <div style={{...s.displayHero,margin:0}}>METTLE</div>
-            <div style={{fontSize:"10px",color:"#7b6a32",letterSpacing:"4px",marginTop:"6px"}}>WRIT SKILL — PROTOTYPE v1.0</div>
+        <div className="mettle-header-grid">
+          <div style={{display:"flex",flexDirection:"column",minHeight:"100%"}}>
+            <div style={s.heroKicker}>Mettle / Personal Ledger</div>
+            <div className="mettle-wordmark" style={{...s.displayHero,margin:"0 0 12px"}}>METTLE</div>
+            <div className="mettle-summary-grid">
+              <div className="mettle-summary-cell">
+                <div style={{fontSize:"10px",letterSpacing:"3px",color:"#666",textTransform:"uppercase"}}>Standing</div>
+                <strong>Level {String(mettleLevel).padStart(2,"0")} · {mettleXP.toLocaleString()} XP</strong>
+              </div>
+              <div className="mettle-summary-cell">
+                <div style={{fontSize:"10px",letterSpacing:"3px",color:"#666",textTransform:"uppercase"}}>Pressure</div>
+                <strong>{debtWrits.length} deferred · {reckoningWrits.length} reckoning</strong>
+              </div>
+              <div className="mettle-summary-cell">
+                <div style={{fontSize:"10px",letterSpacing:"3px",color:"#666",textTransform:"uppercase"}}>Control</div>
+                <strong>{mettleSeals} seals · {streak} streak</strong>
+              </div>
+            </div>
           </div>
-          <div style={{textAlign:"right"}}>
-            <div style={{fontSize:"10px",color:"#666",letterSpacing:"4px",marginBottom:"6px"}}>CURRENT STANDING</div>
-            <div style={s.displayValue}>
-              LVL {String(mettleLevel).padStart(2,"0")}
-              <span style={{fontSize:"16px",color:"#675a34",marginLeft:"6px",fontFamily:"'Courier New', monospace"}}>/99</span>
+          <div style={s.railPanel}>
+            <div>
+              <div style={{fontSize:"10px",letterSpacing:"4px",color:"#666",marginBottom:"8px",textTransform:"uppercase"}}>Run State</div>
+              <div style={s.railValue}>{currentTier} Tier</div>
+              <div style={{fontSize:"12px",color:statusColor,letterSpacing:"3px",marginTop:"8px",textTransform:"uppercase"}}>{draftStatus.replace("_"," ")}</div>
             </div>
-            <div style={{fontSize:"11px",color:"#666",marginTop:"2px"}}>
-              {mettleXP.toLocaleString()} XP · {mettleLevel<99?`${xpToNext.toLocaleString()} to next`:"MAX"}
-            </div>
-            <div style={{fontSize:"11px",color:"#9ca3af",marginTop:"2px"}}>
-              {mettleSeals} seals · {streak} streak{nextUnlock ? ` · next unlock ${nextUnlock.level}` : " · all unlocks earned"}
-            </div>
-            <div style={{fontSize:"11px",marginTop:"2px"}}>
-              <span style={{color:tierColor}}>{currentTier}</span>
-              <span style={{color:"#333",margin:"0 6px"}}>·</span>
-              <span style={{color:statusColor}}>{draftStatus.toUpperCase()}</span>
-              {draftStatus === "favored" && (
-                <span style={{color:"#c4b5fd",fontSize:"10px",marginLeft:"6px"}}>
-                  · {favoredDrawsRemaining} FAVORED DRAWS
-                </span>
-              )}
-              {draftStatus === "hot_streak" && (
-                <span style={{color:"#fbbf24",fontSize:"10px",marginLeft:"6px"}}>
-                  · 🔥 4 OPTIONS
-                </span>
-              )}
-              {hasReckonings && (
-                <span style={{color:"#a855f7",fontSize:"10px",marginLeft:"6px"}}>
-                  · {reckoningWrits.length} RECKONING
-                </span>
-              )}
-              {mustClearAll && debtWrits.length>0 && (
-                <span style={{color:"#f87171",fontSize:"10px",marginLeft:"6px"}}>
-                  — CLEAR ALL {debtWrits.length} TO UNLOCK
-                </span>
-              )}
+            <div>
+              <div className="mettle-mobile-row" style={s.railRow}>
+                <span style={{color:"#686868"}}>Next Unlock</span>
+                <span style={{color:"#d8d0b6"}}>{nextUnlock ? `LVL ${nextUnlock.level} · ${xpToNext.toLocaleString()} XP` : "MAX"}</span>
+              </div>
+              <div className="mettle-mobile-row" style={s.railRow}>
+                <span style={{color:"#686868"}}>Cleared</span>
+                <span style={{color:"#d8d0b6"}}>{completedIds.length} writs</span>
+              </div>
+              <div className="mettle-mobile-row" style={s.railRow}>
+                <span style={{color:"#686868"}}>Ledger</span>
+                <span style={{color:"#d8d0b6"}}>{drawBlocked ? "Blocked" : "Open"}</span>
+              </div>
             </div>
           </div>
         </div>
         <div style={s.xpBar}><div style={s.xpFill(progressPct)}/></div>
         {statsLoaded && (
-          <div style={{display:"flex",gap:"4px",marginTop:"10px"}}>
+          <div className="mettle-tier-strip" style={{display:"flex",gap:"4px",marginTop:"10px"}}>
             {tierCounts.map(t=>(
               <div key={t.tier} style={{flex:1,fontSize:"9px",color:t.color,opacity:currentTier===t.tier?1:0.35}}>
                 <div style={{letterSpacing:"2px",marginBottom:"3px"}}>{t.tier.toUpperCase().slice(0,3)}</div>
@@ -736,18 +900,22 @@ export default function MettlePrototype({
       )}
 
       {statsLoaded && (
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px",fontSize:"11px"}}>
-          <span style={{color:"#4ade80"}}>✓ {rsn||"STATS LOADED"} · AVG {avg.toFixed(1)} · {completedIds.length}/{writPoolCount} WRITS · {mettleSeals} SEALS · {streak} STREAK</span>
-          <button style={{...s.btn(false),fontSize:"10px",padding:"4px 10px"}} onClick={()=>setStatsLoaded(false)}>EDIT STATS</button>
+        <div style={s.infoStrip}>
+          <div className="mettle-info-strip" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"14px",flexWrap:"wrap",width:"100%"}}>
+          <span className="mettle-info-primary" style={s.infoPrimary}>✓ {rsn||"Manual Entry"} · AVG LVL {Math.round(avg)} · {mettleSeals} SEALS · {streak} STREAK</span>
+          <div className="mettle-info-actions" style={s.infoMetaWrap}>
+            <button style={{...s.btn(false),fontSize:"10px",padding:"4px 10px"}} onClick={()=>setStatsLoaded(false)}>EDIT STATS</button>
+          </div>
+          </div>
         </div>
       )}
 
       {statsLoaded && (
-        <div style={{display:"flex",gap:"4px",marginBottom:"24px"}}>
+        <div className="mettle-nav" style={s.navShell}>
           {["board","stats","history"].map(v=>(
-            <button key={v} style={s.btn(activeView===v)} onClick={()=>setActiveView(v)}>{v === "board" ? "LEDGER" : v.toUpperCase()}</button>
+            <button key={v} style={s.btn(activeView===v)} onClick={()=>setActiveView(v)}>{viewLabels[v]}</button>
           ))}
-          <div style={{flex:1}}/>
+          <div className="mettle-nav-spacer" style={{flex:1}}/>
           {confirmReset ? (
             <div style={{display:"flex",gap:"4px"}}>
               <button style={{...s.btn(false),color:"#f87171",borderColor:"#3d1515"}} onClick={resetRun}>CONFIRM RESET</button>
@@ -759,12 +927,12 @@ export default function MettlePrototype({
         </div>
       )}
 
-      {/* ══ BOARD ══ */}
+      {/* ══ LEDGER ══ */}
       {statsLoaded && activeView==="board" && (
         <div>
           {/* RECKONING WRITS — top priority, above debt */}
           {reckoningWrits.length > 0 && (
-            <div style={{border:"1px solid #6b21a8",padding:"16px",background:"#0a0612",marginBottom:"20px",animation:"reckoningPulse 3s infinite"}}>
+            <div style={{...s.sectionFrame,borderColor:"#6b21a8",background:"#0a0612",animation:"reckoningPulse 3s infinite"}}>
               <div style={{...s.secHead,color:"#a855f7"}}>
                 ⚡ RECKONING — {reckoningWrits.length} ACTIVE · MUST CLEAR TO DRAW OR ADVANCE
               </div>
@@ -776,7 +944,7 @@ export default function MettlePrototype({
                       <div style={{fontSize:"10px",color:"#666",marginTop:"2px"}}>
                         <span style={s.tag("#a855f7")}>RECKONING #{rw.reckoningCount}</span>
                         <span style={s.tag(DIFF_COLORS[rw.difficulty])}>{rw.difficulty.toUpperCase()}</span>
-                        <span style={s.tag("#555")}>{writXp(rw)} XP</span>
+                        <span style={s.tag("#555")}>{recoveryXpForWrit(rw)} XP</span>
                       </div>
                     </div>
                   </div>
@@ -784,7 +952,7 @@ export default function MettlePrototype({
                   <div style={{fontSize:"11px",color:"#7c3aed",marginBottom:"12px"}}>MODIFIER: {rw.modifier}</div>
                   <div style={{display:"flex",gap:"8px"}}>
                     <button style={s.btn(false,"#14380f","#4ade80")} onClick={()=>clearReckoningWrit(rw.id)}>
-                      ✓ COMPLETE (+{writXp(rw)} XP)
+                      ✓ COMPLETE (+{recoveryXpForWrit(rw)} XP)
                     </button>
                     <button style={s.btn(false,"#1a0a0a","#f87171")} onClick={()=>failReckoningWrit(rw.id)}>
                       ✗ FAIL → DEFER QUEUE
@@ -797,21 +965,21 @@ export default function MettlePrototype({
 
           {/* CATEGORY WARNINGS (2 defers) */}
           {warningCategories.length > 0 && (
-            <div style={{border:"1px solid #44337a",padding:"10px 16px",background:"#0e0a16",marginBottom:"12px",fontSize:"11px",color:"#a78bfa"}}>
+            <div style={{...s.sectionFrame,borderColor:"#44337a",background:"#0e0a16",fontSize:"11px",color:"#a78bfa",padding:"12px 16px"}}>
               ⚠ RECKONING WARNING — {warningCategories.join(", ")} at 2 defers. One more defer triggers a Reckoning Writ.
             </div>
           )}
 
           {/* PENDING TRIAL NOTICE */}
           {pendingTrial && !activeWrit && !trialPhase && currentDraft.length === 0 && !activeFork && !activeLandmark && (
-            <div style={{border:"1px solid #d4af37",padding:"10px 16px",background:"#141008",marginBottom:"12px",fontSize:"11px",color:"#fbbf24"}}>
+            <div style={{...s.sectionFrame,borderColor:"#d4af37",background:"#141008",fontSize:"11px",color:"#fbbf24",padding:"12px 16px"}}>
               ⚔ TRIAL OF METTLE APPROACHING — Level {pendingTrial.triggerLevel}. The ledger demands you answer.
             </div>
           )}
 
           {/* PATH INDICATOR (Zaros tier) */}
           {assignedPath && (
-            <div style={{border:"1px solid #6b21a8",padding:"10px 16px",background:"#0f0a14",marginBottom:"12px",fontSize:"11px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{...s.sectionFrame,borderColor:"#6b21a8",background:"#0f0a14",fontSize:"11px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:"14px",flexWrap:"wrap",padding:"12px 16px"}}>
               <span style={{color:"#d8b4fe",letterSpacing:"2px"}}>PATH ASSIGNED: <span style={{color:"#fff",fontWeight:"700"}}>{assignedPath.toUpperCase()}</span></span>
               <span style={{color:"#555"}}>{pathRevealed ? "Final Trial path revealed" : "Final Trial pool locked at Level 99"}</span>
             </div>
@@ -819,13 +987,13 @@ export default function MettlePrototype({
 
           {/* ═══ FORK PRESENTATION ═══ */}
           {forkPhase === "presenting" && activeFork && (
-            <div style={{animation:"trialRevealIn 0.6s ease-out, forkPulse 3s infinite",textAlign:"center",padding:"48px 20px",border:"2px solid #dc2626",background:"radial-gradient(circle at top, rgba(220,38,38,0.12) 0%, rgba(12,12,12,1) 40%)",marginBottom:"20px"}}>
+            <div style={{animation:"trialRevealIn 0.6s ease-out, forkPulse 3s infinite",textAlign:"center",padding:"48px 20px",border:"2px solid #dc2626",background:"radial-gradient(circle at top, rgba(220,38,38,0.12) 0%, rgba(12,12,12,1) 40%)",marginBottom:"16px"}}>
               <div style={{fontSize:"10px",letterSpacing:"6px",color:"#dc2626",marginBottom:"16px"}}>⚡ FORK WRIT ⚡</div>
               <div style={{...s.displayBigTitle,color:"#fff",marginBottom:"10px"}}>{activeFork.title}</div>
               <div style={{fontSize:"12px",color:"#666",marginBottom:"32px",maxWidth:"500px",margin:"0 auto 32px",lineHeight:"1.6"}}>
                 Two paths diverge. You must choose one. The other vanishes permanently.
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"20px",maxWidth:"640px",margin:"0 auto"}}>
+              <div className="mettle-mobile-stack" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"20px",maxWidth:"640px",margin:"0 auto"}}>
                 <div style={{border:"1px solid #444",padding:"24px 16px",background:"#111",cursor:"pointer",transition:"border-color 0.2s"}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor="#dc2626"}
                   onMouseLeave={e=>e.currentTarget.style.borderColor="#444"}
@@ -850,7 +1018,7 @@ export default function MettlePrototype({
 
           {/* ═══ LANDMARK REVEAL ═══ */}
           {landmarkPhase === "revealed" && activeLandmark && (
-            <div style={{animation:"trialRevealIn 0.6s ease-out, landmarkGlow 3s infinite",textAlign:"center",padding:"48px 20px",border:"2px solid #3b82f6",background:"radial-gradient(circle at top, rgba(59,130,246,0.12) 0%, rgba(12,12,12,1) 40%)",marginBottom:"20px"}}>
+            <div style={{animation:"trialRevealIn 0.6s ease-out, landmarkGlow 3s infinite",textAlign:"center",padding:"48px 20px",border:"2px solid #3b82f6",background:"radial-gradient(circle at top, rgba(59,130,246,0.12) 0%, rgba(12,12,12,1) 40%)",marginBottom:"16px"}}>
               <div style={{fontSize:"10px",letterSpacing:"6px",color:"#3b82f6",marginBottom:"16px"}}>★ LANDMARK ★</div>
               <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:"80px",height:"80px",border:"1px solid rgba(59,130,246,0.55)",borderRadius:"999px",marginBottom:"16px",boxShadow:"0 0 30px rgba(59,130,246,0.18)"}}>
                 <div style={{fontSize:"32px",color:"#93c5fd",lineHeight:1}}>★</div>
@@ -868,7 +1036,7 @@ export default function MettlePrototype({
 
           {/* DEBT QUEUE */}
           {debtWrits.length>0 && (
-            <div style={{border:"1px solid #3d1515",padding:"16px",background:"#0a0606",marginBottom:"20px"}}>
+            <div style={{...s.sectionFrame,borderColor:"#3d1515",background:"#0a0606"}}>
               <div style={{...s.secHead,color:"#f87171"}}>
                 DEFER QUEUE — {debtWrits.length} OUTSTANDING
                 {mustClearAll && " · BLOCKED — CLEAR ALL TO DRAW AGAIN"}
@@ -882,7 +1050,7 @@ export default function MettlePrototype({
                     {c.reckoning && <div style={{color:"#7c3aed",fontSize:"10px",marginTop:"2px"}}>ORIGINATED FROM RECKONING</div>}
                   </div>
                   <button style={s.btn(false,"#14380f","#4ade80")} onClick={()=>clearDebtWrit(c.queueEntryId)}>
-                    CLEAR (+{writXp(c)} XP)
+                    CLEAR (+{recoveryXpForWrit(c)} XP)
                   </button>
                 </div>
               ))}
@@ -891,7 +1059,7 @@ export default function MettlePrototype({
 
           {/* ═══ TRIAL REVEAL SEQUENCE ═══ */}
           {trialPhase === "approaching" && pendingTrialData && (
-            <div style={{animation:"trialRevealIn 0.6s ease-out, trialGlow 2.5s infinite",textAlign:"center",padding:"60px 20px",border:"1px solid #d4af37",background:"linear-gradient(180deg, #141008 0%, #0c0c0c 100%)",marginBottom:"20px"}}>
+            <div style={{animation:"trialRevealIn 0.6s ease-out, trialGlow 2.5s infinite",textAlign:"center",padding:"60px 20px",border:"1px solid #d4af37",background:"linear-gradient(180deg, #141008 0%, #0c0c0c 100%)",marginBottom:"16px"}}>
               <div style={{fontSize:"10px",letterSpacing:"6px",color:"#d4af37",marginBottom:"24px"}}>⚔ TRIAL OF METTLE ⚔</div>
               <div style={{fontSize:"14px",letterSpacing:"4px",color:"#fbbf24",marginBottom:"12px"}}>LEVEL {pendingTrialData.triggerLevel}</div>
               <div style={{fontSize:"11px",color:"#666",marginBottom:"32px",maxWidth:"400px",margin:"0 auto 32px",lineHeight:"1.6"}}>
@@ -904,7 +1072,7 @@ export default function MettlePrototype({
           )}
 
           {trialPhase === "revealed" && pendingTrialData && (
-            <div style={{animation:"trialRevealIn 0.5s ease-out",position:"relative",overflow:"hidden",border:"2px solid #d4af37",padding:"36px 24px",background:"radial-gradient(circle at top, rgba(212,175,55,0.14) 0%, rgba(26,19,8,1) 28%, rgba(12,12,12,1) 100%)",marginBottom:"20px",boxShadow:"0 0 60px rgba(212,175,55,0.12) inset, 0 0 30px rgba(0,0,0,0.35)",minHeight:"360px"}}>
+            <div style={{animation:"trialRevealIn 0.5s ease-out",position:"relative",overflow:"hidden",border:"2px solid #d4af37",padding:"36px 24px",background:"radial-gradient(circle at top, rgba(212,175,55,0.14) 0%, rgba(26,19,8,1) 28%, rgba(12,12,12,1) 100%)",marginBottom:"16px",boxShadow:"0 0 60px rgba(212,175,55,0.12) inset, 0 0 30px rgba(0,0,0,0.35)",minHeight:"360px"}}>
               <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 28%, rgba(0,0,0,0.18) 100%)",pointerEvents:"none"}} />
               <div style={{position:"relative",zIndex:1,textAlign:"center",maxWidth:"720px",margin:"0 auto"}}>
                 <div className={trialCeremonyStep >= 1 ? "trial-stage-live" : "trial-stage-hidden"} style={{fontSize:"10px",letterSpacing:"6px",color:"#d4af37",marginBottom:"18px"}}>
@@ -1012,8 +1180,11 @@ export default function MettlePrototype({
                   <span style={s.tag("#555")}>{writXp(activeWrit)} XP</span>
                   {modifierXpBonus(activeWrit) > 0 && <span style={s.tag("#fb923c")}>+{modifierXpBonus(activeWrit)} MOD BONUS</span>}
                 </div>
-                <div style={{...s.displayCardTitle,marginBottom:"8px"}}>{activeWrit.title}</div>
-                <div style={{fontSize:"13px",color:"#999",marginBottom: (activeWrit.modifier || activeWrit.trialModifier) ? "8px" : "20px"}}>{activeWrit.objective}</div>
+                <div style={{...s.displayCardTitle,marginBottom:"14px"}}>{activeWrit.title}</div>
+                <div style={{...s.objectiveBox,margin:"0 0 16px",maxWidth:"760px",padding:"16px 18px 14px"}}>
+                  <div style={{fontSize:"10px",letterSpacing:"4px",color:"#7a7a72",marginBottom:"10px",textTransform:"uppercase"}}>Assigned Objective</div>
+                  <div style={{fontSize:"14px",color:"#d4d4d4",lineHeight:"1.75"}}>{activeWrit.objective}</div>
+                </div>
                 {activeWrit.modifier && (
                   <div style={{display:"flex",gap:"8px",marginBottom:"12px",flexWrap:"wrap"}}>
                     <button style={s.btn(false,"#111827", mettleSeals >= REMOVE_MODIFIER_COST ? "#93c5fd" : "#4b5563")} onClick={removeActiveModifier} disabled={mettleSeals < REMOVE_MODIFIER_COST}>
@@ -1022,8 +1193,9 @@ export default function MettlePrototype({
                   </div>
                 )}
                 {(activeWrit.modifier || activeWrit.trialModifier) && (
-                  <div style={{fontSize:"12px",color:"#fb923c",padding:"8px 12px",background:"#1a1008",border:"1px solid #3d2a08",marginBottom:"20px",animation:"modifierFlash 3s infinite"}}>
-                    ⚡ MODIFIER: {activeWrit.modifier || activeWrit.trialModifier}
+                  <div style={{display:"inline-flex",alignItems:"center",gap:"8px",fontSize:"11px",color:"#fb923c",padding:"7px 10px",background:"#1a1008",border:"1px solid #3d2a08",marginBottom:"18px",animation:"modifierFlash 3s infinite"}}>
+                    <span style={{letterSpacing:"2px",textTransform:"uppercase",color:"#c27a1d"}}>Modifier</span>
+                    <span>{activeWrit.modifier || activeWrit.trialModifier}</span>
                   </div>
                 )}
                 <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
@@ -1044,23 +1216,29 @@ export default function MettlePrototype({
           {!activeWrit && !trialPhase && !activeFork && !activeLandmark && (
             <div>
               {currentDraft.length===0 ? (
-                <div style={{textAlign:"center",padding:"48px 0"}}>
+                <div className="mettle-mobile-center" style={s.drawShell}>
                   {drawBlocked ? (
-                    <div>
+                    <div style={{textAlign:"center",maxWidth:"560px"}}>
                       <div style={{fontSize:"10px",color:"#f87171",letterSpacing:"3px",marginBottom:"16px"}}>
                         BLOCKED — {blockReason}
                       </div>
-                      <div style={{fontSize:"12px",color:"#555"}}>
+                      <div style={{fontSize:"12px",color:"#6c6c6c",lineHeight:"1.8"}}>
                         Complete your outstanding obligations above to unlock drawing
                       </div>
                     </div>
                   ) : (
-                    <div>
+                    <div style={{textAlign:"center",maxWidth:"620px"}}>
                       <div style={{fontSize:"10px",color:pendingTrial?"#d4af37":draftStatus==="cursed"?"#fbbf24":draftStatus==="favored"?"#c4b5fd":draftStatus==="hot_streak"?"#fb923c":"#444",letterSpacing:"3px",marginBottom:"20px"}}>
                         {pendingTrial ? "⚔ TRIAL OF METTLE AWAITS — YOU CANNOT DRAFT AROUND IT"
                           : draftStatus==="favored" ? `FAVORED · ${draftSizeFromStatus(draftStatus)} OPTIONS · ${favoredDrawsRemaining} DRAWS REMAINING`
                           : draftStatus==="hot_streak" ? `🔥 HOT STREAK (${streak}) · ${draftSizeFromStatus(draftStatus)} OPTIONS`
-                          : `${draftStatus.toUpperCase()} · ${draftSizeFromStatus(draftStatus)} OPTIONS · UNCHOSEN WRITS GONE PERMANENTLY`}
+                          : `${draftStatus.toUpperCase()} · ${draftSizeFromStatus(draftStatus)} OPTIONS · UNCHOSEN WRITS RETURN LATER`}
+                      </div>
+                      <div className="mettle-mobile-center-title" style={{...s.displayCardTitle,fontSize:"30px",marginBottom:"12px"}}>{pendingTrial ? "Ledger Locked" : "Draw From The Ledger"}</div>
+                      <div style={{...s.sectionLead,margin:"0 auto 24px"}}>
+                        {pendingTrial
+                          ? "A trial has taken priority over normal drafting. The ledger will not offer alternatives until it is faced."
+                          : "Each draft is a brief reading of your account. Choose one writ and let the others disappear back into the record."}
                       </div>
                       <button style={{...s.btn(true),padding:"14px 48px",fontSize:"14px",letterSpacing:"4px",
                         fontFamily:displayFont,
@@ -1072,20 +1250,20 @@ export default function MettlePrototype({
                   )}
                 </div>
               ) : (
-                <div>
+                <div style={{...s.sectionFrame,padding:"18px"}}>
                   <div style={{...s.secHead,marginBottom:"12px"}}>
-                    {draftMode === "final_trial" ? "THE FINAL TRIAL — FIVE WRITS DRAWN, CHOOSE ONE" : "CHOOSE ONE — OTHERS DISAPPEAR PERMANENTLY"}
+                    {draftMode === "final_trial" ? "THE FINAL TRIAL — FIVE WRITS DRAWN, CHOOSE ONE" : "CHOOSE ONE — OTHERS FALL OUT OF THE CURRENT DRAW"}
                   </div>
                   {draftMode === "final_trial" ? (
                     <div style={{fontSize:"11px",color:"#8c7a44",marginBottom:"16px",lineHeight:"1.6"}}>
                       Your path has been revealed. The final pool is fixed at five choices and cannot be rerolled.
                     </div>
                   ) : (
-                    <div style={{display:"flex",gap:"8px",marginBottom:"16px",flexWrap:"wrap"}}>
+                    <div className="mettle-draft-actions" style={{display:"flex",gap:"8px",marginBottom:"16px",flexWrap:"wrap"}}>
                       <button style={s.btn(false,"#111827", mettleSeals >= REROLL_COST ? "#93c5fd" : "#4b5563")} onClick={rerollCurrentDraft} disabled={mettleSeals < REROLL_COST}>
                         REROLL DRAFT ({REROLL_COST} SEALS)
                       </button>
-                      <button style={s.btn(false,"#1f2937", mettleSeals >= EXTRA_CHOICE_COST && currentDraft.length < 5 ? "#c4b5fd" : "#4b5563")} onClick={buyExtraDraftChoice} disabled={mettleSeals < EXTRA_CHOICE_COST || currentDraft.length >= 5}>
+                      <button style={s.btn(false,"#1f2937", mettleSeals >= EXTRA_CHOICE_COST && currentDraft.length < 4 ? "#c4b5fd" : "#4b5563")} onClick={buyExtraDraftChoice} disabled={mettleSeals < EXTRA_CHOICE_COST || currentDraft.length >= 4}>
                         +1 CHOICE ({EXTRA_CHOICE_COST} SEALS)
                       </button>
                     </div>
@@ -1096,22 +1274,24 @@ export default function MettlePrototype({
                         onMouseEnter={e=>e.currentTarget.style.borderColor=w.modifier?"#d4af37":"#666"}
                         onMouseLeave={e=>e.currentTarget.style.borderColor=w.modifier?"#3d2a08":"#2a2a2a"}
                         onClick={()=>chooseWrit(w)}>
-                        <div style={{fontSize:"10px",marginBottom:"8px"}}>
+                        <div style={{fontSize:"10px",marginBottom:"12px"}}>
                           <span style={s.tag(CAT_COLORS[w.category]||"#555")}>{w.category.toUpperCase()}</span>
                           <span style={s.tag(TIER_COLORS[w.tier]||"#555")}>{w.tier.toUpperCase()}</span>
                           {draftMode === "final_trial" && <span style={s.tag("#d4af37")}>FINAL TRIAL</span>}
                           {w.modifier && <span style={s.tag("#fb923c")}>⚡ MODIFIED</span>}
                         </div>
-                        <div style={{...s.displayCardTitle,fontSize:"18px",marginBottom:"8px"}}>{w.title}</div>
-                        <div style={{fontSize:"12px",color:"#888",marginBottom:w.modifier?"6px":"14px",lineHeight:"1.5"}}>{w.objective}</div>
-                        {w.modifier && (
-                          <div style={{fontSize:"11px",color:"#fb923c",marginBottom:"10px",padding:"4px 8px",background:"#1a1008",border:"1px solid #3d2a08"}}>
-                            ⚡ {w.modifier}
-                          </div>
-                        )}
-                        <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px"}}>
-                          <span style={{color:DIFF_COLORS[w.difficulty]}}>{w.difficulty}</span>
-                          <span style={{color:"#555"}}>{writXp(w)} XP</span>
+                        <div>
+                          <div className="mettle-mobile-card-title" style={{...s.displayCardTitle,fontSize:"18px",marginBottom:"10px"}}>{w.title}</div>
+                          <div style={{fontSize:"12px",color:"#8b8b8b",marginBottom:w.modifier?"8px":"16px",lineHeight:"1.7"}}>{w.objective}</div>
+                          {w.modifier && (
+                            <div style={{fontSize:"11px",color:"#fb923c",marginBottom:"12px",padding:"7px 9px",background:"#1a1008",border:"1px solid #3d2a08"}}>
+                              ⚡ {w.modifier}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",paddingTop:"12px",borderTop:"1px solid #171717"}}>
+                          <span style={{color:DIFF_COLORS[w.difficulty],letterSpacing:"1px",textTransform:"uppercase"}}>{w.difficulty}</span>
+                          <span style={{color:"#6d6d6d"}}>{writXp(w)} XP</span>
                         </div>
                       </div>
                     ))}
@@ -1126,8 +1306,12 @@ export default function MettlePrototype({
       {/* ══ STATS ══ */}
       {statsLoaded && activeView==="stats" && (
         <div>
-          <div style={{...s.secHead,marginBottom:"12px"}}>ACCOUNT AVERAGE: {avg.toFixed(1)}</div>
-          <div style={{border:"1px solid #1f2937",background:"#0d1117",padding:"12px 14px",marginBottom:"20px"}}>
+          <div style={{...s.sectionFrame,padding:"18px 18px 16px"}}>
+            <div style={s.secHead}>ACCOUNT SUMMARY</div>
+            <div style={{...s.displayCardTitle,fontSize:"26px",marginBottom:"8px"}}>Average {avg.toFixed(1)}</div>
+            <div style={s.sectionLead}>The stats page reads like an audit sheet: systems, path, pressure, then the raw skill and boss ledgers underneath.</div>
+          </div>
+          <div style={{...s.dataPanel,borderColor:"#1f2937",background:"#0d1117"}}>
             <div style={{fontSize:"11px",color:"#93c5fd",letterSpacing:"2px",marginBottom:"8px"}}>METTLE SYSTEMS</div>
             <div style={{fontSize:"12px",color:"#9ca3af",marginBottom:"8px"}}>Seals let you remove modifiers, reroll drafts, or buy an extra choice.</div>
             <div style={{fontSize:"12px",color:"#d1d5db",marginBottom:"8px"}}>Current: {mettleSeals} seals · streak {streak}{favoredDrawsRemaining > 0 ? ` · ${favoredDrawsRemaining} favored draws` : ""}</div>
@@ -1142,7 +1326,7 @@ export default function MettlePrototype({
 
           {/* FORK DECISIONS */}
           {Object.keys(completedForks).length > 0 && (
-            <div style={{border:"1px solid #3d1515",background:"#0d0808",padding:"12px 14px",marginBottom:"20px"}}>
+            <div style={{...s.dataPanel,borderColor:"#3d1515",background:"#0d0808"}}>
               <div style={{fontSize:"11px",color:"#dc2626",letterSpacing:"2px",marginBottom:"8px"}}>FORK DECISIONS</div>
               {Object.entries(completedForks).map(([id, fork]) => {
                 const def = FORK_WRITS.find(f => f.id === id);
@@ -1158,7 +1342,7 @@ export default function MettlePrototype({
 
           {/* LANDMARK TRACKER */}
           {completedLandmarks.length > 0 && (
-            <div style={{border:"1px solid #1e3a5f",background:"#0d1117",padding:"12px 14px",marginBottom:"20px"}}>
+            <div style={{...s.dataPanel,borderColor:"#1e3a5f",background:"#0d1117"}}>
               <div style={{fontSize:"11px",color:"#3b82f6",letterSpacing:"2px",marginBottom:"8px"}}>LANDMARKS ACHIEVED</div>
               {completedLandmarks.map(id => {
                 const def = LANDMARK_WRITS.find(l => l.id === id);
@@ -1172,7 +1356,7 @@ export default function MettlePrototype({
           )}
 
           {showQuestCapePrompt && !activeWrit && !trialPhase && currentDraft.length === 0 && !activeFork && !activeLandmark && (
-            <div style={{border:"1px solid #1e3a5f",background:"#0d1117",padding:"12px 14px",marginBottom:"20px"}}>
+            <div style={{...s.dataPanel,borderColor:"#1e3a5f",background:"#0d1117"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
                 <div>
                   <div style={{fontSize:"11px",color:"#93c5fd",letterSpacing:"2px",marginBottom:"6px"}}>LATE-GAME LANDMARK</div>
@@ -1190,7 +1374,7 @@ export default function MettlePrototype({
 
           {/* PATH ASSIGNMENT */}
           {assignedPath && (
-            <div style={{border:"1px solid #6b21a8",background:"#0f0a14",padding:"12px 14px",marginBottom:"20px"}}>
+            <div style={{...s.dataPanel,borderColor:"#6b21a8",background:"#0f0a14"}}>
               <div style={{fontSize:"11px",color:"#d8b4fe",letterSpacing:"2px",marginBottom:"8px"}}>FINAL TRIAL PATH</div>
               <div style={{fontSize:"14px",color:"#fff",fontWeight:"700",marginBottom:"4px"}}>The {assignedPath}</div>
               <div style={{fontSize:"11px",color:"#777"}}>
@@ -1202,31 +1386,35 @@ export default function MettlePrototype({
             </div>
           )}
 
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))",gap:"3px",marginBottom:"24px"}}>
+          <div style={{...s.sectionFrame,padding:"16px"}}>
+          <div style={s.secHead}>SKILL LEDGER</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))",gap:"6px",marginBottom:"8px"}}>
             {[...SKILLS].sort((a,b)=>skillLevels[a]-skillLevels[b]).map(skill=>{
               const level=skillLevels[skill],gap=avg-level;
               const color=gap>15?"#f87171":gap>5?"#fbbf24":"#4ade80";
               return (
-                <div key={skill} style={{display:"flex",justifyContent:"space-between",padding:"5px 8px",background:"#111",fontSize:"12px"}}>
+                <div key={skill} style={s.statTile}>
                   <span style={{color:"#666",textTransform:"capitalize"}}>{skill}</span>
                   <span style={{color}}>{level}{gap>0?<span style={{fontSize:"10px",color:"#444"}}> ({gap.toFixed(0)}↓)</span>:null}</span>
                 </div>
               );
             })}
           </div>
+          </div>
 
           {/* RECKONING TRACKER */}
           {Object.keys(categoryDeferCounts).length > 0 && (
-            <div style={{marginBottom:"24px"}}>
+            <div style={{marginBottom:"16px"}}>
+              <div style={{...s.sectionFrame,padding:"16px"}}>
               <div style={s.secHead}>RECKONING TRACKER</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))",gap:"3px"}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))",gap:"6px"}}>
                 {RECKONING_CATEGORIES.map(cat => {
                   const count = categoryDeferCounts[cat] || 0;
                   const total = reckoningTotals[cat] || 0;
                   if (count === 0 && total === 0) return null;
                   const color = count >= 3 ? "#a855f7" : count >= 2 ? "#fbbf24" : "#555";
                   return (
-                    <div key={cat} style={{display:"flex",justifyContent:"space-between",padding:"5px 8px",background:"#111",fontSize:"11px"}}>
+                    <div key={cat} style={{display:"flex",justifyContent:"space-between",padding:"7px 10px",background:"#101010",fontSize:"11px",border:"1px solid #151515"}}>
                       <span style={{color:"#666"}}>{cat}</span>
                       <span style={{color}}>
                         {count}/3 defers
@@ -1236,17 +1424,20 @@ export default function MettlePrototype({
                   );
                 }).filter(Boolean)}
               </div>
+              </div>
             </div>
           )}
 
-          <div style={s.secHead}>BOSS KC — {KEY_BOSSES.length} BOSSES</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(210px, 1fr))",gap:"3px"}}>
+          <div style={{...s.sectionFrame,padding:"16px"}}>
+          <div style={s.secHead}>BOSS LEDGER — {KEY_BOSSES.length} BOSSES</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(210px, 1fr))",gap:"6px"}}>
             {KEY_BOSSES.map(boss=>(
-              <div key={boss} style={{display:"flex",justifyContent:"space-between",padding:"5px 8px",background:"#111",fontSize:"12px"}}>
+              <div key={boss} style={{display:"flex",justifyContent:"space-between",padding:"7px 10px",background:"#101010",fontSize:"12px",border:"1px solid #151515"}}>
                 <span style={{color:"#666",fontSize:"10px"}}>{boss.replace(/_/g," ")}</span>
                 <span style={{color:(bossKC[boss]??0)===0?"#f87171":"#4ade80"}}>{bossKC[boss]??0}</span>
               </div>
             ))}
+          </div>
           </div>
         </div>
       )}
@@ -1254,8 +1445,11 @@ export default function MettlePrototype({
       {/* ══ HISTORY ══ */}
       {statsLoaded && activeView==="history" && (
         <div>
-          <div style={s.secHead}>{history.length} WRITS RESOLVED</div>
-          {history.length===0 && <div style={{color:"#444",fontSize:"13px"}}>No writs resolved yet.</div>}
+          <div style={{...s.sectionFrame,padding:"18px 18px 12px"}}>
+            <div style={s.secHead}>ARCHIVE</div>
+            <div style={{...s.displayCardTitle,fontSize:"24px",marginBottom:"8px"}}>{history.length} Writs Resolved</div>
+            {history.length===0 && <div style={{color:"#666",fontSize:"13px"}}>No writs resolved yet.</div>}
+          </div>
           {history.map((c,i)=>{
             const rc = c.result==="complete"||c.result==="debt_cleared"||c.result==="reckoning_cleared"||c.result==="landmark"?"#4ade80"
               : c.result==="defer"||c.result==="reckoning_failed"?"#fbbf24":"#555";
@@ -1263,7 +1457,7 @@ export default function MettlePrototype({
             const ts = c.timestamp ? new Date(c.timestamp) : null;
             return (
               <div key={i} style={{marginBottom:"4px",cursor:"pointer"}} onClick={()=>setExpandedHistoryIdx(isExpanded?null:i)}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",background:"#111",borderLeft:`3px solid ${rc}`,borderBottom:isExpanded?"none":"1px solid #1a1a1a"}}>
+                <div style={{...s.historyRow,display:"flex",justifyContent:"space-between",alignItems:"center",borderLeft:`3px solid ${rc}`,borderBottom:isExpanded?"none":"1px solid #1a1a1a"}}>
                   <div>
                     <div style={{fontSize:"13px",color:"#ccc"}}>
                       {c.reckoning && <span style={{color:"#a855f7",marginRight:"6px"}}>⚡</span>}
@@ -1315,16 +1509,12 @@ export default function MettlePrototype({
       {statsLoaded && (
         <div style={s.footer}>
           <span>WRITS: {completedIds.length}/{writPoolCount}</span>
-          <span>DEFER: {debtWrits.length}{mustClearAll?" (BLOCKED)":""}</span>
-          <span>RECKONING: {reckoningWrits.length}</span>
-          <span>SEALS: {mettleSeals}</span>
-          <span>STREAK: {streak}</span>
           <span>FORKS: {Object.keys(completedForks).length}/{FORK_WRITS.length}</span>
           <span>LANDMARKS: {completedLandmarks.length}/{LANDMARK_WRITS.length}</span>
-          <span>XP: {mettleXP.toLocaleString()} / 67,000</span>
-          {assignedPath && <span>PATH: {assignedPath.toUpperCase()}</span>}
+          <span>XP: {mettleXP.toLocaleString()} / {MAX_METTLE_XP.toLocaleString()}</span>
         </div>
       )}
+      </div>
     </div>
   );
 }

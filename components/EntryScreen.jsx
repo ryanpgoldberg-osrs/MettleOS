@@ -12,7 +12,7 @@ export default function EntryScreen({ onComplete }) {
   const [fetchError, setFetchError] = useState("");
   const [manualSkills, setManualSkills] = useState(DEFAULT_SKILLS);
   const [manualKC, setManualKC] = useState(DEFAULT_KC);
-  const displayFont = "'RuneScape UF', 'Arial Black', 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif";
+  const displayFont = "'RuneScape UF', 'Silkscreen', 'Arial Black', 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif";
 
   useEffect(() => {
     const save = loadSave();
