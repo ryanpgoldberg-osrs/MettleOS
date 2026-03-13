@@ -55,6 +55,8 @@ That launches a developer-mode RuneLite client with `Mettle Sync` loaded as a bu
 3. Click `Export snapshot`.
 4. Import the exported JSON into the Mettle web app.
 
+On macOS with JDK 17, the Gradle `run` task includes the needed `com.apple.eawt` export flag automatically so RuneLite can start without the fullscreen adapter crash.
+
 If you want a standalone all-in-one jar for local experimentation, build:
 
 ```bash
