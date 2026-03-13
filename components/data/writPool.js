@@ -266,11 +266,11 @@ export const WRIT_POOL = [
   { id:"s_pvm_9",  title:"The King's Court",           category:"PvM Intro",     tier:"Saradomin", difficulty:"Hard",   xp:400, repeatable:false, objective:"Obtain any Barrows item" },
   { id:"s_pvm_10", title:"Wilderness Contract",        category:"PvM Intro",     tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:true,  objective:"Kill any wilderness boss once" },
 
-  { id:"s_q_1", title:"The Long Road",        category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:false, objective:"Reach 200 quest points" },
-  { id:"s_q_2", title:"Dragon Slayer",         category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, objective:"Complete Dragon Slayer I" },
-  { id:"s_q_3", title:"Legends Bound",         category:"Quest", tier:"Saradomin", difficulty:"Hard",   xp:400, repeatable:false, objective:"Complete Legends' Quest" },
+  { id:"s_q_1", title:"The Long Road",        category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:false, questPointsTarget:200, objective:"Reach 200 quest points" },
+  { id:"s_q_2", title:"Dragon Slayer",         category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, questCompleteAnyOf:["dragon_slayer_i"], objective:"Complete Dragon Slayer I" },
+  { id:"s_q_3", title:"Legends Bound",         category:"Quest", tier:"Saradomin", difficulty:"Hard",   xp:400, repeatable:false, questCompleteAnyOf:["legends_quest"], objective:"Complete Legends' Quest" },
   { id:"s_q_4", title:"Piety Unlocked",        category:"Quest", tier:"Saradomin", difficulty:"Hard",   xp:400, repeatable:false, objective:"Complete the quest chain to unlock Piety" },
-  { id:"s_q_5", title:"Desert Treasure I",     category:"Quest", tier:"Saradomin", difficulty:"Hard",   xp:450, repeatable:false, objective:"Complete Desert Treasure I" },
+  { id:"s_q_5", title:"Desert Treasure I",     category:"Quest", tier:"Saradomin", difficulty:"Hard",   xp:450, repeatable:false, questCompleteAnyOf:["desert_treasure_i"], objective:"Complete Desert Treasure I" },
   { id:"s_q_6", title:"The Last Wish",         category:"Quest", tier:"Saradomin", difficulty:"Hard",   xp:400, repeatable:true,  objective:"Complete a quest with a Master difficulty rating" },
   { id:"s_q_7", title:"Story of Order",        category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, objective:"Complete a Saradomin-aligned quest" },
   { id:"s_q_8", title:"Breadth of Knowledge", category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true,  objective:"Complete 5 quests you have never attempted" },
@@ -329,7 +329,7 @@ export const WRIT_POOL = [
   { id:"s_en_6", title:"Dungeon Delve",        category:"Endurance", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true, objective:"Kill 500 monsters in dungeons total" },
   { id:"s_en_7", title:"The Unflinching",      category:"Endurance", tier:"Saradomin", difficulty:"Hard",   xp:450, repeatable:true, objective:"Complete any boss 3 times in a row without dying" },
 
-  { id:"s_ex_1", title:"The Ancestral Path", category:"Exploration", tier:"Saradomin", difficulty:"Hard",   xp:450, repeatable:false, objective:"Complete Desert Treasure I to unlock Ancient Magicks" },
+  { id:"s_ex_1", title:"The Ancestral Path", category:"Exploration", tier:"Saradomin", difficulty:"Hard",   xp:450, repeatable:false, questCompleteAnyOf:["desert_treasure_i"], objective:"Complete Desert Treasure I to unlock Ancient Magicks" },
   { id:"s_ex_2", title:"Raid Recon",          category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, requiresFn:(_,kc)=>(kc.chambers_of_xeric??0)===0, objective:"Enter the Chambers of Xeric for the first time" },
   { id:"s_ex_3", title:"Fairy Network",       category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, objective:"Complete the quest chain to unlock the fairy ring network" },
   { id:"s_ex_4", title:"The God Wars",        category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, objective:"Enter God Wars Dungeon and kill any enemy inside" },
@@ -364,11 +364,11 @@ export const WRIT_POOL = [
     objectiveFn:(s,kc)=>{ const gwd=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana"]; const target=lowestKCBoss(kc, gwd, s); return `Kill ${bossLabel(target)} 5 times in one session (${kc[target]??0} KC)`; },
     objective:"Kill any GWD boss 5 times in one session" },
 
-  { id:"b_q_1", title:"Monkey See",          category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:450, repeatable:false, objective:"Complete Monkey Madness I or II" },
-  { id:"b_q_2", title:"Recipe for Disaster", category:"Quest", tier:"Bandos", difficulty:"Elite",  xp:700, repeatable:false, objective:"Complete Recipe for Disaster" },
-  { id:"b_q_3", title:"The Fremennik",       category:"Quest", tier:"Bandos", difficulty:"Medium", xp:300, repeatable:false, objective:"Complete The Fremennik Trials" },
+  { id:"b_q_1", title:"Monkey See",          category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:450, repeatable:false, questCompleteAnyOf:["monkey_madness_i", "monkey_madness_ii"], objective:"Complete Monkey Madness I or II" },
+  { id:"b_q_2", title:"Recipe for Disaster", category:"Quest", tier:"Bandos", difficulty:"Elite",  xp:700, repeatable:false, questCompleteAnyOf:["recipe_for_disaster"], objective:"Complete Recipe for Disaster" },
+  { id:"b_q_3", title:"The Fremennik",       category:"Quest", tier:"Bandos", difficulty:"Medium", xp:300, repeatable:false, questCompleteAnyOf:["the_fremennik_trials"], objective:"Complete The Fremennik Trials" },
   // FIX: removed incorrect requiresFn that was checking prayer level against QP value
-  { id:"b_q_4", title:"225 Quest Points",    category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:550, repeatable:false, objective:"Reach 225 quest points" },
+  { id:"b_q_4", title:"225 Quest Points",    category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:550, repeatable:false, questPointsTarget:225, objective:"Reach 225 quest points" },
   { id:"b_q_5", title:"The Grand History",   category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:650, repeatable:true,  objective:"Complete 3 Master-difficulty quests" },
   { id:"b_q_6", title:"Bandos Allegiance",   category:"Quest", tier:"Bandos", difficulty:"Medium", xp:325, repeatable:false, objective:"Complete a quest tied to Bandos lore" },
   { id:"b_q_7", title:"The Slayer Codex",    category:"Skill Gap", tier:"Bandos", difficulty:"Hard",   xp:500, repeatable:false, requiresFn:(s)=>s.slayer<80, objective:"Reach 80 Slayer" },
@@ -454,10 +454,10 @@ export const WRIT_POOL = [
     },
     objective:"Face your lowest-KC boss anywhere on the account" },
 
-  { id:"z_q_1", title:"275 Quest Points",    category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:650, repeatable:false, objective:"Reach 275 QP" },
+  { id:"z_q_1", title:"275 Quest Points",    category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:650, repeatable:false, questPointsTarget:275, objective:"Reach 275 QP" },
   { id:"z_q_2", title:"The Grand Library",   category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:700, repeatable:true,  objective:"Complete 5 quests that each unlock a new area or spellbook" },
   { id:"z_q_3", title:"Zamorak's Path",      category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:650, repeatable:false, objective:"Complete a Zamorak-aligned quest chain" },
-  { id:"z_q_4", title:"Recipe Mastered",     category:"Quest", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, objective:"Complete Recipe for Disaster if not already done" },
+  { id:"z_q_4", title:"Recipe Mastered",     category:"Quest", tier:"Zamorak", difficulty:"Elite",  xp:800, repeatable:false, questCompleteAnyOf:["recipe_for_disaster"], objective:"Complete Recipe for Disaster if not already done" },
   { id:"z_q_5", title:"The Slayer Codex II", category:"Skill Gap", tier:"Zamorak", difficulty:"Hard",   xp:700, repeatable:false, requiresFn:(s)=>s.slayer<85, objective:"Reach 85 Slayer" },
   { id:"z_q_6", title:"Master of Quests",    category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:650, repeatable:true,  objective:"Complete every quest in a single skill quest chain" },
   { id:"z_q_7", title:"The Zamorak Codex",  category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:650, repeatable:true,  objective:"Complete a quest chain with a Zamorak-aligned NPC" },
@@ -511,7 +511,7 @@ export const WRIT_POOL = [
   { id:"z_ex_1", title:"Theatre Unlocked",       category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:900, repeatable:false, objective:"Complete Theatre of Blood entry mode with a modifier" },
   { id:"z_ex_2", title:"Tombs of Amascut",       category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:900, repeatable:false, requiresFn:(_,kc)=>(kc.tombs_of_amascut??0)===0, objective:"Enter and complete Tombs of Amascut for the first time" },
   { id:"z_ex_3", title:"Slayer Dungeon Deep",    category:"Exploration", tier:"Zamorak", difficulty:"Hard",   xp:700, repeatable:true,  objective:"Complete a Slayer task in every major dungeon" },
-  { id:"z_ex_4", title:"Ancient Secrets",        category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:950, repeatable:false, objective:"Complete Desert Treasure II" },
+  { id:"z_ex_4", title:"Ancient Secrets",        category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:950, repeatable:false, questCompleteAnyOf:["desert_treasure_ii"], objective:"Complete Desert Treasure II" },
   { id:"z_ex_5", title:"Farming Mastery",        category:"Exploration", tier:"Zamorak", difficulty:"Hard",   xp:550, repeatable:false, objective:"Unlock the Farming Guild" },
   { id:"z_ex_6", title:"The Grand Exchange Gamble",category:"Economic",  tier:"Zamorak", difficulty:"Hard",   xp:700, repeatable:true,  objective:"Earn 5M GP through merching or flipping" },
 
@@ -540,7 +540,7 @@ export const WRIT_POOL = [
 
   { id:"zr_q_3", title:"The Last Chapter",   category:"Quest",       tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Complete the final quest in any major quest chain" },
   { id:"zr_q_4", title:"Zaros Ascendant",    category:"Quest",       tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:false, objective:"Complete a quest that unlocks Zaros-aligned content" },
-  { id:"zr_q_5", title:"Quest Cape",         category:"Quest",       tier:"Zaros", difficulty:"Elite",  xp:1800, repeatable:false, landmark:true, objective:"Complete all quests" },
+  { id:"zr_q_5", title:"Quest Cape",         category:"Quest",       tier:"Zaros", difficulty:"Elite",  xp:1800, repeatable:false, landmark:true, requiresQuestCape:true, objective:"Complete all quests" },
 
   { id:"zr_sk_1", title:"The 90 Club",
     category:"Skill Gap", tier:"Zaros", difficulty:"Elite", xp:1000, repeatable:false,

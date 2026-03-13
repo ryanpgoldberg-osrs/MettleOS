@@ -1,4 +1,5 @@
 import { SKILLS } from "./constants.js";
+import { hasQuestCape } from "../utils/questProgress.js";
 import { skillLabel } from "../utils/labels.js";
 
 export const LANDMARK_WRITS = [
@@ -7,7 +8,7 @@ export const LANDMARK_WRITS = [
     objectiveFn: (skills) => { const maxed = SKILLS.filter(s => skills[s] >= 99); return `You have reached 99 in ${maxed.map(skillLabel).join(", ")}. The ledger acknowledges mastery.`; },
     objective:"Reach level 99 in any skill." },
   { id:"landmark_quest_cape", title:"Quest Cape", category:"Landmark", tier:"Zaros", difficulty:"Elite", xp:1500, landmark:true,
-    conditionFn: () => false, // Manual trigger — we can't detect quest completion from WOM API skill data alone
+    conditionFn: (_skills, _kc, questState) => hasQuestCape(questState),
     objective:"Complete all quests. One of the defining moments of any OSRS account." },
   { id:"landmark_total_1900", title:"Total Level 1900", category:"Landmark", tier:"Zaros", difficulty:"Elite", xp:1000,
     conditionFn: (skills) => { const total = Object.values(skills).reduce((a,b) => a+b, 0); return total >= 1900; },
@@ -18,10 +19,10 @@ export const LANDMARK_WRITS = [
     objective:"Complete any raid for the first time. A defining account moment." },
 ];
 
-export function getPendingLandmark(skillLevels, bossKC, completedLandmarks) {
+export function getPendingLandmark(skillLevels, bossKC, completedLandmarks, questState = null) {
   for (const lm of LANDMARK_WRITS) {
     if (completedLandmarks.includes(lm.id)) continue;
-    if (lm.conditionFn && lm.conditionFn(skillLevels, bossKC)) {
+    if (lm.conditionFn && lm.conditionFn(skillLevels, bossKC, questState)) {
       return {
         ...lm,
         objective: lm.objectiveFn ? lm.objectiveFn(skillLevels, bossKC) : lm.objective,

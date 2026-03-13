@@ -388,7 +388,7 @@ export default function MettlePrototype({
     if (activeFork || activeLandmark) return;
 
     // Landmark check — auto-trigger if conditions met
-    const pendingLandmark = getPendingLandmark(skillLevels, bossKC, completedLandmarks);
+    const pendingLandmark = getPendingLandmark(skillLevels, bossKC, completedLandmarks, questState);
     if (pendingLandmark) {
       setActiveLandmark(pendingLandmark);
       setLandmarkPhase("revealed");
@@ -396,11 +396,23 @@ export default function MettlePrototype({
     }
 
     // Fork check — auto-trigger if conditions met
-    const pendingFork = getPendingFork(mettleLevel, completedForks, completedIds);
+    const pendingFork = getPendingFork(mettleLevel, completedForks, completedIds, questState, bossKC);
     if (pendingFork) {
+      if (pendingFork.autoResolved) {
+        setCompletedForks(prev => ({
+          ...prev,
+          [pendingFork.id]: {
+            chosen: pendingFork.optionA.label,
+            rejected: pendingFork.optionB.label,
+            option: "auto_complete",
+            autoResolvedReason: "Both fork paths were already complete from synced progress.",
+          },
+        }));
+      } else {
       setActiveFork(pendingFork);
       setForkPhase("presenting");
       return;
+      }
     }
 
     // Trial reveal sequence
@@ -417,7 +429,7 @@ export default function MettlePrototype({
     }
 
     const last5=draftHistory.slice(-5);
-    const draft=generateDraft(skillLevels,bossKC,completedIds,last5,debtWrits,mettleLevel,null,streak,favoredDrawsRemaining);
+    const draft=generateDraft(skillLevels,bossKC,completedIds,last5,debtWrits,mettleLevel,null,streak,favoredDrawsRemaining,questState);
     setCurrentDraft(draft);
     setDraftMode("normal");
     setDraftHistory(prev=>[...prev,draft.map(w=>w.id)]);
@@ -430,7 +442,7 @@ export default function MettlePrototype({
   function rerollCurrentDraft() {
     if (currentDraft.length === 0 || mettleSeals < REROLL_COST) return;
     const last5 = draftHistory.slice(-5);
-    const draft = generateDraft(skillLevels, bossKC, completedIds, last5, debtWrits, mettleLevel, currentDraft.length);
+    const draft = generateDraft(skillLevels, bossKC, completedIds, last5, debtWrits, mettleLevel, currentDraft.length, streak, favoredDrawsRemaining, questState);
     setMettleSeals(prev => prev - REROLL_COST);
     setCurrentDraft(draft);
     setDraftMode("normal");
@@ -440,7 +452,7 @@ export default function MettlePrototype({
   function buyExtraDraftChoice() {
     if (currentDraft.length === 0 || currentDraft.length >= 4 || mettleSeals < EXTRA_CHOICE_COST) return;
     const last5 = draftHistory.slice(-5);
-    const expanded = generateDraft(skillLevels, bossKC, completedIds, last5, debtWrits, mettleLevel, currentDraft.length + 1);
+    const expanded = generateDraft(skillLevels, bossKC, completedIds, last5, debtWrits, mettleLevel, currentDraft.length + 1, streak, favoredDrawsRemaining, questState);
     setMettleSeals(prev => prev - EXTRA_CHOICE_COST);
     setCurrentDraft(expanded);
     setDraftMode("normal");
@@ -486,6 +498,7 @@ export default function MettlePrototype({
     // option is "a" or "b"
     const chosen = option === "a" ? fork.optionA : fork.optionB;
     const rejected = option === "a" ? fork.optionB : fork.optionA;
+    if (chosen.alreadyCompleted) return;
     setCompletedForks(prev => ({ ...prev, [fork.id]: { chosen: chosen.label, rejected: rejected.label, option } }));
     // Create an active writ from the chosen fork option
     setActiveWrit({
@@ -582,8 +595,10 @@ export default function MettlePrototype({
       if (newDeferCounts[cat] >= 3 && reckoningWrits.length < 2) {
         const totalForCat = (reckoningTotals[cat] || 0) + 1;
         setReckoningTotals(prev => ({ ...prev, [cat]: totalForCat }));
-        const rw = generateReckoningWrit(cat, totalForCat, mettleLevel, skillLevels, bossKC);
-        setReckoningWrits(prev => [...prev, rw]);
+        const rw = generateReckoningWrit(cat, totalForCat, mettleLevel, skillLevels, bossKC, questState);
+        if (rw) {
+          setReckoningWrits(prev => [...prev, rw]);
+        }
         // Reset the category defer count
         setCategoryDeferCounts(prev => ({ ...prev, [cat]: 0 }));
       }
@@ -720,9 +735,9 @@ export default function MettlePrototype({
   const writPoolCount = WRIT_POOL.filter(w=>!w.trial).length;
   const questCapeLandmark = LANDMARK_WRITS.find(lm => lm.id === "landmark_quest_cape");
   const canTriggerQuestCape = !!questCapeLandmark && !completedLandmarks.includes(questCapeLandmark.id);
-  const showQuestCapePrompt = canTriggerQuestCape && (mettleLevel >= 80 || assignedPath || completedLandmarks.length > 0);
   const questSummary = summarizeQuestState(questState);
   const diarySummary = summarizeDiaryState(diaryState);
+  const showQuestCapePrompt = canTriggerQuestCape && !questSummary.questCapeDetected && (mettleLevel >= 80 || assignedPath || completedLandmarks.length > 0);
   const viewLabels = { board: "LEDGER", stats: "STATS", history: "HISTORY" };
   const tierCounts = TIER_ORDER.map(t=>({
     tier:t, color:TIER_COLORS[t],
@@ -1172,25 +1187,33 @@ export default function MettlePrototype({
               <div style={{fontSize:"10px",letterSpacing:"6px",color:"#dc2626",marginBottom:"16px"}}>⚡ FORK TASK ⚡</div>
               <div style={{...s.displayBigTitle,color:"#fff",marginBottom:"10px"}}>{activeFork.title}</div>
               <div style={{fontSize:"12px",color:"#666",marginBottom:"32px",maxWidth:"500px",margin:"0 auto 32px",lineHeight:"1.6"}}>
-                Two paths diverge. You must choose one. The other vanishes permanently.
+                {activeFork.availableOptions?.length === 1
+                  ? "One path is already complete on this account. The remaining path is the only live branch."
+                  : "Two paths diverge. You must choose one. The other vanishes permanently."}
               </div>
               <div className="mettle-mobile-stack" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"20px",maxWidth:"640px",margin:"0 auto"}}>
-                <div style={{border:"1px solid #444",padding:"24px 16px",background:"#111",cursor:"pointer",transition:"border-color 0.2s"}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor="#dc2626"}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor="#444"}
+                <div style={{border:`1px solid ${activeFork.optionA.alreadyCompleted ? "#1f4d36" : "#444"}`,padding:"24px 16px",background:"#111",cursor:activeFork.optionA.alreadyCompleted ? "default" : "pointer",opacity:activeFork.optionA.alreadyCompleted ? 0.72 : 1,transition:"border-color 0.2s"}}
+                  onMouseEnter={e=>{ if (!activeFork.optionA.alreadyCompleted) e.currentTarget.style.borderColor="#dc2626"; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.borderColor=activeFork.optionA.alreadyCompleted ? "#1f4d36" : "#444"; }}
                   onClick={()=>chooseForkOption(activeFork,"a")}>
                   <div style={{fontSize:"10px",letterSpacing:"3px",color:"#dc2626",marginBottom:"8px"}}>OPTION A</div>
                   <div style={{...s.displayCardTitle,fontSize:"18px",marginBottom:"8px"}}>{activeFork.optionA.label}</div>
                   <div style={{fontSize:"12px",color:"#888",lineHeight:"1.5"}}>{activeFork.optionA.objective}</div>
+                  {activeFork.optionA.alreadyCompleted && (
+                    <div style={{marginTop:"10px",fontSize:"11px",color:"#4ade80"}}>Already complete from synced progress</div>
+                  )}
                   <div style={{marginTop:"12px",fontSize:"11px",color:"#555"}}>{activeFork.xp} XP</div>
                 </div>
-                <div style={{border:"1px solid #444",padding:"24px 16px",background:"#111",cursor:"pointer",transition:"border-color 0.2s"}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor="#dc2626"}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor="#444"}
+                <div style={{border:`1px solid ${activeFork.optionB.alreadyCompleted ? "#1f4d36" : "#444"}`,padding:"24px 16px",background:"#111",cursor:activeFork.optionB.alreadyCompleted ? "default" : "pointer",opacity:activeFork.optionB.alreadyCompleted ? 0.72 : 1,transition:"border-color 0.2s"}}
+                  onMouseEnter={e=>{ if (!activeFork.optionB.alreadyCompleted) e.currentTarget.style.borderColor="#dc2626"; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.borderColor=activeFork.optionB.alreadyCompleted ? "#1f4d36" : "#444"; }}
                   onClick={()=>chooseForkOption(activeFork,"b")}>
                   <div style={{fontSize:"10px",letterSpacing:"3px",color:"#dc2626",marginBottom:"8px"}}>OPTION B</div>
                   <div style={{...s.displayCardTitle,fontSize:"18px",marginBottom:"8px"}}>{activeFork.optionB.label}</div>
                   <div style={{fontSize:"12px",color:"#888",lineHeight:"1.5"}}>{activeFork.optionB.objective}</div>
+                  {activeFork.optionB.alreadyCompleted && (
+                    <div style={{marginTop:"10px",fontSize:"11px",color:"#4ade80"}}>Already complete from synced progress</div>
+                  )}
                   <div style={{marginTop:"12px",fontSize:"11px",color:"#555"}}>{activeFork.xp} XP</div>
                 </div>
               </div>
@@ -1544,7 +1567,11 @@ export default function MettlePrototype({
                 return (
                   <div key={id} style={{display:"flex",justifyContent:"space-between",padding:"5px 8px",background:"#111",fontSize:"11px",marginBottom:"3px"}}>
                     <span style={{color:"#888"}}>{def?.title || id}</span>
-                    <span><span style={{color:"#4ade80"}}>{fork.chosen}</span> <span style={{color:"#444"}}>/ rejected</span> <span style={{color:"#f87171",textDecoration:"line-through"}}>{fork.rejected}</span></span>
+                    <span>
+                      {fork.autoResolvedReason
+                        ? <span style={{color:"#4ade80"}}>{fork.autoResolvedReason}</span>
+                        : <><span style={{color:"#4ade80"}}>{fork.chosen}</span> <span style={{color:"#444"}}>/ rejected</span> <span style={{color:"#f87171",textDecoration:"line-through"}}>{fork.rejected}</span></>}
+                    </span>
                   </div>
                 );
               })}

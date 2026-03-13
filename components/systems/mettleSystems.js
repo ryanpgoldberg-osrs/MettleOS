@@ -11,6 +11,7 @@ import { FORK_WRITS } from "../data/forkDefs.js";
 import { LANDMARK_WRITS } from "../data/landmarkDefs.js";
 import { WRIT_POOL } from "../data/writPool.js";
 import { getModifierForCategory, rollModifier } from "../utils/modifiers.js";
+import { isQuestObjectiveAlreadyComplete } from "../utils/questProgress.js";
 import { accountAverage, gapScores } from "../utils/skillHelpers.js";
 import { generateFinalTrialDraft, computePath as computePathFromPool } from "../data/finalTrialDefs.js";
 
@@ -23,7 +24,8 @@ export function materializeWrit(writ, skillLevels, bossKC) {
   };
 }
 
-export function meetsRequirements(writ, skillLevels, bossKC) {
+export function meetsRequirements(writ, skillLevels, bossKC, questState = null) {
+  if (isQuestObjectiveAlreadyComplete(writ, questState, bossKC)) return false;
   if (writ.requiresFn) return writ.requiresFn(skillLevels, bossKC);
   return true;
 }
@@ -99,7 +101,7 @@ export function getPendingTrial(mettleLevel, completedIds) {
   return null;
 }
 
-export function generateReckoningWrit(category, reckoningCount, mettleLevel, skillLevels, bossKC) {
+export function generateReckoningWrit(category, reckoningCount, mettleLevel, skillLevels, bossKC, questState = null) {
   const currentTier = tierForLevel(mettleLevel);
   const eligible = WRIT_POOL.filter(w =>
     !w.trial &&
@@ -107,7 +109,7 @@ export function generateReckoningWrit(category, reckoningCount, mettleLevel, ski
       (category === "PvM Intro" && w.category === "PvM Endurance") ||
       (category === "PvM Endurance" && w.category === "PvM Intro")) &&
     TIER_ORDER.indexOf(w.tier) <= TIER_ORDER.indexOf(currentTier) &&
-    meetsRequirements(w, skillLevels, bossKC)
+    meetsRequirements(w, skillLevels, bossKC, questState)
   );
 
   let baseWrit = eligible[0];
@@ -136,11 +138,11 @@ export function generateReckoningWrit(category, reckoningCount, mettleLevel, ski
   };
 }
 
-function computeWeight(writ, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel) {
+function computeWeight(writ, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel, questState = null) {
   if (writ.trial) return 0;
   if (!writ.repeatable && completedIds.includes(writ.id)) return 0;
   if (suppressedIds.includes(writ.id)) return 0;
-  if (!meetsRequirements(writ, skillLevels, bossKC)) return 0;
+  if (!meetsRequirements(writ, skillLevels, bossKC, questState)) return 0;
   if (TIER_ORDER.indexOf(writ.tier) > TIER_ORDER.indexOf(tierForLevel(mettleLevel))) return 0;
 
   const gaps = gapScores(skillLevels);
@@ -194,14 +196,14 @@ function computeWeight(writ, skillLevels, bossKC, completedIds, suppressedIds, m
   return Math.max(0.1, weight);
 }
 
-export function generateDraft(skillLevels, bossKC, completedIds, recentDraftHistory, debtWrits, mettleLevel, requestedSize = null, streak = 0, favoredDrawsRemaining = 0) {
+export function generateDraft(skillLevels, bossKC, completedIds, recentDraftHistory, debtWrits, mettleLevel, requestedSize = null, streak = 0, favoredDrawsRemaining = 0, questState = null) {
   const status = getDebtStatus(debtWrits, false, streak, favoredDrawsRemaining);
   const draftSize = requestedSize ?? draftSizeFromStatus(status);
   const suppressedIds = recentDraftHistory.flat();
 
   const weighted = WRIT_POOL
     .filter(w => !w.trial)
-    .map(w => ({ ...w, weight: computeWeight(w, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel) }))
+    .map(w => ({ ...w, weight: computeWeight(w, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel, questState) }))
     .filter(w => w.weight > 0);
 
   if (weighted.length === 0) return [];
