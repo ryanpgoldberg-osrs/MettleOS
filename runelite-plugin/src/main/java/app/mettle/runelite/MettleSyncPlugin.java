@@ -9,6 +9,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import org.slf4j.Logger;
@@ -25,6 +26,9 @@ public class MettleSyncPlugin extends Plugin
 
     @Inject
     private ClientToolbar clientToolbar;
+
+    @Inject
+    private ClientThread clientThread;
 
     @Inject
     private MettleSyncConfig config;
@@ -53,7 +57,7 @@ public class MettleSyncPlugin extends Plugin
     @Override
     protected void startUp()
     {
-        panel = new MettleSyncPanel(syncService, questSyncService, achievementDiarySyncService, bossSyncService);
+        panel = new MettleSyncPanel(clientThread, syncService, questSyncService, achievementDiarySyncService, bossSyncService);
         navigationButton = NavigationButton.builder()
             .tooltip("Mettle Sync")
             .icon(syncService.createNavigationIcon())
@@ -89,7 +93,7 @@ public class MettleSyncPlugin extends Plugin
             String exportPath = syncService.exportSnapshot().toString();
             if (panel != null)
             {
-                panel.refreshSummary();
+                panel.refreshSummaryAsync();
                 panel.setStatus("Exported to " + exportPath);
             }
             log.info("Exported Mettle sync snapshot to {}", exportPath);

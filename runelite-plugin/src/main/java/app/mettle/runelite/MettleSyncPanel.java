@@ -11,10 +11,12 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.PluginPanel;
 
 public class MettleSyncPanel extends PluginPanel
 {
+    private final ClientThread clientThread;
     private final MettleSyncService syncService;
     private final QuestSyncService questSyncService;
     private final AchievementDiarySyncService achievementDiarySyncService;
@@ -26,12 +28,14 @@ public class MettleSyncPanel extends PluginPanel
     private final JLabel bossLabel = new JLabel();
 
     public MettleSyncPanel(
+        ClientThread clientThread,
         MettleSyncService syncService,
         QuestSyncService questSyncService,
         AchievementDiarySyncService achievementDiarySyncService,
         BossSyncService bossSyncService
     )
     {
+        this.clientThread = clientThread;
         this.syncService = syncService;
         this.questSyncService = questSyncService;
         this.achievementDiarySyncService = achievementDiarySyncService;
@@ -77,36 +81,47 @@ public class MettleSyncPanel extends PluginPanel
         content.add(statusLabel);
 
         add(content, BorderLayout.NORTH);
-        refreshSummary();
+        refreshSummaryAsync();
     }
 
-    public void refreshSummary()
+    public void refreshSummaryAsync()
     {
-        int completedQuests = questSyncService.completedQuestCount();
-        int startedQuests = questSyncService.startedQuestCount();
-        int completedDiaryTiers = achievementDiarySyncService.completedTierCount();
-        questLabel.setText("Quests: " + completedQuests + " complete, " + startedQuests + " in progress");
-        diaryLabel.setText("Diaries: " + completedDiaryTiers + " completed tiers tracked");
-        bossLabel.setText("Bosses: " + bossSyncService.sourceLabel());
+        clientThread.invokeLater(() ->
+        {
+            int completedQuests = questSyncService.completedQuestCount();
+            int startedQuests = questSyncService.startedQuestCount();
+            int completedDiaryTiers = achievementDiarySyncService.completedTierCount();
+            String bossText = "Bosses: " + bossSyncService.sourceLabel();
+
+            SwingUtilities.invokeLater(() ->
+            {
+                questLabel.setText("Quests: " + completedQuests + " complete, " + startedQuests + " in progress");
+                diaryLabel.setText("Diaries: " + completedDiaryTiers + " completed tiers tracked");
+                bossLabel.setText(bossText);
+            });
+        });
     }
 
     public void setStatus(String status)
     {
-        statusLabel.setText(status);
+        SwingUtilities.invokeLater(() -> statusLabel.setText(status));
     }
 
     private void exportSnapshot()
     {
-        try
+        setStatus("Exporting...");
+        clientThread.invokeLater(() ->
         {
-            refreshSummary();
-            setStatus("Exporting...");
-            String exportPath = syncService.exportSnapshot().toString();
-            SwingUtilities.invokeLater(() -> setStatus("Exported to " + exportPath));
-        }
-        catch (IOException ex)
-        {
-            SwingUtilities.invokeLater(() -> setStatus("Export failed: " + ex.getMessage()));
-        }
+            try
+            {
+                String exportPath = syncService.exportSnapshot().toString();
+                refreshSummaryAsync();
+                setStatus("Exported to " + exportPath);
+            }
+            catch (IOException ex)
+            {
+                setStatus("Export failed: " + ex.getMessage());
+            }
+        });
     }
 }
