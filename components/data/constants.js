@@ -64,7 +64,7 @@ export const EXTRA_CHOICE_COST = 5;
 export const METTLE_UNLOCKS = [
   { level: 10, unlock: "Trials" },
   { level: 20, unlock: "Draft (3 options)" },
-  { level: 40, unlock: "Endurance Writs" },
+  { level: 40, unlock: "Endurance Tasks" },
   { level: 60, unlock: "Elite modifiers" },
   { level: 80, unlock: "Mythic pressure" },
 ];

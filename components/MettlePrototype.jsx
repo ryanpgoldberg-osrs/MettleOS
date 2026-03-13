@@ -36,24 +36,24 @@ import {
   xpToLevel,
 } from "./systems/mettleSystems.js";
 import { modifierXpBonus, sealsForWrit, streakSealBonus, writXp } from "./utils/modifiers.js";
-import { loadSave, SAVE_KEY, writeSave } from "./utils/persistence.js";
+import { clearSave, loadSave, writeSave } from "./utils/persistence.js";
 import { accountAverage } from "./utils/skillHelpers.js";
 
 function trialFlavorLine(trial) {
-  if (!trial) return "The ledger has made its judgment.";
+  if (!trial) return "The ledger has picked the next pressure point.";
   if (trial.tier === "Zaros") return "Your path narrows. Only proof remains.";
-  if (trial.category === "Trial") return "The ledger has measured your account and found a weakness worth naming.";
-  return "Comfort is not part of this trial.";
+  if (trial.category === "Trial") return "The ledger found a weakness your account now has to answer.";
+  return "This trial is now the priority.";
 }
 
 function trialCeremonyLabel(trial) {
-  if (!trial) return "A writ has been drawn";
-  if (trial.tier === "Guthix") return "A writ has been drawn";
+  if (!trial) return "A task is ready";
+  if (trial.tier === "Guthix") return "A task is ready";
   if (trial.tier === "Saradomin") return "A sealed directive emerges";
-  if (trial.tier === "Bandos") return "A harsher writ is invoked";
+  if (trial.tier === "Bandos") return "A harder task is ready";
   if (trial.tier === "Zamorak") return "A blood-marked decree descends";
   if (trial.tier === "Zaros") return "The final reckoning stirs";
-  return "A writ has been drawn";
+  return "A task is ready";
 }
 
 function activeTrialPrompt(trial) {
@@ -62,11 +62,11 @@ function activeTrialPrompt(trial) {
     if (trial.trialModifier) return "The terms are fixed. Enter prepared and clear the trial.";
     if (trial.tier === "Zaros") return "The trial stands open. Only execution remains.";
     if (trial.tier === "Zamorak") return "No more ceremony. The ledger expects action.";
-    return "The writ is now active. Enter and settle it.";
+    return "The task is now active. Finish it to move on.";
   }
   if (trial.trialModifier) return "Restriction imposed. Completion now carries weight.";
   if (trial.tier === "Zaros") return "No lesser answer will satisfy this trial.";
-  if (trial.tier === "Zamorak") return "This writ does not ask politely.";
+  if (trial.tier === "Zamorak") return "This task does not ask politely.";
   return "The moment has arrived. Only completion settles the draw.";
 }
 
@@ -83,6 +83,10 @@ function makeQueueEntryId() {
 
 function toDeferredQueueEntry(writ) {
   return { ...writ, queueEntryId: writ.queueEntryId || makeQueueEntryId() };
+}
+
+function hasOwn(save, key) {
+  return Object.prototype.hasOwnProperty.call(save, key);
 }
 
 // ─────────────────────────────────────────────
@@ -165,35 +169,47 @@ export default function MettlePrototype({
   useEffect(() => {
     if (hasInitialStats) return;
     const save=loadSave(); if(!save) return;
-    if(save.skillLevels)         setSkillLevels(save.skillLevels);
-    if(save.skillLevels)         setManualSkills(save.skillLevels);
-    if(save.bossKC)              setBossKC(save.bossKC);
-    if(save.bossKC)              setManualKC(save.bossKC);
-    if(save.mettleXP)            setMettleXP(save.mettleXP);
-    if(save.mettleSeals)         setMettleSeals(save.mettleSeals);
-    if(save.streak)              setStreak(save.streak);
-    if(save.completedIds)        setCompletedIds(save.completedIds);
-    if(save.history)             setHistory(save.history);
-    if(save.debtWrits)           setDebtWrits(save.debtWrits.map(toDeferredQueueEntry));
-    if(save.mustClearAll)        setMustClearAll(save.mustClearAll);
-    if(save.draftHistory)        setDraftHistory(save.draftHistory);
-    if(save.statsLoaded)         setStatsLoaded(save.statsLoaded);
-    if(save.rsn)                 setRsn(save.rsn);
-    if(save.categoryDeferCounts) setCategoryDeferCounts(save.categoryDeferCounts);
-    if(save.reckoningWrits)      setReckoningWrits(save.reckoningWrits);
-    if(save.reckoningTotals)     setReckoningTotals(save.reckoningTotals);
-    if(save.favoredDrawsRemaining) setFavoredDrawsRemaining(save.favoredDrawsRemaining);
-    if(save.completedForks)      setCompletedForks(save.completedForks);
-    if(save.completedLandmarks)  setCompletedLandmarks(save.completedLandmarks);
-    if(save.assignedPath)        setAssignedPath(save.assignedPath);
-    if(save.pathRevealed)        setPathRevealed(save.pathRevealed);
+    if(hasOwn(save, "skillLevels"))         setSkillLevels(save.skillLevels);
+    if(hasOwn(save, "skillLevels"))         setManualSkills(save.skillLevels);
+    if(hasOwn(save, "bossKC"))              setBossKC(save.bossKC);
+    if(hasOwn(save, "bossKC"))              setManualKC(save.bossKC);
+    if(hasOwn(save, "mettleXP"))            setMettleXP(save.mettleXP);
+    if(hasOwn(save, "mettleSeals"))         setMettleSeals(save.mettleSeals);
+    if(hasOwn(save, "streak"))              setStreak(save.streak);
+    if(hasOwn(save, "completedIds"))        setCompletedIds(save.completedIds);
+    if(hasOwn(save, "history"))             setHistory(save.history);
+    if(hasOwn(save, "debtWrits"))           setDebtWrits(save.debtWrits.map(toDeferredQueueEntry));
+    if(hasOwn(save, "mustClearAll"))        setMustClearAll(save.mustClearAll);
+    if(hasOwn(save, "draftHistory"))        setDraftHistory(save.draftHistory);
+    if(hasOwn(save, "currentDraft"))        setCurrentDraft(save.currentDraft);
+    if(hasOwn(save, "draftMode"))           setDraftMode(save.draftMode);
+    if(hasOwn(save, "activeWrit"))          setActiveWrit(save.activeWrit);
+    if(hasOwn(save, "activeView"))          setActiveView(save.activeView);
+    if(hasOwn(save, "statsLoaded"))         setStatsLoaded(save.statsLoaded);
+    if(hasOwn(save, "rsn"))                 setRsn(save.rsn);
+    if(hasOwn(save, "trialPhase"))          setTrialPhase(save.trialPhase);
+    if(hasOwn(save, "pendingTrialData"))    setPendingTrialData(save.pendingTrialData);
+    if(hasOwn(save, "categoryDeferCounts")) setCategoryDeferCounts(save.categoryDeferCounts);
+    if(hasOwn(save, "reckoningWrits"))      setReckoningWrits(save.reckoningWrits);
+    if(hasOwn(save, "reckoningTotals"))     setReckoningTotals(save.reckoningTotals);
+    if(hasOwn(save, "favoredDrawsRemaining")) setFavoredDrawsRemaining(save.favoredDrawsRemaining);
+    if(hasOwn(save, "completedForks"))      setCompletedForks(save.completedForks);
+    if(hasOwn(save, "activeFork"))          setActiveFork(save.activeFork);
+    if(hasOwn(save, "forkPhase"))           setForkPhase(save.forkPhase);
+    if(hasOwn(save, "completedLandmarks"))  setCompletedLandmarks(save.completedLandmarks);
+    if(hasOwn(save, "activeLandmark"))      setActiveLandmark(save.activeLandmark);
+    if(hasOwn(save, "landmarkPhase"))       setLandmarkPhase(save.landmarkPhase);
+    if(hasOwn(save, "assignedPath"))        setAssignedPath(save.assignedPath);
+    if(hasOwn(save, "pathRevealed"))        setPathRevealed(save.pathRevealed);
   }, [hasInitialStats]);
 
   // ── SAVE
   useEffect(() => {
     if(!statsLoaded) return;
-    writeSave({ skillLevels,bossKC,mettleXP,mettleSeals,streak,completedIds,history,debtWrits,mustClearAll,draftHistory,statsLoaded,rsn,categoryDeferCounts,reckoningWrits,reckoningTotals,favoredDrawsRemaining,completedForks,completedLandmarks,assignedPath,pathRevealed });
-  }, [skillLevels,bossKC,mettleXP,mettleSeals,streak,completedIds,history,debtWrits,mustClearAll,draftHistory,statsLoaded,rsn,categoryDeferCounts,reckoningWrits,reckoningTotals,favoredDrawsRemaining,completedForks,completedLandmarks,assignedPath,pathRevealed]);
+    writeSave({
+      skillLevels,bossKC,mettleXP,mettleSeals,streak,completedIds,history,debtWrits,mustClearAll,draftHistory,currentDraft,draftMode,activeWrit,activeView,statsLoaded,rsn,trialPhase,pendingTrialData,categoryDeferCounts,reckoningWrits,reckoningTotals,favoredDrawsRemaining,completedForks,activeFork,forkPhase,completedLandmarks,activeLandmark,landmarkPhase,assignedPath,pathRevealed,
+    });
+  }, [skillLevels,bossKC,mettleXP,mettleSeals,streak,completedIds,history,debtWrits,mustClearAll,draftHistory,currentDraft,draftMode,activeWrit,activeView,statsLoaded,rsn,trialPhase,pendingTrialData,categoryDeferCounts,reckoningWrits,reckoningTotals,favoredDrawsRemaining,completedForks,activeFork,forkPhase,completedLandmarks,activeLandmark,landmarkPhase,assignedPath,pathRevealed]);
 
   const mettleLevel = xpToLevel(mettleXP);
   const currentTier = tierForLevel(mettleLevel);
@@ -246,7 +262,7 @@ export default function MettlePrototype({
       setSkillLevels(levels); setManualSkills(levels);
       const kc={}; KEY_BOSSES.forEach(b=>{kc[b]=data?.bosses?.[b]??0;});
       setBossKC(kc); setManualKC(kc); setStatsLoaded(true);
-    } catch { setFetchError("Failed to load — check your RSN and try again."); }
+    } catch { setFetchError("Couldn't load that player. Check the RSN or switch to manual entry."); }
     finally { setLoading(false); }
   }
 
@@ -516,7 +532,7 @@ export default function MettlePrototype({
     setCompletedLandmarks([]); setActiveLandmark(null); setLandmarkPhase(null);
     setAssignedPath(null); setPathRevealed(false);
     setConfirmReset(false);
-    try { localStorage.removeItem(SAVE_KEY); } catch {}
+    clearSave();
     onResetToEntry?.();
   }
 
@@ -579,10 +595,10 @@ export default function MettlePrototype({
   const hasLandmarkPending = !!activeLandmark;
   const drawBlocked = mustClearAll || debtWrits.length >= 3 || hasReckonings || gateBlocked || hasForkPending || hasLandmarkPending;
   let blockReason = "";
-  if (hasForkPending) blockReason = "FORK WRIT ACTIVE — CHOOSE A PATH";
+  if (hasForkPending) blockReason = "FORK TASK ACTIVE — CHOOSE A PATH";
   else if (hasLandmarkPending) blockReason = "LANDMARK ACTIVE — ACKNOWLEDGE TO CONTINUE";
-  else if (hasReckonings) blockReason = `CLEAR ${reckoningWrits.length} RECKONING WRIT${reckoningWrits.length>1?"S":""} TO DRAW`;
-  else if (mustClearAll) blockReason = `CLEAR ALL ${debtWrits.length} DEFERRED WRITS TO DRAW`;
+  else if (hasReckonings) blockReason = `CLEAR ${reckoningWrits.length} RECKONING TASK${reckoningWrits.length>1?"S":""} TO DRAW`;
+  else if (mustClearAll) blockReason = `CLEAR ALL ${debtWrits.length} DEFERRED TASKS TO DRAW`;
   else if (gateBlocked) blockReason = "CLEAR ALL DEBT & RECKONINGS TO ADVANCE PAST TIER GATE";
 
   return (
@@ -801,7 +817,7 @@ export default function MettlePrototype({
               </div>
               <div className="mettle-summary-cell">
                 <div style={{fontSize:"10px",letterSpacing:"3px",color:"#666",textTransform:"uppercase"}}>Pressure</div>
-                <strong>{debtWrits.length} deferred · {reckoningWrits.length} reckoning</strong>
+                <strong>{debtWrits.length} deferred · {reckoningWrits.length} reckoning tasks</strong>
               </div>
               <div className="mettle-summary-cell">
                 <div style={{fontSize:"10px",letterSpacing:"3px",color:"#666",textTransform:"uppercase"}}>Control</div>
@@ -822,7 +838,7 @@ export default function MettlePrototype({
               </div>
               <div className="mettle-mobile-row" style={s.railRow}>
                 <span style={{color:"#686868"}}>Cleared</span>
-                <span style={{color:"#d8d0b6"}}>{completedIds.length} writs</span>
+                <span style={{color:"#d8d0b6"}}>{completedIds.length} tasks</span>
               </div>
               <div className="mettle-mobile-row" style={s.railRow}>
                 <span style={{color:"#686868"}}>Ledger</span>
@@ -852,18 +868,21 @@ export default function MettlePrototype({
           <div style={{display:"flex",gap:"4px",marginBottom:"16px"}}>
             {["manual","wom"].map(m=>(
               <button key={m} style={s.btn(inputMode===m)} onClick={()=>setInputMode(m)}>
-                {m==="manual"?"MANUAL ENTRY":"WISE OLD MAN"}
+                {m==="manual"?"ENTER MANUALLY":"IMPORT FROM WISE OLD MAN"}
               </button>
             ))}
           </div>
           {inputMode==="wom" && (
             <div>
+              <div style={{fontSize:"11px",color:"#666",marginBottom:"10px",lineHeight:"1.6"}}>
+                Enter your RuneScape name to import public stats from Wise Old Man.
+              </div>
               <div style={{display:"flex",gap:"8px"}}>
                 <input style={{flex:1,background:"#111",border:"1px solid #2a2a2a",color:"#fff",padding:"8px 12px",fontFamily:"inherit",fontSize:"13px",outline:"none"}}
                   type="text" placeholder="Enter RSN..." value={rsn}
                   onChange={e=>setRsn(e.target.value)} onKeyDown={e=>e.key==="Enter"&&loadPlayerStats()}/>
                 <button style={s.btn(false,loading?"#1a1a1a":"#fff",loading?"#555":"#000")} onClick={loadPlayerStats} disabled={loading}>
-                  {loading?"LOADING...":"LOAD"}
+                  {loading?"IMPORTING...":"IMPORT"}
                 </button>
               </div>
               {fetchError && <div style={{color:"#f87171",fontSize:"11px",marginTop:"8px"}}>⚠ {fetchError}</div>}
@@ -882,7 +901,7 @@ export default function MettlePrototype({
                   </div>
                 ))}
               </div>
-              <div style={s.secHead}>BOSS KC</div>
+              <div style={s.secHead}>BOSS KILLCOUNT</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(210px, 1fr))",gap:"3px",marginBottom:"20px"}}>
                 {KEY_BOSSES.map(boss=>(
                   <div key={boss} style={{display:"flex",alignItems:"center",gap:"6px",background:"#111",padding:"5px 8px"}}>
@@ -893,7 +912,7 @@ export default function MettlePrototype({
                   </div>
                 ))}
               </div>
-              <button style={{...s.btn(true),padding:"10px 32px"}} onClick={confirmManualStats}>CONFIRM — START RUN</button>
+              <button style={{...s.btn(true),padding:"10px 32px"}} onClick={confirmManualStats}>START RUN</button>
             </div>
           )}
         </div>
@@ -902,7 +921,7 @@ export default function MettlePrototype({
       {statsLoaded && (
         <div style={s.infoStrip}>
           <div className="mettle-info-strip" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"14px",flexWrap:"wrap",width:"100%"}}>
-          <span className="mettle-info-primary" style={s.infoPrimary}>✓ {rsn||"Manual Entry"} · AVG LVL {Math.round(avg)} · {mettleSeals} SEALS · {streak} STREAK</span>
+          <span className="mettle-info-primary" style={s.infoPrimary}>✓ {rsn||"Manual stats"} · AVG LVL {Math.round(avg)} · {mettleSeals} SEALS · {streak} STREAK</span>
           <div className="mettle-info-actions" style={s.infoMetaWrap}>
             <button style={{...s.btn(false),fontSize:"10px",padding:"4px 10px"}} onClick={()=>setStatsLoaded(false)}>EDIT STATS</button>
           </div>
@@ -955,7 +974,7 @@ export default function MettlePrototype({
                       ✓ COMPLETE (+{recoveryXpForWrit(rw)} XP)
                     </button>
                     <button style={s.btn(false,"#1a0a0a","#f87171")} onClick={()=>failReckoningWrit(rw.id)}>
-                      ✗ FAIL → DEFER QUEUE
+                      ✗ FAIL → DEFERRED TASKS
                     </button>
                   </div>
                 </div>
@@ -966,7 +985,7 @@ export default function MettlePrototype({
           {/* CATEGORY WARNINGS (2 defers) */}
           {warningCategories.length > 0 && (
             <div style={{...s.sectionFrame,borderColor:"#44337a",background:"#0e0a16",fontSize:"11px",color:"#a78bfa",padding:"12px 16px"}}>
-              ⚠ RECKONING WARNING — {warningCategories.join(", ")} at 2 defers. One more defer triggers a Reckoning Writ.
+              ⚠ RECKONING WARNING — {warningCategories.join(", ")} at 2 defers. One more defer triggers a Reckoning Task.
             </div>
           )}
 
@@ -988,7 +1007,7 @@ export default function MettlePrototype({
           {/* ═══ FORK PRESENTATION ═══ */}
           {forkPhase === "presenting" && activeFork && (
             <div style={{animation:"trialRevealIn 0.6s ease-out, forkPulse 3s infinite",textAlign:"center",padding:"48px 20px",border:"2px solid #dc2626",background:"radial-gradient(circle at top, rgba(220,38,38,0.12) 0%, rgba(12,12,12,1) 40%)",marginBottom:"16px"}}>
-              <div style={{fontSize:"10px",letterSpacing:"6px",color:"#dc2626",marginBottom:"16px"}}>⚡ FORK WRIT ⚡</div>
+              <div style={{fontSize:"10px",letterSpacing:"6px",color:"#dc2626",marginBottom:"16px"}}>⚡ FORK TASK ⚡</div>
               <div style={{...s.displayBigTitle,color:"#fff",marginBottom:"10px"}}>{activeFork.title}</div>
               <div style={{fontSize:"12px",color:"#666",marginBottom:"32px",maxWidth:"500px",margin:"0 auto 32px",lineHeight:"1.6"}}>
                 Two paths diverge. You must choose one. The other vanishes permanently.
@@ -1038,7 +1057,7 @@ export default function MettlePrototype({
           {debtWrits.length>0 && (
             <div style={{...s.sectionFrame,borderColor:"#3d1515",background:"#0a0606"}}>
               <div style={{...s.secHead,color:"#f87171"}}>
-                DEFER QUEUE — {debtWrits.length} OUTSTANDING
+                DEFERRED TASKS — {debtWrits.length} OUTSTANDING
                 {mustClearAll && " · BLOCKED — CLEAR ALL TO DRAW AGAIN"}
               </div>
               {debtWrits.map((c)=>(
@@ -1063,7 +1082,7 @@ export default function MettlePrototype({
               <div style={{fontSize:"10px",letterSpacing:"6px",color:"#d4af37",marginBottom:"24px"}}>⚔ TRIAL OF METTLE ⚔</div>
               <div style={{fontSize:"14px",letterSpacing:"4px",color:"#fbbf24",marginBottom:"12px"}}>LEVEL {pendingTrialData.triggerLevel}</div>
               <div style={{fontSize:"11px",color:"#666",marginBottom:"32px",maxWidth:"400px",margin:"0 auto 32px",lineHeight:"1.6"}}>
-                The ledger has watched your progress. A Trial has been summoned. It cannot be drafted around. It cannot be ignored. It must be faced.
+                The ledger has watched your progress. A trial is ready. It cannot be skipped. It must be cleared before the run moves on.
               </div>
               <button style={{padding:"14px 48px",fontFamily:"inherit",fontWeight:"700",fontSize:"14px",letterSpacing:"4px",background:"transparent",color:"#d4af37",border:"1px solid #d4af37",cursor:"pointer"}} onClick={revealTrial}>
                 REVEAL TRIAL
@@ -1172,7 +1191,7 @@ export default function MettlePrototype({
               </div>
             ) : (
               <div style={{...s.activeCard, borderColor: activeWrit.reckoning ? "#6b21a8" : "#555"}}>
-                <div style={s.secHead}>ACTIVE WRIT</div>
+                <div style={s.secHead}>ACTIVE TASK</div>
                 <div style={{fontSize:"11px",marginBottom:"8px"}}>
                   <span style={s.tag(CAT_COLORS[activeWrit.category]||"#555")}>{activeWrit.category.toUpperCase()}</span>
                   <span style={s.tag(DIFF_COLORS[activeWrit.difficulty])}>{activeWrit.difficulty.toUpperCase()}</span>
@@ -1223,7 +1242,7 @@ export default function MettlePrototype({
                         BLOCKED — {blockReason}
                       </div>
                       <div style={{fontSize:"12px",color:"#6c6c6c",lineHeight:"1.8"}}>
-                        Complete your outstanding obligations above to unlock drawing
+                        Clear the outstanding tasks above to unlock drawing
                       </div>
                     </div>
                   ) : (
@@ -1232,19 +1251,19 @@ export default function MettlePrototype({
                         {pendingTrial ? "⚔ TRIAL OF METTLE AWAITS — YOU CANNOT DRAFT AROUND IT"
                           : draftStatus==="favored" ? `FAVORED · ${draftSizeFromStatus(draftStatus)} OPTIONS · ${favoredDrawsRemaining} DRAWS REMAINING`
                           : draftStatus==="hot_streak" ? `🔥 HOT STREAK (${streak}) · ${draftSizeFromStatus(draftStatus)} OPTIONS`
-                          : `${draftStatus.toUpperCase()} · ${draftSizeFromStatus(draftStatus)} OPTIONS · UNCHOSEN WRITS RETURN LATER`}
+                          : `${draftStatus.toUpperCase()} · ${draftSizeFromStatus(draftStatus)} OPTIONS · UNCHOSEN TASKS RETURN LATER`}
                       </div>
-                      <div className="mettle-mobile-center-title" style={{...s.displayCardTitle,fontSize:"30px",marginBottom:"12px"}}>{pendingTrial ? "Ledger Locked" : "Draw From The Ledger"}</div>
+                      <div className="mettle-mobile-center-title" style={{...s.displayCardTitle,fontSize:"30px",marginBottom:"12px"}}>{pendingTrial ? "Trial Ready" : "Draw Tasks"}</div>
                       <div style={{...s.sectionLead,margin:"0 auto 24px"}}>
                         {pendingTrial
-                          ? "A trial has taken priority over normal drafting. The ledger will not offer alternatives until it is faced."
-                          : "Each draft is a brief reading of your account. Choose one writ and let the others disappear back into the record."}
+                          ? "A trial has taken priority over normal drafts. Clear it before drawing new tasks."
+                          : "Each draft is a fresh read of your account. Choose one task and the others return to the pool."}
                       </div>
                       <button style={{...s.btn(true),padding:"14px 48px",fontSize:"14px",letterSpacing:"4px",
                         fontFamily:displayFont,
                         ...(pendingTrial ? {background:"#d4af37",color:"#000",borderColor:"#d4af37"} : {})
                       }} onClick={drawWrits}>
-                        {pendingTrial ? "⚔ FACE THE TRIAL" : "DRAW WRITS"}
+                        {pendingTrial ? "⚔ START TRIAL" : "DRAW TASKS"}
                       </button>
                     </div>
                   )}
@@ -1252,7 +1271,7 @@ export default function MettlePrototype({
               ) : (
                 <div style={{...s.sectionFrame,padding:"18px"}}>
                   <div style={{...s.secHead,marginBottom:"12px"}}>
-                    {draftMode === "final_trial" ? "THE FINAL TRIAL — FIVE WRITS DRAWN, CHOOSE ONE" : "CHOOSE ONE — OTHERS FALL OUT OF THE CURRENT DRAW"}
+                    {draftMode === "final_trial" ? "THE FINAL TRIAL — FIVE TASKS DRAWN, CHOOSE ONE" : "CHOOSE ONE — THE REST RETURN TO THE POOL"}
                   </div>
                   {draftMode === "final_trial" ? (
                     <div style={{fontSize:"11px",color:"#8c7a44",marginBottom:"16px",lineHeight:"1.6"}}>
@@ -1378,9 +1397,9 @@ export default function MettlePrototype({
               <div style={{fontSize:"11px",color:"#d8b4fe",letterSpacing:"2px",marginBottom:"8px"}}>FINAL TRIAL PATH</div>
               <div style={{fontSize:"14px",color:"#fff",fontWeight:"700",marginBottom:"4px"}}>The {assignedPath}</div>
               <div style={{fontSize:"11px",color:"#777"}}>
-                {assignedPath === "Warrior" && "PvM contracts dominant across the run. Your finale pool draws from elite combat challenges."}
-                {assignedPath === "Scholar" && "Quest and Skill Gap contracts dominant. Your finale pool draws from mastery and knowledge."}
-                {assignedPath === "Survivor" && "Endurance and Exploration contracts dominant. Your finale pool draws from sustained pressure."}
+                {assignedPath === "Warrior" && "PvM tasks dominated the run. Your finale pool draws from elite combat challenges."}
+                {assignedPath === "Scholar" && "Quest and Skill Gap tasks dominated the run. Your finale pool draws from mastery and knowledge."}
+                {assignedPath === "Survivor" && "Endurance and Exploration tasks dominated the run. Your finale pool draws from sustained pressure."}
                 {assignedPath === "Balanced" && "No dominant category — even spread. Your finale draws from all paths."}
               </div>
             </div>
@@ -1447,8 +1466,8 @@ export default function MettlePrototype({
         <div>
           <div style={{...s.sectionFrame,padding:"18px 18px 12px"}}>
             <div style={s.secHead}>ARCHIVE</div>
-            <div style={{...s.displayCardTitle,fontSize:"24px",marginBottom:"8px"}}>{history.length} Writs Resolved</div>
-            {history.length===0 && <div style={{color:"#666",fontSize:"13px"}}>No writs resolved yet.</div>}
+            <div style={{...s.displayCardTitle,fontSize:"24px",marginBottom:"8px"}}>{history.length} Tasks Resolved</div>
+            {history.length===0 && <div style={{color:"#666",fontSize:"13px"}}>No tasks resolved yet.</div>}
           </div>
           {history.map((c,i)=>{
             const rc = c.result==="complete"||c.result==="debt_cleared"||c.result==="reckoning_cleared"||c.result==="landmark"?"#4ade80"
@@ -1508,7 +1527,7 @@ export default function MettlePrototype({
 
       {statsLoaded && (
         <div style={s.footer}>
-          <span>WRITS: {completedIds.length}/{writPoolCount}</span>
+          <span>TASKS: {completedIds.length}/{writPoolCount}</span>
           <span>FORKS: {Object.keys(completedForks).length}/{FORK_WRITS.length}</span>
           <span>LANDMARKS: {completedLandmarks.length}/{LANDMARK_WRITS.length}</span>
           <span>XP: {mettleXP.toLocaleString()} / {MAX_METTLE_XP.toLocaleString()}</span>

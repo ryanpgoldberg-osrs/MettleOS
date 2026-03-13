@@ -403,7 +403,7 @@ export const WRIT_POOL = [
   { id:"b_en_4", title:"The Grind Never Stops",category:"Endurance",tier:"Bandos", difficulty:"Hard",  xp:600, repeatable:true, objective:"Train any skill for 5 hours total across sessions" },
   { id:"b_en_5", title:"Wilderness Survivor", category:"Endurance", tier:"Bandos", difficulty:"Hard",  xp:650, repeatable:true, objective:"Kill 3 wilderness bosses without dying" },
   { id:"b_en_6", title:"Sustained Bossing",   category:"Endurance", tier:"Bandos", difficulty:"Hard",  xp:550, repeatable:true, objective:"Kill 3 different bosses in a single session" },
-  { id:"b_en_7", title:"The Unbroken",        category:"Endurance", tier:"Bandos", difficulty:"Hard",  xp:575, repeatable:true, objective:"Complete 5 writs in a row without deferring" },
+  { id:"b_en_7", title:"The Unbroken",        category:"Endurance", tier:"Bandos", difficulty:"Hard",  xp:575, repeatable:true, objective:"Complete 5 tasks in a row without deferring" },
 
   { id:"b_ex_1", title:"The Gauntlet Awaits", category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:600, repeatable:false, requiresFn:(_,kc)=>(kc.the_gauntlet??0)===0, objective:"Unlock and enter The Gauntlet" },
   { id:"b_ex_2", title:"Ancient Arsenal",     category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:525, repeatable:false, objective:"Unlock Ancient Magicks and cast 100 spells" },
@@ -501,12 +501,12 @@ export const WRIT_POOL = [
 
   { id:"z_en_1", title:"The Long Campaign",    category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:700, repeatable:true, objective:"Complete 50 Slayer tasks total" },
   { id:"z_en_2", title:"Chaos Endurance",      category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:700, repeatable:true, objective:"Kill any Zamorak-aligned boss 30 times total" },
-  { id:"z_en_3", title:"Modified Grind",       category:"Endurance", tier:"Zamorak", difficulty:"Elite",  xp:850, repeatable:true, objective:"Complete 3 writs with modifiers in a row" },
+  { id:"z_en_3", title:"Modified Grind",       category:"Endurance", tier:"Zamorak", difficulty:"Elite",  xp:850, repeatable:true, objective:"Complete 3 tasks with modifiers in a row" },
   { id:"z_en_4", title:"The Unrelenting",      category:"Endurance", tier:"Zamorak", difficulty:"Elite",  xp:950, repeatable:true, objective:"Complete a 5-hour grind session" },
   { id:"z_en_5", title:"Raid Regularity",      category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:775, repeatable:true, objective:"Complete 10 raids total across any type" },
   { id:"z_en_6", title:"Wilderness Veteran",   category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:750, repeatable:true, objective:"Survive 10 wilderness boss kills without dying" },
-  { id:"z_en_7", title:"The Defer Collector",  category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:700, repeatable:true, objective:"Clear all deferred writs within a single tier" },
-  { id:"z_en_8", title:"Streak Master",        category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:725, repeatable:true, objective:"Complete 7 writs in a row without deferring" },
+  { id:"z_en_7", title:"The Defer Collector",  category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:700, repeatable:true, objective:"Clear all deferred tasks within a single tier" },
+  { id:"z_en_8", title:"Streak Master",        category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:725, repeatable:true, objective:"Complete 7 tasks in a row without deferring" },
 
   { id:"z_ex_1", title:"Theatre Unlocked",       category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:900, repeatable:false, objective:"Complete Theatre of Blood entry mode with a modifier" },
   { id:"z_ex_2", title:"Tombs of Amascut",       category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:900, repeatable:false, requiresFn:(_,kc)=>(kc.tombs_of_amascut??0)===0, objective:"Enter and complete Tombs of Amascut for the first time" },
@@ -522,7 +522,7 @@ export const WRIT_POOL = [
     title:"Trial of Mettle: Elite Challenge",
     objectiveFn:(s,kc)=>{ const b=hardestUntouchedBoss(kc, s); return `Kill ${bossLabel(b)} — the ledger has spoken. ${(kc[b]??0)} KC. Non-skippable.`; },
     objective:"Highest-difficulty uncompleted boss. Non-skippable." },
-  { id:"trial_99", title:"The Final Trial", category:"Trial", tier:"Zaros", triggerLevel:99, difficulty:"Elite", xp:2000, repeatable:false, trial:true, finalTrial:true, objective:"The series finale. Your Path is revealed. Five writs drawn. You choose one." },
+  { id:"trial_99", title:"The Final Trial", category:"Trial", tier:"Zaros", triggerLevel:99, difficulty:"Elite", xp:2000, repeatable:false, trial:true, finalTrial:true, objective:"The series finale. Your path is revealed. Five tasks are drawn. You choose one." },
 
   { id:"zr_pvm_1",  title:"Vorkath Mastered",    category:"PvM Endurance", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Kill Vorkath 50 times total" },
   { id:"zr_pvm_2",  title:"Zulrah Mastered",     category:"PvM Endurance", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Kill Zulrah 50 times total" },
@@ -570,8 +570,8 @@ export const WRIT_POOL = [
 
   { id:"zr_en_1", title:"The Final Campaign",     category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1300, repeatable:true, objective:"Complete 100 Slayer tasks total" },
   { id:"zr_en_2", title:"Elite Endurance",        category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1300, repeatable:true, objective:"Complete the Corrupted Gauntlet 5 times" },
-  { id:"zr_en_3", title:"Mastery Under Pressure", category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1350, repeatable:true, objective:"Complete 3 hard boss writs with modifiers in a row" },
-  { id:"zr_en_4", title:"The Unbreakable",        category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1300, repeatable:true, objective:"Complete 10 writs in a row without deferring" },
+  { id:"zr_en_3", title:"Mastery Under Pressure", category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1350, repeatable:true, objective:"Complete 3 hard boss tasks with modifiers in a row" },
+  { id:"zr_en_4", title:"The Unbreakable",        category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1300, repeatable:true, objective:"Complete 10 tasks in a row without deferring" },
   { id:"zr_en_5", title:"Raid Veteran",           category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1450, repeatable:true, objective:"Complete 50 raids total" },
 
   { id:"zr_ex_1", title:"The Wilderness Throne", category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Kill Artio, Spindel, and Calvar'ion at least once each" },

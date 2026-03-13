@@ -41,7 +41,7 @@ export default function EntryScreen({ onComplete }) {
       });
       onComplete(levels, kc, data?.rsn ?? trimmed);
     } catch {
-      setFetchError("Failed to load — check your RSN and try again.");
+      setFetchError("Couldn't load that player. Check the RSN or switch to manual entry.");
     } finally {
       setLoading(false);
     }
@@ -437,70 +437,68 @@ export default function EntryScreen({ onComplete }) {
                 <div>
                   <div style={s.topRail}>
                     <div style={s.codeBlock}>
-                      <div style={s.docket}>METTLE / LEDGER INITIATION</div>
-                      <div style={s.docket}>SERIES ENTRY / FIRST CONTACT</div>
+                      <div style={s.docket}>METTLE / PERSONAL LEDGER</div>
+                      <div style={s.docket}>OSRS / TASK RUN</div>
                     </div>
                     <div style={s.sigilWrap}>
                       <div style={s.sigil}>✦</div>
                       <div style={s.sigilMeta}>
-                        LEDGER STATUS
+                        STATUS
                         <br />
-                        LISTENING
+                        READY
                         <br />
-                        UNFORGIVING
+                        LOCAL ONLY
                       </div>
                     </div>
                   </div>
-                  <div style={s.marker}>Your account has been avoiding things.</div>
-                  <h1 style={s.headline}>
-                    {"Mettle finds them.\nNames them.\nMakes you face them."}
-                  </h1>
+                  <div style={s.marker}>Built from your account.</div>
+                  <h1 style={s.headline}>{"Mettle builds\nyour ledger."}</h1>
                   <div style={s.divider} />
                   <p style={s.body}>
-                    A contract ledger generated from your account&apos;s gaps. The things your
-                    stats say you should be able to do but haven&apos;t. Each run is yours alone.
-                    No two accounts face the same ledger.
+                    Import your stats, generate a task run, and work through the gaps your
+                    account has left behind. Each ledger is personal to the account you load.
                   </p>
                 </div>
                 <div style={{ ...s.docket, color: "#444" }}>
-                  THIS LEDGER DOES NOT MEASURE POTENTIAL. IT MEASURES NEGLECT.
+                  PRIVATE RUN STATE. SAVED IN THIS BROWSER.
                 </div>
               </div>
 
               <div style={s.aside}>
                 <div>
-                  <div style={s.asideLabel}>INTAKE SUMMARY</div>
+                  <div style={s.asideLabel}>HOW IT WORKS</div>
                   <div style={s.asideTitle}>
-                    The ledger reads your account, isolates the gaps, and turns them into a run
-                    only your profile could receive.
+                    Import your account, generate tasks, and push through the run one draft at a
+                    time.
                   </div>
                   <div style={s.ledgerRow}>
-                    <div style={s.ledgerIndex}>01 / READ THE ACCOUNT</div>
+                    <div style={s.ledgerIndex}>01 / IMPORT STATS</div>
                     <div style={s.ledgerBody}>
-                      Pull combat, skilling, and boss data from Wise Old Man or enter it yourself.
+                      Use Wise Old Man for a quick import, or enter skills and boss killcount
+                      manually.
                     </div>
                   </div>
                   <div style={s.ledgerRow}>
-                    <div style={s.ledgerIndex}>02 / GENERATE THE LEDGER</div>
+                    <div style={s.ledgerIndex}>02 / GENERATE TASKS</div>
                     <div style={s.ledgerBody}>
-                      Drafts, trials, reckoning pressure, and landmarks emerge from what your
-                      account has and has not done.
+                      Mettle turns account gaps into a draft of tasks, trials, and progression
+                      pressure.
                     </div>
                   </div>
                   <div style={s.ledgerRow}>
-                    <div style={s.ledgerIndex}>03 / PROVE IT</div>
+                    <div style={s.ledgerIndex}>03 / TRACK THE RUN</div>
                     <div style={s.ledgerBody}>
-                      The ledger is not shared. No templates. No universal checklist. Just your
-                      blind spots turned into obligations.
+                      Your run saves in this browser. Complete tasks, defer them, and manage the
+                      pressure that builds up.
                     </div>
                   </div>
                 </div>
 
                 <div style={s.ctaBlock}>
                   <button style={s.cta} onClick={() => setPhase("input")}>
-                    BEGIN THE RECKONING
+                    GENERATE LEDGER
                   </button>
-                  <div style={s.ctaNote}>ENTER YOUR RSN · FREE · NO ACCOUNT REQUIRED</div>
+                  <div style={s.ctaNote}>ENTER YOUR RSN · FREE · NO SIGN-UP</div>
                 </div>
               </div>
             </div>
@@ -509,21 +507,21 @@ export default function EntryScreen({ onComplete }) {
           <div style={s.frame}>
             <div className="entry-input-grid" style={s.inputShell}>
               <div className="entry-intro" style={s.inputIntro}>
-                <div style={s.inputLabel}>LEDGER INTAKE</div>
-                <div style={s.inputTitle}>Give the ledger a name to work with.</div>
+                <div style={s.inputLabel}>RUN SETUP</div>
+                <div style={s.inputTitle}>Start with your RuneScape name.</div>
                 <div style={s.inputCopy}>
-                  Wise Old Man is the default path. It lets the ledger build your first draft from
-                  real account data in one step.
+                  Import public stats through Wise Old Man, or switch to manual entry if you want
+                  full control over the starting data.
                 </div>
                 <div style={s.inputStat}>SOURCE / Wise Old Man API</div>
-                <div style={s.inputStat}>FALLBACK / Manual stat and boss KC entry</div>
-                <div style={s.inputStat}>OUTPUT / A ledger tailored to your account&apos;s gaps</div>
+                <div style={s.inputStat}>FALLBACK / Manual stats and boss killcount</div>
+                <div style={s.inputStat}>STORAGE / Saved in this browser only</div>
               </div>
 
               <div style={s.intake}>
                 {inputMode === "wom" ? (
                   <>
-                    <div style={s.formLabel}>ENTER YOUR RUNESCAPE NAME</div>
+                    <div style={s.formLabel}>RUNESCAPE NAME (RSN)</div>
                     <form onSubmit={loadPlayerStats}>
                       <div style={s.formRow}>
                         <input
@@ -531,17 +529,17 @@ export default function EntryScreen({ onComplete }) {
                           type="text"
                           value={rsn}
                           autoFocus
-                          placeholder="Enter RSN..."
+                          placeholder="Enter your RSN..."
                           onChange={(event) => setRsn(event.target.value)}
                         />
                         <button type="submit" style={s.confirmBtn} disabled={loading}>
-                          {loading ? "LOADING..." : "CONFIRM"}
+                          {loading ? "IMPORTING..." : "IMPORT"}
                         </button>
                       </div>
                     </form>
                     {fetchError && <div style={s.error}>⚠ {fetchError}</div>}
                     <div style={s.helper}>
-                      Stats pulled from Wise Old Man ·{" "}
+                      Imports public stats from Wise Old Man ·{" "}
                       <button
                         type="button"
                         style={s.link}
@@ -550,7 +548,7 @@ export default function EntryScreen({ onComplete }) {
                           setInputMode("manual");
                         }}
                       >
-                        enter manually instead
+                        enter stats manually
                       </button>
                     </div>
                   </>
@@ -565,7 +563,7 @@ export default function EntryScreen({ onComplete }) {
                           setInputMode("wom");
                         }}
                       >
-                        ← use wise old man instead
+                        ← import from Wise Old Man instead
                       </button>
                     </div>
                     <div style={s.secHead}>SKILLS</div>
@@ -589,7 +587,7 @@ export default function EntryScreen({ onComplete }) {
                         </div>
                       ))}
                     </div>
-                    <div style={s.secHead}>BOSS KC</div>
+                    <div style={s.secHead}>BOSS KILLCOUNT</div>
                     <div style={s.gridBosses}>
                       {KEY_BOSSES.map((boss) => (
                         <div key={boss} style={s.statRow}>
@@ -610,7 +608,7 @@ export default function EntryScreen({ onComplete }) {
                       ))}
                     </div>
                     <button type="button" style={s.manualBtn} onClick={confirmManualStats}>
-                      CONFIRM — START RUN
+                      START RUN
                     </button>
                   </>
                 )}

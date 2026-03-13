@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Mettle OS",
-  description: "A progression-based Old School RuneScape challenge tracker.",
+  title: "Mettle Ledger",
+  description: "A personal OSRS task ledger built from your account's gaps.",
 };
 
 export default function RootLayout({
