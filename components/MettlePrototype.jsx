@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import {
+  CLEAR_DEFERRED_COST,
   CAT_COLORS,
   DEFAULT_KC,
   DEFAULT_SKILLS,
@@ -545,6 +546,28 @@ export default function MettlePrototype({
     setXpDrop({amount:xpGained,id:Date.now()});
     setTimeout(()=>setXpDrop(null),1800);
     setHistory(prev=>[{...c,result:"debt_cleared",xpGained,sealsGained,baseXp:c.xp,modifierXpBonus:modifierXpBonus(c),streakAfter:nextStreak,timestamp:Date.now()},...prev]);
+  }
+
+  function clearDebtWritWithSeals(queueEntryId) {
+    const c = debtWrits.find(x => x.queueEntryId === queueEntryId); if (!c || mettleSeals < CLEAR_DEFERRED_COST) return;
+    const newDebt = debtWrits.filter(x => x.queueEntryId !== queueEntryId);
+    const nextStreak = streak;
+    setDebtWrits(newDebt);
+    if (newDebt.length === 0) setMustClearAll(false);
+    setMettleSeals(prev => prev - CLEAR_DEFERRED_COST);
+    setStreak(nextStreak);
+    if (!completedIds.includes(c.id)) setCompletedIds(prev => [...prev, c.id]);
+    setHistory(prev => [{
+      ...c,
+      result: "debt_cleared_with_seals",
+      xpGained: 0,
+      sealsGained: 0,
+      sealsSpent: CLEAR_DEFERRED_COST,
+      baseXp: c.xp,
+      modifierXpBonus: modifierXpBonus(c),
+      streakAfter: nextStreak,
+      timestamp: Date.now()
+    }, ...prev]);
   }
 
   function clearReckoningWrit(id) {
@@ -1133,9 +1156,18 @@ export default function MettlePrototype({
                     {c.modifier && <div style={{color:"#fb923c",fontSize:"10px",marginTop:"2px"}}>MODIFIER: {c.modifier}</div>}
                     {c.reckoning && <div style={{color:"#7c3aed",fontSize:"10px",marginTop:"2px"}}>ORIGINATED FROM RECKONING</div>}
                   </div>
-                  <button style={s.btn(false,"#14380f","#4ade80")} onClick={()=>clearDebtWrit(c.queueEntryId)}>
-                    CLEAR (+{recoveryXpForWrit(c)} XP)
-                  </button>
+                  <div style={{display:"flex",gap:"8px",flexWrap:"wrap",justifyContent:"flex-end"}}>
+                    <button style={s.btn(false,"#14380f","#4ade80")} onClick={()=>clearDebtWrit(c.queueEntryId)}>
+                      CLEAR (+{recoveryXpForWrit(c)} XP)
+                    </button>
+                    <button
+                      style={s.btn(false,"#111827", mettleSeals >= CLEAR_DEFERRED_COST ? "#93c5fd" : "#4b5563")}
+                      onClick={()=>clearDebtWritWithSeals(c.queueEntryId)}
+                      disabled={mettleSeals < CLEAR_DEFERRED_COST}
+                    >
+                      SEAL CLEAR ({CLEAR_DEFERRED_COST} SEALS)
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1397,7 +1429,7 @@ export default function MettlePrototype({
           </div>
           <div style={{...s.dataPanel,borderColor:"#1f2937",background:"#0d1117"}}>
             <div style={{fontSize:"11px",color:"#93c5fd",letterSpacing:"2px",marginBottom:"8px"}}>METTLE SYSTEMS</div>
-            <div style={{fontSize:"12px",color:"#9ca3af",marginBottom:"8px"}}>Seals let you remove modifiers, reroll drafts, or buy an extra choice.</div>
+            <div style={{fontSize:"12px",color:"#9ca3af",marginBottom:"8px"}}>Seals let you remove modifiers, reroll drafts, buy an extra choice, or clear a deferred task instantly.</div>
             <div style={{fontSize:"12px",color:"#d1d5db",marginBottom:"8px"}}>Current: {mettleSeals} seals · streak {streak}{favoredDrawsRemaining > 0 ? ` · ${favoredDrawsRemaining} favored draws` : ""}</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
               {METTLE_UNLOCKS.map(u => (
@@ -1535,7 +1567,7 @@ export default function MettlePrototype({
             {history.length===0 && <div style={{color:"#666",fontSize:"13px"}}>No tasks resolved yet.</div>}
           </div>
           {history.map((c,i)=>{
-            const rc = c.result==="complete"||c.result==="debt_cleared"||c.result==="reckoning_cleared"||c.result==="landmark"?"#4ade80"
+            const rc = c.result==="complete"||c.result==="debt_cleared"||c.result==="debt_cleared_with_seals"||c.result==="reckoning_cleared"||c.result==="landmark"?"#4ade80"
               : c.result==="defer"||c.result==="reckoning_failed"?"#fbbf24":"#555";
             const isExpanded = expandedHistoryIdx === i;
             const ts = c.timestamp ? new Date(c.timestamp) : null;
@@ -1557,6 +1589,7 @@ export default function MettlePrototype({
                       <div style={{color:rc}}>{c.result.replace(/_/g," ").toUpperCase()}</div>
                       {c.xpGained>0&&<div style={{color:"#555"}}>+{c.xpGained} XP</div>}
                       {c.sealsGained>0&&<div style={{color:"#7dd3fc"}}>+{c.sealsGained} seals</div>}
+                      {c.sealsSpent>0&&<div style={{color:"#93c5fd"}}>-{c.sealsSpent} seals</div>}
                     </div>
                     <div style={{color:"#333",fontSize:"10px"}}>{isExpanded?"▼":"▶"}</div>
                   </div>
@@ -1579,7 +1612,7 @@ export default function MettlePrototype({
                       </div>
                     )}
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:"10px",color:"#444"}}>
-                      <span>XP: {c.xp} base{c.xpGained > 0 ? ` · +${c.xpGained} earned` : " · 0 earned (deferred)"}{c.sealsGained ? ` · +${c.sealsGained} seals` : ""}{typeof c.streakAfter === "number" ? ` · streak ${c.streakAfter}` : ""}</span>
+                      <span>XP: {c.xp} base{c.xpGained > 0 ? ` · +${c.xpGained} earned` : c.result === "defer" ? " · 0 earned (deferred)" : " · 0 earned"}{c.sealsGained ? ` · +${c.sealsGained} seals` : ""}{c.sealsSpent ? ` · -${c.sealsSpent} seals spent` : ""}{typeof c.streakAfter === "number" ? ` · streak ${c.streakAfter}` : ""}</span>
                       {ts && <span>{ts.toLocaleDateString()} {ts.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>}
                     </div>
                   </div>

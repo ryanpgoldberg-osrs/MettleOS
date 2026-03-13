@@ -60,6 +60,7 @@ export const ACCOUNT_MODIFIERS = ["Must complete in one session","Must stream th
 export const REMOVE_MODIFIER_COST = 3;
 export const REROLL_COST = 2;
 export const EXTRA_CHOICE_COST = 5;
+export const CLEAR_DEFERRED_COST = 4;
 
 export const METTLE_UNLOCKS = [
   { level: 10, unlock: "Trials" },
