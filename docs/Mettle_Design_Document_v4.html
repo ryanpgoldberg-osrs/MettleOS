@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>METTLE Design Document v4</title>
+  <style>
+    body {
+      font-family: "Georgia", "Times New Roman", serif;
+      color: #171717;
+      line-height: 1.5;
+      margin: 40px auto;
+      max-width: 900px;
+      padding: 0 28px 56px;
+      background: #ffffff;
+    }
+
+    h1, h2, h3 {
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      color: #111111;
+      line-height: 1.15;
+      margin-bottom: 0.35em;
+    }
+
+    h1 {
+      font-size: 34px;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.1em;
+    }
+
+    h2 {
+      font-size: 22px;
+      margin-top: 1.7em;
+      border-bottom: 1px solid #d8d8d8;
+      padding-bottom: 0.18em;
+    }
+
+    h3 {
+      font-size: 16px;
+      margin-top: 1.2em;
+    }
+
+    p {
+      margin: 0.55em 0;
+    }
+
+    ul {
+      margin: 0.5em 0 0.8em 1.3em;
+    }
+
+    li {
+      margin: 0.25em 0;
+    }
+
+    .subtitle {
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #6a6a6a;
+      font-size: 12px;
+      margin-bottom: 0.5em;
+    }
+
+    .meta {
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 12px;
+      color: #555555;
+      margin-bottom: 1.2em;
+    }
+
+    .callout {
+      border: 1px solid #d3d3d3;
+      background: #f6f6f6;
+      padding: 14px 16px;
+      margin: 1em 0 1.2em;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.8em 0 1.2em;
+      font-size: 13px;
+    }
+
+    th, td {
+      border: 1px solid #d9d9d9;
+      padding: 8px 9px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #f2f2f2;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 12px;
+      letter-spacing: 0.03em;
+    }
+
+    .small {
+      font-size: 12px;
+      color: #5c5c5c;
+    }
+  </style>
+</head>
+<body>
+  <h1>METTLE</h1>
+  <div class="subtitle">Updated Design Document</div>
+  <div class="meta">Ryan Goldberg | March 13, 2026 | Living Document | v4</div>
+
+  <p>Mettle has moved from a concept pitch into a working product prototype. This v4 document replaces the older v3 design doc as the current source-of-truth summary for the repo at <span class="small">/Users/ryan/Documents/GitHub/MettleOS</span>. It preserves the original core vision while updating the design around what is now implemented, what has changed, and what still needs to be built.</p>
+
+  <div class="callout">
+    <strong>Short version:</strong> Mettle is still the custom Old School RuneScape challenge skill built around personalized writs, public accountability, and a path to level 99. The big difference is that Mettle now has a live Next.js prototype with real draft logic, a ledger UI, Trials, Forks, Landmarks, debt pressure, reckoning pressure, local persistence, and a new seal economy.
+  </div>
+
+  <h2>1. The Current Concept</h2>
+  <p>Mettle is a custom progression skill layered on top of Old School RuneScape. It exists in two forms at the same time:</p>
+  <ul>
+    <li>A creator format for YouTube and streaming, where the account is pushed into neglected or uncomfortable content.</li>
+    <li>A playable web tool that lets other players run their own Mettle ledger from their real account data.</li>
+  </ul>
+  <p>The core idea is still intact: the account already reveals what the player has avoided. Mettle reads that pattern, turns it into named writs, and makes the player answer for it over time.</p>
+  <p>The biggest terminology update is that the main surface is now called the <strong>ledger</strong> rather than the board. “Writ” remains the name for the challenge unit itself.</p>
+
+  <h2>2. What Changed Since v3</h2>
+  <ul>
+    <li>The project is now a functioning app prototype instead of only a design plan.</li>
+    <li>The UI surface evolved from “writ board” language toward a more system-driven “ledger” identity.</li>
+    <li>The account model now tracks <strong>24 skills</strong> and <strong>69 bosses</strong>, including newer OSRS content and a Sailing placeholder.</li>
+    <li>Trial selection is more account-aware than the original fixed milestone pitch. Several Trials now resolve dynamically from untouched bosses or low-KC targets.</li>
+    <li>The draft system gained more states: <strong>Normal</strong>, <strong>Cursed</strong>, <strong>Favored</strong>, <strong>Hot Streak</strong>, and <strong>Final Trial</strong>.</li>
+    <li>Mettle now includes a live <strong>seal economy</strong>: reroll a draft, buy an extra draft choice, or remove a modifier from an active writ.</li>
+    <li>Debt and reckoning cleanup now intentionally pay reduced rewards: half XP, no seals, and no streak gain.</li>
+    <li>The current build uses <strong>local browser persistence</strong>, not Supabase or server-side run storage.</li>
+    <li>Quest Cape still exists as a Landmark, but because Wise Old Man cannot fully verify quest completion from the current integration, it is triggered manually.</li>
+    <li>The prototype already has an improved mobile pass and a more intentional visual identity than the original MVP framing.</li>
+  </ul>
+
+  <h2>3. Current Product Experience</h2>
+  <h3>Player Flow</h3>
+  <table>
+    <tr><th>Step</th><th>Current Behavior</th></tr>
+    <tr><td>1. Entry</td><td>Player lands on a branded cold-open screen and chooses Wise Old Man lookup or manual stat entry.</td></tr>
+    <tr><td>2. Intake</td><td>The app fetches skills and boss KC through a local API route that refreshes Wise Old Man data, or accepts manual values.</td></tr>
+    <tr><td>3. Run Start</td><td>The player enters the ledger with Mettle XP, seals, streak, debt, history, and draft systems active.</td></tr>
+    <tr><td>4. Progression</td><td>The player draws writs, chooses one, resolves it, and accumulates progress toward higher tiers and eventual path assignment.</td></tr>
+    <tr><td>5. Return Visits</td><td>Runs reopen automatically from local storage, so the prototype supports an ongoing single-player save loop without account auth.</td></tr>
+  </table>
+
+  <h3>Current Surface Areas</h3>
+  <ul>
+    <li><strong>Ledger:</strong> active writ, draft state, debt queue, reckoning queue, trial reveals, fork presentations, and landmark moments.</li>
+    <li><strong>Stats:</strong> skill audit, boss ledger, system state, path information, reckoning tracker, fork history, landmark tracker.</li>
+    <li><strong>History:</strong> archived resolved writs with results, XP earned, seals earned, modifiers, timestamps, and expansion details.</li>
+  </ul>
+
+  <h2>4. Live System Design</h2>
+  <h3>Progression Model</h3>
+  <p>Mettle is still framed as a custom skill with deity tiers, a march to level 99, and long-form account pressure. The current prototype uses the following breakpoints:</p>
+  <table>
+    <tr><th>Level</th><th>Total XP</th><th>Notes</th></tr>
+    <tr><td>1</td><td>0</td><td>Run start</td></tr>
+    <tr><td>20</td><td>2,500</td><td>First gate and full draft unlock</td></tr>
+    <tr><td>40</td><td>9,000</td><td>Endurance unlock region</td></tr>
+    <tr><td>60</td><td>22,000</td><td>Elite modifier pressure begins</td></tr>
+    <tr><td>80</td><td>45,000</td><td>Mythic/endgame pressure phase</td></tr>
+    <tr><td>99</td><td>85,000</td><td>End of the run and Final Trial resolution</td></tr>
+  </table>
+
+  <table>
+    <tr><th>Tier</th><th>Levels</th><th>Live Non-Trial Pool</th><th>Theme</th></tr>
+    <tr><td>Guthix</td><td>1-20</td><td>35 writs</td><td>Foundation, first weaknesses, first real bossing pressure</td></tr>
+    <tr><td>Saradomin</td><td>21-40</td><td>40 writs</td><td>Discipline, structure, first real escalation</td></tr>
+    <tr><td>Bandos</td><td>41-60</td><td>40 writs</td><td>Combat force, broader bossing, raid pressure</td></tr>
+    <tr><td>Zamorak</td><td>61-80</td><td>46 writs</td><td>Chaos, modifiers, debt punishment, fork pressure</td></tr>
+    <tr><td>Zaros</td><td>81-99</td><td>28 writs</td><td>Mastery, finale shaping, endgame pressure</td></tr>
+  </table>
+
+  <p>Total current content in code is <strong>199 writ definitions</strong>: <strong>189 non-trial writs</strong> and <strong>10 Trials</strong>. Of the non-trial pool, <strong>104 writs are repeatable</strong>.</p>
+
+  <h3>Unlocks</h3>
+  <table>
+    <tr><th>Level</th><th>Unlock</th></tr>
+    <tr><td>10</td><td>Trials</td></tr>
+    <tr><td>20</td><td>Standard 3-option drafting</td></tr>
+    <tr><td>40</td><td>Endurance writs</td></tr>
+    <tr><td>60</td><td>Elite modifiers</td></tr>
+    <tr><td>80</td><td>Mythic pressure / endgame lane</td></tr>
+  </table>
+
+  <h3>Draft States</h3>
+  <table>
+    <tr><th>State</th><th>Draft Size</th><th>How It Happens</th></tr>
+    <tr><td>Normal</td><td>3</td><td>Default run state</td></tr>
+    <tr><td>Cursed</td><td>2</td><td>Any active debt puts the run into cursed pressure</td></tr>
+    <tr><td>Favored</td><td>4</td><td>Granted for 5 draws after clearing a Trial</td></tr>
+    <tr><td>Hot Streak</td><td>4</td><td>Granted at 15-streak if no debt or favored override is active</td></tr>
+    <tr><td>Final Trial</td><td>5</td><td>Level 99 finale draw</td></tr>
+  </table>
+
+  <p>The original “other writs disappear permanently” concept has been softened in the live version. Unchosen writs leave the current draw, but they can return later unless completion or repeatability rules remove them from the eligible pool.</p>
+
+  <h3>Debt, Cursed, and Reckoning</h3>
+  <table>
+    <tr><th>System</th><th>Live Rule</th></tr>
+    <tr><td>Debt</td><td>Deferring a writ pushes it into the debt queue.</td></tr>
+    <tr><td>Debt cap</td><td>3 deferred writs.</td></tr>
+    <tr><td>Blocked state</td><td>At the cap, the player must clear debt before drawing again.</td></tr>
+    <tr><td>Tier gates</td><td>Debt and reckoning must be cleared at levels 20, 40, 60, and 80.</td></tr>
+    <tr><td>Cursed state</td><td>Any debt immediately shrinks the draft to 2 options.</td></tr>
+    <tr><td>Reckoning warning</td><td>2 defers in a category.</td></tr>
+    <tr><td>Reckoning trigger</td><td>3 defers in a category, with up to 2 active reckoning writs at once.</td></tr>
+    <tr><td>Reckoning escalation</td><td>Repeated reckonings in the same category increase severity, difficulty, and XP multiplier.</td></tr>
+  </table>
+
+  <p>Debt clearing and reckoning clearing are intentionally weaker than clean completion. They currently grant roughly half XP, do not award seals, and do not advance the streak system. This keeps the pressure loop meaningful.</p>
+
+  <h3>Modifiers and Seal Economy</h3>
+  <p>One of the biggest upgrades over v3 is the addition of seals as an earned tactical currency.</p>
+  <table>
+    <tr><th>Mechanic</th><th>Live Rule</th></tr>
+    <tr><td>Modifier roll chance</td><td>About 35% of drafted writs</td></tr>
+    <tr><td>Modifier pools</td><td>Combat, skilling, or account-level pools depending on category</td></tr>
+    <tr><td>Reroll draft</td><td>Costs 2 seals</td></tr>
+    <tr><td>Buy extra choice</td><td>Costs 5 seals</td></tr>
+    <tr><td>Remove active modifier</td><td>Costs 3 seals</td></tr>
+    <tr><td>Seal sources</td><td>Clean writ clears, streak bonuses, and landmarks</td></tr>
+  </table>
+
+  <p>Streaks are now meaningful beyond prestige because they feed into the seal economy. Landmarks also award a flat bonus of 3 seals.</p>
+
+  <h3>Trials, Forks, Landmarks, and Final Path</h3>
+  <p>The milestone structure from v3 is still the backbone of the format, but the prototype is more dynamic and more game-like than the original draft.</p>
+
+  <table>
+    <tr><th>System</th><th>Current Behavior</th></tr>
+    <tr><td>Trials</td><td>10 total milestone Trials at levels 10, 20, 30, 40, 50, 60, 70, 80, 90, and 99.</td></tr>
+    <tr><td>Trial behavior</td><td>Trials auto-trigger, bypass regular drafting, and use their own reveal flow.</td></tr>
+    <tr><td>Trial targeting</td><td>Several Trials dynamically choose low-KC or untouched bosses rather than pointing to one fixed objective every time.</td></tr>
+    <tr><td>Forks</td><td>4 major branch choices across Zamorak and Zaros tiers.</td></tr>
+    <tr><td>Landmarks</td><td>First 99, Quest Cape, Total 1900, First Raid Completion.</td></tr>
+    <tr><td>Path assignment</td><td>Assigned automatically when the player enters Zaros tier based on run history.</td></tr>
+    <tr><td>Final Trial</td><td>At level 99 the assigned path generates a 5-writ final draft.</td></tr>
+  </table>
+
+  <h3>Current Fork Set</h3>
+  <table>
+    <tr><th>Fork</th><th>Option A</th><th>Option B</th><th>Trigger</th></tr>
+    <tr><td>The Ancient Path</td><td>Desert Treasure II</td><td>Dragon Slayer II</td><td>Level 65</td></tr>
+    <tr><td>The Elven Choice</td><td>Song of the Elves</td><td>Sins of the Father</td><td>Level 75</td></tr>
+    <tr><td>The Endgame</td><td>Tombs of Amascut (Full)</td><td>Theatre of Blood (Full)</td><td>Level 85</td></tr>
+    <tr><td>The Final Reckoning</td><td>The Inferno</td><td>The Nightmare</td><td>Level 92</td></tr>
+  </table>
+
+  <h2>5. Generator Logic and Account Modeling</h2>
+  <h3>Inputs</h3>
+  <ul>
+    <li>RuneScape name through Wise Old Man API</li>
+    <li>Manual fallback for skills and boss KC</li>
+    <li>All 24 tracked skills</li>
+    <li>69 tracked bosses</li>
+  </ul>
+
+  <p>The local API route first asks Wise Old Man to refresh a player profile, waits briefly, then fetches the latest snapshot. This makes the app feel more live than a static account import.</p>
+
+  <h3>Gap Logic</h3>
+  <p>The original account-average idea still drives the system, but the live prototype is more nuanced than v3. Instead of relying mainly on fixed “gain 5 levels” style tasks, many skill writs now scale around the account’s current weakest skills, level bands, and practical target ranges. At higher levels, some writs convert into chunk-based progression asks instead of always demanding a full jump to account average.</p>
+
+  <h3>Weighting Factors</h3>
+  <ul>
+    <li>Tier eligibility</li>
+    <li>Completion status and repeatability</li>
+    <li>Recent draft suppression</li>
+    <li>Skill gap severity</li>
+    <li>Combat average</li>
+    <li>Boss touch count and total boss KC</li>
+    <li>Low-KC or zero-KC bonuses for relevant bosses</li>
+    <li>Fresh-account bias toward PvM introductions rather than endurance bossing</li>
+  </ul>
+
+  <p>This matters because the live Mettle system is no longer just a weighted random pick from a static list. It behaves more like an account-reading pressure engine.</p>
+
+  <h3>Examples of Dynamic Behavior</h3>
+  <ul>
+    <li>Level 10 Trial can choose from Obor, Bryophyta, Scurrius, or Giant Mole based on account state.</li>
+    <li>Later Trials can pivot toward untouched God Wars bosses, lowest-KC raid-adjacent encounters, or the hardest untouched endgame boss.</li>
+    <li>Skill Gap writs frequently rewrite their own title and objective around the player’s actual weakest skill, lowest production skill, or lowest set of skilling stats.</li>
+    <li>Final path assignment is computed from what the player actually resolved over the course of the run.</li>
+  </ul>
+
+  <h2>6. Live Content Inventory</h2>
+  <h3>By Category</h3>
+  <table>
+    <tr><th>Category</th><th>Count</th></tr>
+    <tr><td>Trial</td><td>10</td></tr>
+    <tr><td>PvM Intro</td><td>31</td></tr>
+    <tr><td>PvM Endurance</td><td>23</td></tr>
+    <tr><td>Quest</td><td>31</td></tr>
+    <tr><td>Exploration</td><td>21</td></tr>
+    <tr><td>Skill Gap</td><td>42</td></tr>
+    <tr><td>Endurance</td><td>36</td></tr>
+    <tr><td>Economic</td><td>5</td></tr>
+  </table>
+
+  <h3>By Milestone Structure</h3>
+  <ul>
+    <li><strong>Trials:</strong> fully implemented</li>
+    <li><strong>Forks:</strong> fully implemented</li>
+    <li><strong>Landmarks:</strong> implemented, with Quest Cape as manual confirmation</li>
+    <li><strong>Final Trial pools:</strong> implemented for Warrior, Scholar, Survivor, and Balanced paths</li>
+  </ul>
+
+  <p>The major difference from the older v3 document is that the content is now encoded directly in the app. The code is the source of truth for exact wording and eligibility rules.</p>
+
+  <h2>7. Visual and UX Direction</h2>
+  <p>The original doc correctly identified presentation as a core differentiator, and the live prototype already leans into that. The current app uses a dark, ceremonial, OSRS-adjacent presentation with strong gold accents, high-contrast interface panels, branded reveal states, and a more premium “ritual ledger” tone than a plain utility tool.</p>
+
+  <h3>Current Visual Language</h3>
+  <ul>
+    <li>Cinematic entry screen instead of a plain form</li>
+    <li>Ledger framing rather than spreadsheet framing</li>
+    <li>Dedicated reveal moments for Trials, Forks, and Landmarks</li>
+    <li>Separate board, stats, and archive views</li>
+    <li>Responsive CSS pass for mobile layouts</li>
+  </ul>
+
+  <p>The visual direction is stronger than the original MVP recommendation. The app is already trying to feel like part game interface, part archive, and part ceremonial challenge system.</p>
+
+  <h2>8. Technical Implementation</h2>
+  <table>
+    <tr><th>Layer</th><th>Current Reality</th></tr>
+    <tr><td>Framework</td><td>Next.js 16 with App Router</td></tr>
+    <tr><td>UI Runtime</td><td>React 19</td></tr>
+    <tr><td>Language</td><td>TypeScript entry files plus JSX component files</td></tr>
+    <tr><td>Styling</td><td>Mostly inline styles; Tailwind is installed but not the primary styling approach</td></tr>
+    <tr><td>Data source</td><td>Wise Old Man API through a local app route</td></tr>
+    <tr><td>Persistence</td><td>Browser localStorage</td></tr>
+    <tr><td>Hosting assumption</td><td>Still compatible with Vercel deployment</td></tr>
+  </table>
+
+  <h3>Important Architecture Notes</h3>
+  <ul>
+    <li>The prototype does not currently use Supabase, authentication, or cloud saves.</li>
+    <li>The app does not require project-level environment variables for the current local flow.</li>
+    <li>The live save key is <span class="small">mettle_run_v8</span>.</li>
+    <li>The current structure keeps content, systems, and UI in a compact local repo layout, which is good for fast iteration but will eventually need tooling support if the writ pool keeps growing.</li>
+  </ul>
+
+  <h3>Current Repo Shape</h3>
+  <table>
+    <tr><th>Path Area</th><th>Purpose</th></tr>
+    <tr><td>app/</td><td>Next.js shell, page entry, and Wise Old Man API route</td></tr>
+    <tr><td>components/MettlePrototype.jsx</td><td>Main ledger experience and run-state orchestration</td></tr>
+    <tr><td>components/EntryScreen.jsx</td><td>Landing experience plus intake flow</td></tr>
+    <tr><td>components/data/</td><td>Writ pool, constants, forks, landmarks, and final trial definitions</td></tr>
+    <tr><td>components/systems/</td><td>Drafting, XP progression, reckoning generation, and path logic</td></tr>
+    <tr><td>components/utils/</td><td>Persistence, modifiers, labels, and skill helper functions</td></tr>
+  </table>
+
+  <h2>9. What Is Live vs. What Is Still Missing</h2>
+  <h3>Live Now</h3>
+  <ul>
+    <li>Branded entry screen</li>
+    <li>Wise Old Man account intake</li>
+    <li>Manual stat and KC fallback</li>
+    <li>Core draft loop</li>
+    <li>Debt and cursed states</li>
+    <li>Reckoning system</li>
+    <li>Trials, Forks, Landmarks, and Final Trial paths</li>
+    <li>Seal economy</li>
+    <li>Run history and archive</li>
+    <li>Mobile-responsive pass</li>
+    <li>Local save / resume loop</li>
+  </ul>
+
+  <h3>Still Missing or Intentionally Deferred</h3>
+  <ul>
+    <li>Cloud persistence and login</li>
+    <li>Shareable public Mettle profiles</li>
+    <li>Social comparison features</li>
+    <li>Quest verification beyond manual Quest Cape confirmation</li>
+    <li>Admin tooling for balancing and content authoring</li>
+    <li>Series-brand asset package: logo system, typography, channel packaging, and full motion toolkit</li>
+    <li>RuneLite integration or automatic account resync beyond current Wise Old Man pulls</li>
+  </ul>
+
+  <h3>Important Reality Check</h3>
+  <p>Some design ideas from v3 remain part of the project identity but are not yet hard-coded as isolated systems. For example, wilderness pressure is present in content and tier framing, but not as a dedicated wilderness-only rules engine. The format is clearly alive; some edge-rule specificity is still better described in content than in code.</p>
+
+  <h2>10. Recommended Next Phase</h2>
+  <p>If the goal is to move from strong prototype to launch-ready product and creator platform, the next phase should focus on six priorities:</p>
+  <ol>
+    <li><strong>Persistent accounts and shareable profiles.</strong> This is the biggest product multiplier after the current prototype.</li>
+    <li><strong>Content authoring tools.</strong> The writ pool is already large enough that editing raw data files will become painful over time.</li>
+    <li><strong>Balance instrumentation.</strong> Add analytics or debug views so the team can tune draft weights, defers, seals, and Trials with evidence instead of feel alone.</li>
+    <li><strong>Quest and progression verification.</strong> Reduce manual confirmation wherever Wise Old Man or future integrations make that possible.</li>
+    <li><strong>Brand package and series tooling.</strong> Bring the logo, crest states, overlays, and episode graphics up to the same level as the product idea.</li>
+    <li><strong>Public rollout planning.</strong> Decide whether Mettle remains mostly a creator-led format first or whether the public tool should be prepared for broader adoption early.</li>
+  </ol>
+
+  <h2>11. Summary</h2>
+  <p>v3 captured the right vision. v4 documents the fact that Mettle is now a real system with a real UI, a real account model, and a real gameplay loop. The project is no longer “should this work?” It is now “how polished, social, and scalable should this become?”</p>
+  <p>Mettle’s identity is strongest where the original concept and the current implementation overlap: personalized challenge pressure, visible avoidance, ceremonial progression, and a finale that feels earned. The job from here is not inventing the product. It is sharpening it.</p>
+
+  <p class="small">Reference implementation at time of writing: README, app route, live ledger component, content definitions, and system logic in the MettleOS repo as of March 13, 2026.</p>
+</body>
+</html>
