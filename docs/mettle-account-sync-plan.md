@@ -71,11 +71,11 @@ The plugin scaffold now has:
 1. Build local export first.
 2. Make export the default user flow.
 3. Add direct upload only after the web app has a server-side sync target.
-4. Promote quest and diary state into rule-backed writ generation.
+4. Promote quest and diary state into rule-backed task generation.
 
 ## Why Include Achievement Diaries Now
 
-Mettle does not yet generate diary-based writs, but diary sync belongs in v1 because:
+Mettle does not yet generate diary-based tasks, but diary sync belongs in v1 because:
 
 - RuneLite can surface the data in the same plugin session.
 - it avoids a future breaking change to the sync contract

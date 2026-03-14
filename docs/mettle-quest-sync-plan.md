@@ -2,7 +2,7 @@
 
 ## Why a Mettle Plugin
 
-Wise Old Man gives Mettle the right public account surface for skills and boss KC, but it does not expose per-quest completion. That makes quest writs, quest-point deltas, forks, and Quest Cape verification impossible to back with real account state.
+Wise Old Man gives Mettle the right public account surface for skills and boss KC, but it does not expose per-quest completion. That makes quest tasks, quest-point deltas, forks, and Quest Cape verification impossible to back with real account state.
 
 The safest path is a Mettle-owned RuneLite plugin that reads quest state locally and exports or uploads it using a Mettle contract we control.
 
@@ -47,7 +47,7 @@ This is intentionally a bridge step. The app still uses local browser saves, so 
 2. Use JSON import in the app while Mettle remains local-save only.
 3. Add sync sessions or authenticated accounts on the web app.
 4. Upgrade the plugin from file export to direct upload.
-5. Make quest writs rule-backed using synced quest state.
+5. Make quest tasks rule-backed using synced quest state.
 
 ## Direct Sync Requirement
 

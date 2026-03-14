@@ -7,26 +7,26 @@ import {
   TIER_ORDER,
   XP_BREAKPOINTS,
 } from "../data/constants.js";
-import { FORK_WRITS } from "../data/forkDefs.js";
-import { LANDMARK_WRITS } from "../data/landmarkDefs.js";
-import { WRIT_POOL } from "../data/writPool.js";
+import { FORK_TASKS } from "../data/forkDefs.js";
+import { LANDMARK_TASKS } from "../data/landmarkDefs.js";
+import { TASK_POOL } from "../data/taskPool.js";
 import { getModifierForCategory, rollModifier } from "../utils/modifiers.js";
-import { isQuestObjectiveAlreadyComplete } from "../utils/questProgress.js";
+import { isTaskObjectiveAlreadyComplete } from "../utils/questProgress.js";
 import { accountAverage, gapScores } from "../utils/skillHelpers.js";
 import { generateFinalTrialDraft, computePath as computePathFromPool } from "../data/finalTrialDefs.js";
 
-export function materializeWrit(writ, skillLevels, bossKC) {
-  if (!writ) return writ;
+export function materializeTask(task, skillLevels, bossKC, questState = null, diaryState = null) {
+  if (!task) return task;
   return {
-    ...writ,
-    title: writ.titleFn ? writ.titleFn(skillLevels, bossKC) : writ.title,
-    objective: writ.objectiveFn ? writ.objectiveFn(skillLevels, bossKC) : writ.objective,
+    ...task,
+    title: task.titleFn ? task.titleFn(skillLevels, bossKC, questState, diaryState) : task.title,
+    objective: task.objectiveFn ? task.objectiveFn(skillLevels, bossKC, questState, diaryState) : task.objective,
   };
 }
 
-export function meetsRequirements(writ, skillLevels, bossKC, questState = null) {
-  if (isQuestObjectiveAlreadyComplete(writ, questState, bossKC)) return false;
-  if (writ.requiresFn) return writ.requiresFn(skillLevels, bossKC);
+export function meetsRequirements(task, skillLevels, bossKC, questState = null, diaryState = null) {
+  if (isTaskObjectiveAlreadyComplete(task, questState, bossKC, diaryState)) return false;
+  if (task.requiresFn) return task.requiresFn(skillLevels, bossKC, questState, diaryState);
   return true;
 }
 
@@ -76,9 +76,9 @@ export function unlockedFeatures(level) {
   return METTLE_UNLOCKS.filter(x => level >= x.level);
 }
 
-export function getDebtStatus(debtWrits, mustClearAll, streak, favoredDrawsRemaining) {
+export function getDebtStatus(deferredTasks, mustClearAll, streak, favoredDrawsRemaining) {
   if (mustClearAll) return "blocked";
-  if (debtWrits.length >= 1) return "cursed";
+  if (deferredTasks.length >= 1) return "cursed";
   if ((favoredDrawsRemaining ?? 0) > 0) return "favored";
   if (streak >= 15) return "hot_streak";
   return "normal";
@@ -92,7 +92,7 @@ export function draftSizeFromStatus(status) {
 }
 
 export function getPendingTrial(mettleLevel, completedIds) {
-  const trials = WRIT_POOL.filter(w => w.trial);
+  const trials = TASK_POOL.filter(w => w.trial);
   for (const t of trials.sort((a, b) => a.triggerLevel - b.triggerLevel)) {
     if (mettleLevel >= t.triggerLevel && !completedIds.includes(t.id)) {
       return t;
@@ -101,28 +101,28 @@ export function getPendingTrial(mettleLevel, completedIds) {
   return null;
 }
 
-export function generateReckoningWrit(category, reckoningCount, mettleLevel, skillLevels, bossKC, questState = null) {
+export function generateReckoningTask(category, reckoningCount, mettleLevel, skillLevels, bossKC, questState = null, diaryState = null) {
   const currentTier = tierForLevel(mettleLevel);
-  const eligible = WRIT_POOL.filter(w =>
+  const eligible = TASK_POOL.filter(w =>
     !w.trial &&
     (w.category === category ||
       (category === "PvM Intro" && w.category === "PvM Endurance") ||
       (category === "PvM Endurance" && w.category === "PvM Intro")) &&
     TIER_ORDER.indexOf(w.tier) <= TIER_ORDER.indexOf(currentTier) &&
-    meetsRequirements(w, skillLevels, bossKC, questState)
+    meetsRequirements(w, skillLevels, bossKC, questState, diaryState)
   );
 
-  let baseWrit = eligible[0];
+  let baseTask = eligible[0];
   if (eligible.length > 1) {
     const idx = Math.floor(Math.random() * Math.min(3, eligible.length));
-    baseWrit = eligible[idx];
+    baseTask = eligible[idx];
   }
 
   const severity = Math.min(reckoningCount, 3);
   const xpMultiplier = severity === 1 ? 1.5 : severity === 2 ? 2 : 3;
   const modifier = getModifierForCategory(category, (severity - 1) / 2);
-  const baseXP = baseWrit ? baseWrit.xp : 300;
-  const baseObjective = baseWrit ? materializeWrit(baseWrit, skillLevels, bossKC).objective : `Complete a ${category} challenge`;
+  const baseXP = baseTask ? baseTask.xp : 300;
+  const baseObjective = baseTask ? materializeTask(baseTask, skillLevels, bossKC, questState, diaryState).objective : `Complete a ${category} challenge`;
 
   return {
     id: `reckoning_${category}_${Date.now()}`,
@@ -138,12 +138,12 @@ export function generateReckoningWrit(category, reckoningCount, mettleLevel, ski
   };
 }
 
-function computeWeight(writ, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel, questState = null) {
-  if (writ.trial) return 0;
-  if (!writ.repeatable && completedIds.includes(writ.id)) return 0;
-  if (suppressedIds.includes(writ.id)) return 0;
-  if (!meetsRequirements(writ, skillLevels, bossKC, questState)) return 0;
-  if (TIER_ORDER.indexOf(writ.tier) > TIER_ORDER.indexOf(tierForLevel(mettleLevel))) return 0;
+function computeWeight(task, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel, questState = null, diaryState = null) {
+  if (task.trial) return 0;
+  if (!task.repeatable && completedIds.includes(task.id)) return 0;
+  if (suppressedIds.includes(task.id)) return 0;
+  if (!meetsRequirements(task, skillLevels, bossKC, questState, diaryState)) return 0;
+  if (TIER_ORDER.indexOf(task.tier) > TIER_ORDER.indexOf(tierForLevel(mettleLevel))) return 0;
 
   const gaps = gapScores(skillLevels);
   const maxGap = Math.max(...Object.values(gaps));
@@ -154,41 +154,41 @@ function computeWeight(writ, skillLevels, bossKC, completedIds, suppressedIds, m
   const earlyBossingAccount = touchedBosses > 0 && touchedBosses <= 4;
 
   let weight = 1;
-  if (writ.category === "Skill Gap" && maxGap > 0.10) weight *= 2 + maxGap * 5;
-  if ((writ.category === "PvM Intro" || writ.category === "PvM Endurance") && combatAvg > 85) weight *= 3;
-  if (writ.category === "Quest") weight *= 2;
-  if (writ.category === "Endurance") weight *= 1.2;
-  if (writ.category === "Economic") weight *= 0.8;
+  if (task.category === "Skill Gap" && maxGap > 0.10) weight *= 2 + maxGap * 5;
+  if ((task.category === "PvM Intro" || task.category === "PvM Endurance") && combatAvg > 85) weight *= 3;
+  if (task.category === "Quest") weight *= 2;
+  if (task.category === "Endurance") weight *= 1.2;
+  if (task.category === "Economic") weight *= 0.8;
 
-  if (writ.category === "PvM Intro" || writ.category === "PvM Endurance") {
+  if (task.category === "PvM Intro" || task.category === "PvM Endurance") {
     if (freshBossingAccount) {
-      weight *= writ.category === "PvM Intro" ? 3 : 0.35;
-      if (writ.difficulty === "Hard") weight *= 0.75;
-      if (writ.difficulty === "Elite") weight *= 0.55;
+      weight *= task.category === "PvM Intro" ? 3 : 0.35;
+      if (task.difficulty === "Hard") weight *= 0.75;
+      if (task.difficulty === "Elite") weight *= 0.55;
     } else if (earlyBossingAccount) {
-      weight *= writ.category === "PvM Intro" ? 1.8 : 0.75;
+      weight *= task.category === "PvM Intro" ? 1.8 : 0.75;
     } else if (touchedBosses >= 12) {
-      weight *= writ.category === "PvM Endurance" ? 1.25 : 0.9;
+      weight *= task.category === "PvM Endurance" ? 1.25 : 0.9;
     }
 
-    if (combatAvg < 70 && writ.tier !== "Guthix") weight *= 0.8;
-    if (totalBossKC >= 100 && writ.category === "PvM Endurance") weight *= 1.15;
+    if (combatAvg < 70 && task.tier !== "Guthix") weight *= 0.8;
+    if (totalBossKC >= 100 && task.category === "PvM Endurance") weight *= 1.15;
   }
 
   const bossMap = { g_pvm_2: "obor", g_pvm_3: "bryophyta" };
-  if (bossMap[writ.id]) {
-    const kc = bossKC[bossMap[writ.id]] ?? 0;
+  if (bossMap[task.id]) {
+    const kc = bossKC[bossMap[task.id]] ?? 0;
     if (kc === 0) weight *= 3;
     else if (kc <= 5) weight *= 2;
     else if (kc > 20) weight *= 0.5;
   }
-  if (writ.id === "g_pvm_1" || writ.id === "g_pvm_7") {
+  if (task.id === "g_pvm_1" || task.id === "g_pvm_7") {
     const kc = bossKC.barrows_chests ?? 0;
     if (kc === 0) weight *= 3;
     else if (kc <= 5) weight *= 2;
     else if (kc > 20) weight *= 0.5;
   }
-  if (writ.id === "z_pvm_14") {
+  if (task.id === "z_pvm_14") {
     const untouchedBosses = KEY_BOSSES.filter(boss => (bossKC[boss] ?? 0) === 0).length;
     if (untouchedBosses > 0) weight *= 1.6 + Math.min(untouchedBosses / 40, 0.8);
     if (freshBossingAccount) weight *= 0.8;
@@ -196,14 +196,14 @@ function computeWeight(writ, skillLevels, bossKC, completedIds, suppressedIds, m
   return Math.max(0.1, weight);
 }
 
-export function generateDraft(skillLevels, bossKC, completedIds, recentDraftHistory, debtWrits, mettleLevel, requestedSize = null, streak = 0, favoredDrawsRemaining = 0, questState = null) {
-  const status = getDebtStatus(debtWrits, false, streak, favoredDrawsRemaining);
+export function generateDraft(skillLevels, bossKC, completedIds, recentDraftHistory, deferredTasks, mettleLevel, requestedSize = null, streak = 0, favoredDrawsRemaining = 0, questState = null, diaryState = null) {
+  const status = getDebtStatus(deferredTasks, false, streak, favoredDrawsRemaining);
   const draftSize = requestedSize ?? draftSizeFromStatus(status);
   const suppressedIds = recentDraftHistory.flat();
 
-  const weighted = WRIT_POOL
+  const weighted = TASK_POOL
     .filter(w => !w.trial)
-    .map(w => ({ ...w, weight: computeWeight(w, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel, questState) }))
+    .map(w => ({ ...w, weight: computeWeight(w, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel, questState, diaryState) }))
     .filter(w => w.weight > 0);
 
   if (weighted.length === 0) return [];
@@ -222,21 +222,21 @@ export function generateDraft(skillLevels, bossKC, completedIds, recentDraftHist
     }
     idx = Math.min(idx, pool.length - 1);
 
-    const writ = materializeWrit(pool[idx], skillLevels, bossKC);
-    if (seenObjectives.has(writ.objective)) {
+    const task = materializeTask(pool[idx], skillLevels, bossKC, questState, diaryState);
+    if (seenObjectives.has(task.objective)) {
       pool.splice(idx, 1);
       i--;
       continue;
     }
 
-    const mod = rollModifier(writ);
+    const mod = rollModifier(task);
     if (mod) {
-      writ.modifier = mod;
-      writ.objective = `${writ.objective} — MODIFIER: ${mod}`;
+      task.modifier = mod;
+      task.objective = `${task.objective} — MODIFIER: ${mod}`;
     }
 
-    seenObjectives.add(writ.objective);
-    selected.push(writ);
+    seenObjectives.add(task.objective);
+    selected.push(task);
     pool.splice(idx, 1);
   }
 
@@ -245,4 +245,4 @@ export function generateDraft(skillLevels, bossKC, completedIds, recentDraftHist
 
 export const computePath = computePathFromPool;
 export { generateFinalTrialDraft };
-export { RECKONING_CATEGORIES, TIER_GATES, TIER_ORDER, FORK_WRITS, LANDMARK_WRITS };
+export { RECKONING_CATEGORIES, TIER_GATES, TIER_ORDER, FORK_TASKS, LANDMARK_TASKS };

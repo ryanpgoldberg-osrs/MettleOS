@@ -12,10 +12,10 @@ function toInternalSaveShape(parsed) {
     history: parsed.history ?? parsed.taskHistory ?? [],
     completedIds: parsed.completedIds ?? parsed.completedTaskIds ?? [],
     draftHistory: parsed.draftHistory ?? parsed.taskDraftHistory ?? [],
-    debtWrits: parsed.debtWrits ?? parsed.deferredTasks ?? [],
-    reckoningWrits: parsed.reckoningWrits ?? parsed.reckoningTasks ?? [],
-    activeWrit: parsed.activeWrit ?? parsed.activeTask ?? null,
-    pendingTrialData: parsed.pendingTrialData ?? parsed.pendingTrialTask ?? null,
+    deferredTasks: parsed.deferredTasks ?? parsed.debtWrits ?? [],
+    reckoningTasks: parsed.reckoningTasks ?? parsed.reckoningWrits ?? [],
+    activeTask: parsed.activeTask ?? parsed.activeWrit ?? null,
+    pendingTrialTask: parsed.pendingTrialTask ?? parsed.pendingTrialData ?? null,
     questState: normalizeQuestState(parsed.questState ?? parsed.questLedger ?? createEmptyQuestState()),
     diaryState: normalizeDiaryState(parsed.diaryState ?? parsed.achievementDiaryState ?? createEmptyDiaryState()),
   };
@@ -29,10 +29,10 @@ function toStoredSaveShape(parsed) {
     history,
     completedIds,
     draftHistory,
-    debtWrits,
-    reckoningWrits,
-    activeWrit,
-    pendingTrialData,
+    deferredTasks,
+    reckoningTasks,
+    activeTask,
+    pendingTrialTask,
     ...rest
   } = internal;
 
@@ -41,10 +41,10 @@ function toStoredSaveShape(parsed) {
     taskHistory: history ?? [],
     completedTaskIds: completedIds ?? [],
     taskDraftHistory: draftHistory ?? [],
-    deferredTasks: debtWrits ?? [],
-    reckoningTasks: reckoningWrits ?? [],
-    activeTask: activeWrit ?? null,
-    pendingTrialTask: pendingTrialData ?? null,
+    deferredTasks: deferredTasks ?? [],
+    reckoningTasks: reckoningTasks ?? [],
+    activeTask: activeTask ?? null,
+    pendingTrialTask: pendingTrialTask ?? null,
   };
 }
 
@@ -76,10 +76,10 @@ function migrateSave(parsed) {
       updatedAt: migrated.updatedAt || Date.now(),
       currentDraft: Array.isArray(migrated.currentDraft) ? migrated.currentDraft : [],
       draftMode: typeof migrated.draftMode === "string" ? migrated.draftMode : "normal",
-      activeWrit: migrated.activeWrit ?? null,
+      activeTask: migrated.activeTask ?? null,
       activeView: typeof migrated.activeView === "string" ? migrated.activeView : "board",
       trialPhase: typeof migrated.trialPhase === "string" ? migrated.trialPhase : null,
-      pendingTrialData: migrated.pendingTrialData ?? null,
+      pendingTrialTask: migrated.pendingTrialTask ?? null,
       activeFork: migrated.activeFork ?? null,
       forkPhase: typeof migrated.forkPhase === "string" ? migrated.forkPhase : null,
       activeLandmark: migrated.activeLandmark ?? null,

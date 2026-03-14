@@ -5,13 +5,13 @@ import {
   TIER_SEAL_REWARDS,
 } from "../data/constants.js";
 
-export function rollModifier(writ) {
+export function rollModifier(task) {
   if (Math.random() > 0.35) return null;
   let pool;
-  if (["PvM Intro","PvM Endurance"].includes(writ.category)) pool = COMBAT_MODIFIERS;
-  else if (["Skill Gap","Economic"].includes(writ.category)) pool = SKILLING_MODIFIERS;
-  else if (["Endurance"].includes(writ.category)) pool = [...SKILLING_MODIFIERS, ...ACCOUNT_MODIFIERS];
-  else if (["Quest","Exploration"].includes(writ.category)) pool = ACCOUNT_MODIFIERS;
+  if (["PvM Intro","PvM Endurance"].includes(task.category)) pool = COMBAT_MODIFIERS;
+  else if (["Skill Gap","Economic"].includes(task.category)) pool = SKILLING_MODIFIERS;
+  else if (["Endurance"].includes(task.category)) pool = [...SKILLING_MODIFIERS, ...ACCOUNT_MODIFIERS];
+  else if (["Quest","Exploration"].includes(task.category)) pool = ACCOUNT_MODIFIERS;
   else pool = ACCOUNT_MODIFIERS;
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -27,19 +27,19 @@ export function getModifierForCategory(category, severity) {
   return pool[idx];
 }
 
-export function sealsForWrit(writ) {
-  return TIER_SEAL_REWARDS[writ?.tier] ?? 1;
+export function sealsForTask(task) {
+  return TIER_SEAL_REWARDS[task?.tier] ?? 1;
 }
 
-export function modifierXpBonus(writ) {
-  if (!writ) return 0;
-  const modifierCount = (writ.modifier ? 1 : 0) + (writ.trialModifier ? 1 : 0);
+export function modifierXpBonus(task) {
+  if (!task) return 0;
+  const modifierCount = (task.modifier ? 1 : 0) + (task.trialModifier ? 1 : 0);
   if (modifierCount === 0) return 0;
-  return Math.max(25, Math.round((writ.xp ?? 0) * 0.25 * modifierCount));
+  return Math.max(25, Math.round((task.xp ?? 0) * 0.25 * modifierCount));
 }
 
-export function writXp(writ) {
-  return (writ?.xp ?? 0) + modifierXpBonus(writ);
+export function taskXp(task) {
+  return (task?.xp ?? 0) + modifierXpBonus(task);
 }
 
 export function streakSealBonus(streak) {

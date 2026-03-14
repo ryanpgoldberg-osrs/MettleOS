@@ -2,7 +2,7 @@ import { SKILLS } from "./constants.js";
 import { hasQuestCape } from "../utils/questProgress.js";
 import { skillLabel } from "../utils/labels.js";
 
-export const LANDMARK_WRITS = [
+export const LANDMARK_TASKS = [
   { id:"landmark_first_99", title:"First Level 99", category:"Landmark", tier:"Zaros", difficulty:"Elite", xp:1000,
     conditionFn: (skills, _kc) => SKILLS.some(s => skills[s] >= 99),
     objectiveFn: (skills) => { const maxed = SKILLS.filter(s => skills[s] >= 99); return `You have reached 99 in ${maxed.map(skillLabel).join(", ")}. The ledger acknowledges mastery.`; },
@@ -20,7 +20,7 @@ export const LANDMARK_WRITS = [
 ];
 
 export function getPendingLandmark(skillLevels, bossKC, completedLandmarks, questState = null) {
-  for (const lm of LANDMARK_WRITS) {
+  for (const lm of LANDMARK_TASKS) {
     if (completedLandmarks.includes(lm.id)) continue;
     if (lm.conditionFn && lm.conditionFn(skillLevels, bossKC, questState)) {
       return {

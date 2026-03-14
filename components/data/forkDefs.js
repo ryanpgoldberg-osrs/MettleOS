@@ -1,6 +1,6 @@
 import { isQuestObjectiveAlreadyComplete } from "../utils/questProgress.js";
 
-export const FORK_WRITS = [
+export const FORK_TASKS = [
   { id:"fork_ancient_path", title:"The Ancient Path", tier:"Zamorak", triggerLevel:65, difficulty:"Elite", xp:900, category:"Fork",
     optionA: { label:"Desert Treasure II", objective:"Complete Desert Treasure II", questCompleteAnyOf:["desert_treasure_ii"] },
     optionB: { label:"Dragon Slayer II", objective:"Complete Dragon Slayer II", questCompleteAnyOf:["dragon_slayer_ii"] },
@@ -20,7 +20,7 @@ export const FORK_WRITS = [
 ];
 
 export function getPendingFork(mettleLevel, completedForks, completedIds, questState = null, bossKC = {}) {
-  for (const fork of FORK_WRITS) {
+  for (const fork of FORK_TASKS) {
     if (mettleLevel >= fork.triggerLevel && !completedForks[fork.id]) {
       const optionA = {
         ...fork.optionA,
@@ -47,5 +47,5 @@ export function getPendingFork(mettleLevel, completedForks, completedIds, questS
 }
 
 // ─────────────────────────────────────────────
-// LANDMARK WRITS — auto-trigger on condition
+// LANDMARK TASKS — auto-trigger on condition
 // ─────────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 > *Your account has been avoiding things. Mettle finds them, names them, and makes you face them.*
 
-Mettle is a custom skill layered on top of Old School RuneScape. It is both a YouTube/streaming format and a playable web tool that generates account-specific writs from your actual stats and boss history.
+Mettle is a custom skill layered on top of Old School RuneScape. It is both a YouTube/streaming format and a playable web tool that generates account-specific tasks from your actual stats and boss history.
 
 The core idea is simple: your account already tells a story about what you delay, ignore, and avoid. Mettle turns that story into a ledger.
 
@@ -10,9 +10,9 @@ The core idea is simple: your account already tells a story about what you delay
 
 ## What Is Mettle?
 
-You enter your RSN. The app pulls your account through the Wise Old Man API, maps your skills and boss KC into a local account model, and drafts personalized writs based on account gaps, untouched bosses, progression state, and recent history.
+You enter your RSN. The app pulls your account through the Wise Old Man API, maps your skills and boss KC into a local account model, and drafts personalized tasks based on account gaps, untouched bosses, progression state, and recent history.
 
-You draft from a small set of writs and choose one. The unchosen writs fall out of the current draw and can return later. The chosen writ becomes active. Complete it cleanly and you gain full rewards. Defer too many and you build debt. Push that too far and reckoning pressure begins to form around the categories you keep dodging.
+You draft from a small set of tasks and choose one. The unchosen tasks fall out of the current draw and can return later. The chosen task becomes active. Complete it cleanly and you gain full rewards. Defer too many and you build debt. Push that too far and reckoning pressure begins to form around the categories you keep dodging.
 
 Mettle tracks its own progression as **Mettle XP** across five deity tiers toward level 99. Along the way it introduces Trials, Forks, Landmarks, debt pressure, and finally a path-based Final Trial.
 
@@ -45,15 +45,15 @@ The live account model currently tracks:
 
 | Tier | Levels | Current Pool | Theme |
 |---|---:|---:|---|
-| Guthix | 1–20 | 35 writs | Foundation, first avoidance patterns |
-| Saradomin | 21–40 | 40 writs | Discipline, structure, first larger asks |
-| Bandos | 41–60 | 40 writs | Combat escalation, account force |
-| Zamorak | 61–80 | 46 writs | Chaos, punishment, pressure systems |
-| Zaros | 81–99 | 28 writs | Mastery, pathing, endgame pressure |
+| Guthix | 1–20 | 55 tasks | Foundation, first avoidance patterns |
+| Saradomin | 21–40 | 58 tasks | Discipline, structure, first larger asks |
+| Bandos | 41–60 | 59 tasks | Combat escalation, account force |
+| Zamorak | 61–80 | 53 tasks | Chaos, punishment, pressure systems |
+| Zaros | 81–99 | 50 tasks | Mastery, pathing, endgame pressure |
 
 Total live pool:
 
-- `189` non-trial writs
+- `265` non-trial tasks
 - `10` Trials
 
 ### Mettle XP Curve
@@ -80,7 +80,7 @@ Tier gates:
 |---|---|
 | 10 | Trials |
 | 20 | Draft (3 options) |
-| 40 | Endurance Writs |
+| 40 | Endurance Tasks |
 | 60 | Elite modifiers |
 | 80 | Mythic pressure |
 
@@ -100,9 +100,9 @@ Tier gates:
 
 ### Important Rules
 
-- Unchosen writs are **not** permanently deleted. They only leave the current draw.
-- Most completed writs leave the pool permanently.
-- Writs marked `repeatable` can return later.
+- Unchosen tasks are **not** permanently deleted. They only leave the current draw.
+- Most completed tasks leave the pool permanently.
+- Tasks marked `repeatable` can return later.
 - Recent draft history is suppressed to reduce repetition.
 - Favored state is currently granted by Trial completion, not by clearing debt.
 
@@ -112,7 +112,7 @@ Tier gates:
 
 ### Debt
 
-- Deferring a writ moves it into the debt queue.
+- Deferring a task moves it into the debt queue.
 - Debt cap is `3`.
 - Hitting the cap forces cleanup before drafting can continue.
 - Tier advancement is blocked at gates if debt or reckoning is unresolved.
@@ -121,21 +121,21 @@ Tier gates:
 
 - Any debt puts the run into a cursed draft state.
 - Cursed drafts shrink to `2` options.
-- Deferring a writ breaks favored state immediately.
+- Deferring a task breaks favored state immediately.
 
 ### Reckoning
 
 - Reckoning is category-based pressure triggered by repeated defers.
 - Warning starts at `2` defers in a category.
-- At `3`, a reckoning writ can be created for that category.
-- Reckoning writs must be cleared before drawing or advancing.
+- At `3`, a reckoning task can be created for that category.
+- Reckoning tasks must be cleared before drawing or advancing.
 
 ### Debt / Reckoning Recovery Rewards
 
 Recovery is intentionally weaker than clean completion:
 
-- Clearing a deferred writ gives **half XP**
-- Completing a reckoning writ gives **half XP**
+- Clearing a deferred task gives **half XP**
+- Completing a reckoning task gives **half XP**
 - Neither gives seals
 - Neither increases streak
 
@@ -145,7 +145,7 @@ Recovery is intentionally weaker than clean completion:
 
 ### Trials
 
-Trials are milestone writs that auto-trigger and bypass the normal draft.
+Trials are milestone tasks that auto-trigger and bypass the normal draft.
 
 Live trial levels:
 
@@ -197,11 +197,11 @@ At the top end of the run, Mettle assigns a path from account history:
 - Survivor
 - Balanced
 
-Each path has its own `8`-writ pool, and the Final Trial draws `5` from that pool.
+Each path has its own `8`-task pool, and the Final Trial draws `5` from that pool.
 
 ---
 
-## Writ Categories
+## Task Categories
 
 | Category | Description |
 |---|---|
@@ -212,7 +212,7 @@ Each path has its own `8`-writ pool, and the Final Trial draws `5` from that poo
 | Exploration | Unlocks, access, movement, area and system asks |
 | Endurance | Time-based, volume-based, or streak-based asks |
 | Economic | Profit, production, or trade-centered asks |
-| Trial | Milestone writs that bypass the normal draft |
+| Trial | Milestone tasks that bypass the normal draft |
 
 ---
 
@@ -232,13 +232,13 @@ Manual entry is also supported for skills and boss KC.
 
 ### Skill Gap Logic
 
-The app still uses account-average logic, but the writ sizing is now more dynamic than the original pitch.
+The app still uses account-average logic, but the task sizing is now more dynamic than the original pitch.
 
 Notable updates:
 
-- fixed `+5` style level-gain writs were replaced with level-band scaling
-- high-level skill writs can switch from levels to XP chunks
-- gap-closing writs no longer always force a skill all the way to account average
+- fixed `+5` style level-gain tasks were replaced with level-band scaling
+- high-level skill tasks can switch from levels to XP chunks
+- gap-closing tasks no longer always force a skill all the way to account average
 
 ### Weighting
 
@@ -316,7 +316,7 @@ app/
 components/
   EntryScreen.jsx             Cold open + RSN/manual intake
   MettlePrototype.jsx         Main ledger experience
-  data/                       Writ pool, tiers, forks, landmarks, final trial pools
+  data/                       Task pool, tiers, forks, landmarks, final trial pools
   systems/                    Drafting and progression logic
   utils/                      Persistence, labels, modifiers, helpers
 
