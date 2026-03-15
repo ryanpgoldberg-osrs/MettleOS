@@ -1,4 +1,5 @@
 "use client";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import {
   CLEAR_DEFERRED_COST,
@@ -46,6 +47,11 @@ import { clearSave, exportSaveData, importSaveText, loadSave, writeSave } from "
 import { createEmptyQuestState, parseQuestSyncText, summarizeQuestState } from "./utils/questSync.js";
 import { accountAverage } from "./utils/skillHelpers.js";
 import { fetchPlayerSnapshotByRsn } from "./utils/womImport.js";
+import MerchantToggle from "./merchant/MerchantToggle.jsx";
+
+const MerchantBoard = dynamic(() => import("./merchant/MerchantBoard.jsx"), {
+  ssr: false,
+});
 
 function trialFlavorLine(trial) {
   if (!trial) return "The ledger has picked the next pressure point.";
@@ -143,6 +149,8 @@ export default function MettlePrototype({
   const [activeTask,     setActiveTask]     = useState(null);
   const [activeView,     setActiveView]     = useState("board");
   const [xpDrop,         setXpDrop]         = useState(null);
+  const [merchantOpen, setMerchantOpen]     = useState(false);
+  const [merchantReady, setMerchantReady]   = useState(false);
 
   // ── TRIAL REVEAL STATE
   const [trialPhase,     setTrialPhase]     = useState(null); // null | "approaching" | "revealed"
@@ -685,9 +693,16 @@ export default function MettlePrototype({
     setAssignedPath(null); setPathRevealed(false);
     setQuestState(createEmptyQuestState());
     setDiaryState(createEmptyDiaryState());
+    setMerchantOpen(false);
+    setMerchantReady(false);
     setConfirmReset(false);
     clearSave();
     onResetToEntry?.();
+  }
+
+  function openMerchantBoard() {
+    setMerchantReady(true);
+    setMerchantOpen(true);
   }
 
   const displayFont = "'RuneScape UF', 'Silkscreen', 'Arial Black', 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif";
@@ -983,15 +998,24 @@ export default function MettlePrototype({
             <div className="mettle-summary-grid">
               <div className="mettle-summary-cell">
                 <div style={{fontSize:"10px",letterSpacing:"3px",color:"#666",textTransform:"uppercase"}}>Standing</div>
-                <strong>Level {String(mettleLevel).padStart(2,"0")} · {mettleXP.toLocaleString()} XP</strong>
+                <strong>
+                  <span style={{display:"block"}}>Level {String(mettleLevel).padStart(2,"0")}</span>
+                  <span style={{display:"block"}}>{mettleXP.toLocaleString()} XP</span>
+                </strong>
               </div>
               <div className="mettle-summary-cell">
                 <div style={{fontSize:"10px",letterSpacing:"3px",color:"#666",textTransform:"uppercase"}}>Pressure</div>
-                <strong>{deferredTasks.length} deferred · {reckoningTasks.length} reckoning tasks</strong>
+                <strong>
+                  <span style={{display:"block"}}>{deferredTasks.length} deferred</span>
+                  <span style={{display:"block"}}>{reckoningTasks.length} reckoning</span>
+                </strong>
               </div>
               <div className="mettle-summary-cell">
                 <div style={{fontSize:"10px",letterSpacing:"3px",color:"#666",textTransform:"uppercase"}}>Control</div>
-                <strong>{mettleSeals} seals · {streak} streak</strong>
+                <strong>
+                  <span style={{display:"block"}}>{mettleSeals} seals</span>
+                  <span style={{display:"block"}}>{streak} streak</span>
+                </strong>
               </div>
             </div>
           </div>
@@ -1095,7 +1119,7 @@ export default function MettlePrototype({
           <div className="mettle-info-actions" style={s.infoMetaWrap}>
             <button style={{...s.btn(false),fontSize:"10px",padding:"4px 10px"}} onClick={exportSaveFile}>EXPORT SAVE</button>
             <button style={{...s.btn(false),fontSize:"10px",padding:"4px 10px"}} onClick={openImportPicker}>IMPORT SAVE</button>
-            <button style={{...s.btn(false),fontSize:"10px",padding:"4px 10px"}} onClick={()=>setStatsLoaded(false)}>EDIT STATS</button>
+            <button style={{...s.btn(false),fontSize:"10px",padding:"4px 10px"}} onClick={()=>{ setMerchantOpen(false); setStatsLoaded(false); }}>EDIT STATS</button>
           </div>
           </div>
           {saveFileMessage && (
@@ -1111,6 +1135,7 @@ export default function MettlePrototype({
           {["board","stats","history"].map(v=>(
             <button key={v} style={s.btn(activeView===v)} onClick={()=>setActiveView(v)}>{viewLabels[v]}</button>
           ))}
+          <MerchantToggle isActive={merchantOpen} onClick={openMerchantBoard} buttonStyle={s.btn(merchantOpen)} />
           <div className="mettle-nav-spacer" style={{flex:1}}/>
           {confirmReset ? (
             <div style={{display:"flex",gap:"4px"}}>
@@ -1753,6 +1778,9 @@ export default function MettlePrototype({
           <span>XP: {mettleXP.toLocaleString()} / {MAX_METTLE_XP.toLocaleString()}</span>
         </div>
       )}
+      {statsLoaded && merchantReady ? (
+        <MerchantBoard isOpen={merchantOpen} onClose={() => setMerchantOpen(false)} />
+      ) : null}
       </div>
     </div>
   );
