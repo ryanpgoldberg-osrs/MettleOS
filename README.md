@@ -30,6 +30,18 @@ Current save key:
 
 - `mettle_run_v8`
 
+## Built-In Merchant Utility
+
+Mettle now also includes an optional, separate **merchant utility** for GE flipping. It is meant to live inside the same app so you do not need another repo, deployment, or domain just to keep a personal market tool around.
+
+How it works right now:
+
+- Access is through the main `LEDGER / STATS / HISTORY` navigation row after you load a run.
+- The merchant panel opens over the current screen and does not replace the ledger/stats/history views.
+- It keeps its own watchlist in `localStorage` and does **not** write into the main Mettle save.
+- It only fetches price data while the panel is open and the page is visible.
+- Price data comes through `app/api/prices/route.ts`, which uses a short in-memory cache plus cache headers. That reduces upstream load heavily, but it is not a single global cache across every server instance.
+
 ---
 
 ## The Skill
