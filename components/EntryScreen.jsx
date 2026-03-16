@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DEFAULT_KC, DEFAULT_SKILLS, KEY_BOSSES, SKILLS } from "./data/constants.js";
-import { parseAccountSyncText } from "./utils/accountSync.js";
+import { mergeSkillSources, parseAccountSyncText } from "./utils/accountSync.js";
 import { importSaveText, loadSave } from "./utils/persistence.js";
 import { fetchPlayerSnapshotByRsn } from "./utils/womImport.js";
 
@@ -87,11 +87,13 @@ export default function EntryScreen({ onComplete }) {
     try {
       const rawText = await file.text();
       const sync = parseAccountSyncText(rawText);
+      let mergedSkills = sync.skills;
       let mergedBosses = sync.bosses;
       let resolvedRsn = sync.player.rsn;
 
       try {
         const womData = await fetchPlayerSnapshotByRsn(sync.player.rsn);
+        mergedSkills = mergeSkillSources(sync.skills, womData?.skills);
         const kc = {};
         KEY_BOSSES.forEach((boss) => {
           kc[boss] = womData?.bosses?.[boss] ?? sync.bosses?.[boss] ?? 0;
@@ -103,7 +105,7 @@ export default function EntryScreen({ onComplete }) {
         setSyncError("Account sync imported, but Wise Old Man boss sync was unavailable.");
       }
 
-      onComplete(sync.skills, mergedBosses, resolvedRsn, sync.questState, sync.diaryState);
+      onComplete(mergedSkills, mergedBosses, resolvedRsn, sync.questState, sync.diaryState);
     } catch (error) {
       setSyncError(error instanceof Error ? error.message : "That account sync file could not be imported.");
     }

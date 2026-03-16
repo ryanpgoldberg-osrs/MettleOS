@@ -46,6 +46,19 @@ function normalizeMap(source, keys, fallback) {
   return normalized;
 }
 
+export function mergeSkillSources(...sources) {
+  const merged = {};
+
+  for (const skill of SKILLS) {
+    merged[skill] = sources.reduce((highest, source) => {
+      const level = numberOrDefault(source?.[skill], 1);
+      return Math.max(highest, level);
+    }, 1);
+  }
+
+  return merged;
+}
+
 function idsFromList(list) {
   if (!Array.isArray(list)) return [];
   const seen = new Set();

@@ -61,6 +61,7 @@ export default function Home() {
         initialQuestState={entryData?.questState ?? null}
         initialDiaryState={entryData?.diaryState ?? null}
         onResetToEntry={handleResetToEntry}
+        theme="light"
       />
     );
   }

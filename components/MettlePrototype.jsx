@@ -11,7 +11,6 @@ import {
   KEY_BOSSES,
   MAX_METTLE_XP,
   METTLE_UNLOCKS,
-  RECKONING_CATEGORIES,
   REMOVE_MODIFIER_COST,
   REROLL_COST,
   SKILLS,
@@ -39,6 +38,7 @@ import {
 } from "./systems/mettleSystems.js";
 import {
   createEmptyDiaryState,
+  mergeSkillSources,
   parseAccountSyncText,
   summarizeDiaryState,
 } from "./utils/accountSync.js";
@@ -60,10 +60,6 @@ const TRIAL_TASK_IDS = new Set(TRIAL_TASKS.map(task => task.id));
 const NON_TRIAL_TASK_BY_ID = new Map(NON_TRIAL_TASKS.map(task => [task.id, task]));
 const FINAL_TRIAL_LIBRARY = Object.values(FINAL_TRIAL_POOLS).flat();
 const FINAL_TRIAL_ID_SET = new Set(FINAL_TRIAL_LIBRARY.map(task => task.id));
-const DRAFT_CATEGORY_COUNTS = NON_TRIAL_TASKS.reduce((counts, task) => {
-  counts[task.category] = (counts[task.category] || 0) + 1;
-  return counts;
-}, {});
 const CONTENT_LIBRARY = {
   draftPool: NON_TRIAL_TASKS.length,
   trials: TRIAL_TASKS.length,
@@ -71,14 +67,6 @@ const CONTENT_LIBRARY = {
   landmarks: LANDMARK_TASKS.length,
   finalTrialLibrary: FINAL_TRIAL_LIBRARY.length,
 };
-CONTENT_LIBRARY.total = Object.values(CONTENT_LIBRARY).reduce((sum, count) => sum + count, 0);
-
-const CONTENT_SUBPOOLS = [
-  { label: "Diary tasks", count: NON_TRIAL_TASKS.filter(task => task.diaryTierAnyOf).length },
-  { label: "Specific quest one-offs", count: NON_TRIAL_TASKS.filter(task => /^([a-z]+)_q_extra_/.test(task.id)).length },
-  { label: "Quest-chain pool tasks", count: NON_TRIAL_TASKS.filter(task => task.questPoolAnyOf).length },
-  { label: "Quest point milestones", count: NON_TRIAL_TASKS.filter(task => task.questPointsTarget).length },
-];
 
 function trialFlavorLine(trial) {
   if (!trial) return "The ledger has picked the next pressure point.";
@@ -320,11 +308,13 @@ export default function MettlePrototype({
     try {
       const rawText = await file.text();
       const sync = parseAccountSyncText(rawText, { expectedRsn: rsn });
+      let mergedSkills = sync.skills;
       let mergedBosses = sync.bosses;
       let resolvedRsn = sync.player.rsn;
 
       try {
         const womData = await fetchPlayerSnapshotByRsn(sync.player.rsn);
+        mergedSkills = mergeSkillSources(sync.skills, womData?.skills);
         const kc = {};
         KEY_BOSSES.forEach((boss) => {
           kc[boss] = womData?.bosses?.[boss] ?? sync.bosses?.[boss] ?? 0;
@@ -335,8 +325,8 @@ export default function MettlePrototype({
         setSaveFileMessage("Account sync imported. Wise Old Man boss sync was unavailable.");
       }
 
-      setSkillLevels(sync.skills);
-      setManualSkills(sync.skills);
+      setSkillLevels(mergedSkills);
+      setManualSkills(mergedSkills);
       setBossKC(mergedBosses);
       setManualKC(mergedBosses);
       setQuestState(sync.questState);
@@ -782,12 +772,6 @@ export default function MettlePrototype({
   const taskPoolCount = CONTENT_LIBRARY.draftPool;
   const currentPathFinalTrialPool = assignedPath ? (FINAL_TRIAL_POOLS[assignedPath] || []) : [];
   const currentPathFinalTrialIds = new Set(currentPathFinalTrialPool.map(task => task.id));
-  const currentPathFinalTrialCount = completedIds.filter(id => currentPathFinalTrialIds.has(id)).length;
-  const totalContentResolved = completedDraftTaskCount
-    + completedTrialCount
-    + Object.keys(completedForks).length
-    + completedLandmarks.length
-    + completedFinalTrialCount;
   const questCapeLandmark = LANDMARK_TASKS.find(lm => lm.id === "landmark_quest_cape");
   const canTriggerQuestCape = !!questCapeLandmark && !completedLandmarks.includes(questCapeLandmark.id);
   const questSummary = summarizeQuestState(questState);
@@ -1174,9 +1158,9 @@ export default function MettlePrototype({
           <div className="mettle-info-strip" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"14px",flexWrap:"wrap",width:"100%"}}>
           <span className="mettle-info-primary" style={s.infoPrimary}>
             {isLightTheme ? (
-              <>Profile <span className="mettle-osrs-value">{rsn||"Manual stats"}</span> · Avg Lvl <span className="mettle-osrs-value">{Math.round(avg)}</span> · Seals <span className="mettle-osrs-value">{mettleSeals}</span> · Streak <span className="mettle-osrs-value">{streak}</span></>
+              <>Profile <span className="mettle-osrs-value">{rsn||"Manual stats"}</span> · Avg Lvl <span className="mettle-osrs-value">{Math.round(avg)}</span></>
             ) : (
-              <>✓ {rsn||"Manual stats"} · AVG LVL {Math.round(avg)} · {mettleSeals} SEALS · {streak} STREAK</>
+              <>✓ {rsn||"Manual stats"} · AVG LVL {Math.round(avg)}</>
             )}
           </span>
           <div className="mettle-info-actions" style={s.infoMetaWrap}>
@@ -1646,59 +1630,6 @@ export default function MettlePrototype({
             </div>
           </div>
 
-          <div style={{...s.sectionFrame,padding:"16px"}}>
-            <div style={s.secHead}>CONTENT LEDGER</div>
-            <div style={{fontSize:"13px",color:"#d1d5db",marginBottom:"8px",lineHeight:"1.7"}}>
-              {CONTENT_LIBRARY.total} total definitions are live across the draft pool, Trials, Forks, Landmarks, and the Final Trial library.
-            </div>
-            <div style={{fontSize:"11px",color:"#6b7280",marginBottom:"12px",lineHeight:"1.7"}}>
-              Resolved this run: {totalContentResolved}/{CONTENT_LIBRARY.total}. The finale library holds {CONTENT_LIBRARY.finalTrialLibrary} definitions overall{assignedPath ? `, with ${currentPathFinalTrialPool.length} on the ${assignedPath} path` : ""}.
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))",gap:"6px",marginBottom:"12px"}}>
-              <div style={s.statTile}>
-                <span style={{color:"#666"}}>Draft pool</span>
-                <span style={{color:"#d8d0b6"}}>{completedDraftTaskCount}/{CONTENT_LIBRARY.draftPool}</span>
-              </div>
-              <div style={s.statTile}>
-                <span style={{color:"#666"}}>Trials</span>
-                <span style={{color:"#d8d0b6"}}>{completedTrialCount}/{CONTENT_LIBRARY.trials}</span>
-              </div>
-              <div style={s.statTile}>
-                <span style={{color:"#666"}}>Forks</span>
-                <span style={{color:"#d8d0b6"}}>{Object.keys(completedForks).length}/{CONTENT_LIBRARY.forks}</span>
-              </div>
-              <div style={s.statTile}>
-                <span style={{color:"#666"}}>Landmarks</span>
-                <span style={{color:"#d8d0b6"}}>{completedLandmarks.length}/{CONTENT_LIBRARY.landmarks}</span>
-              </div>
-              <div style={s.statTile}>
-                <span style={{color:"#666"}}>Final Trial library</span>
-                <span style={{color:"#d8d0b6"}}>{completedFinalTrialCount}/{CONTENT_LIBRARY.finalTrialLibrary}</span>
-              </div>
-              <div style={s.statTile}>
-                <span style={{color:"#666"}}>Active path pool</span>
-                <span style={{color:"#d8d0b6"}}>
-                  {assignedPath ? `${currentPathFinalTrialCount}/${currentPathFinalTrialPool.length}` : "Locked"}
-                </span>
-              </div>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))",gap:"6px",marginBottom:"12px"}}>
-              {Object.entries(DRAFT_CATEGORY_COUNTS).map(([category, count]) => (
-                <div key={category} style={s.statTile}>
-                  <span style={{color:CAT_COLORS[category] || "#666"}}>{category}</span>
-                  <span style={{color:"#d8d0b6"}}>{count}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
-              {CONTENT_SUBPOOLS.map(({ label, count }) => (
-                <span key={label} style={s.tag("#93c5fd")}>
-                  {count} {label.toUpperCase()}
-                </span>
-              ))}
-            </div>
-          </div>
-
           {/* FORK DECISIONS */}
           {Object.keys(completedForks).length > 0 && (
             <div style={{...s.dataPanel,borderColor:"#3d1515",background:"#0d0808"}}>
@@ -1780,32 +1711,6 @@ export default function MettlePrototype({
             })}
           </div>
           </div>
-
-          {/* RECKONING TRACKER */}
-          {Object.keys(categoryDeferCounts).length > 0 && (
-            <div style={{marginBottom:"16px"}}>
-              <div style={{...s.sectionFrame,padding:"16px"}}>
-              <div style={s.secHead}>RECKONING TRACKER</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))",gap:"6px"}}>
-                {RECKONING_CATEGORIES.map(cat => {
-                  const count = categoryDeferCounts[cat] || 0;
-                  const total = reckoningTotals[cat] || 0;
-                  if (count === 0 && total === 0) return null;
-                  const color = count >= 3 ? "#a855f7" : count >= 2 ? "#fbbf24" : "#555";
-                  return (
-                    <div key={cat} style={{display:"flex",justifyContent:"space-between",padding:"7px 10px",background:"#101010",fontSize:"11px",border:"1px solid #151515"}}>
-                      <span style={{color:"#666"}}>{cat}</span>
-                      <span style={{color}}>
-                        {count}/3 defers
-                        {total > 0 && <span style={{color:"#7c3aed",marginLeft:"6px"}}>({total} reckoned)</span>}
-                      </span>
-                    </div>
-                  );
-                }).filter(Boolean)}
-              </div>
-              </div>
-            </div>
-          )}
 
           <div style={{...s.sectionFrame,padding:"16px"}}>
           <div style={s.secHead}>BOSS LEDGER — {KEY_BOSSES.length} BOSSES</div>
