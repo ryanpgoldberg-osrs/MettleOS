@@ -108,23 +108,24 @@ function sortItems(sortBy, left, right) {
   return right.score - left.score;
 }
 
-function StatPill({ label, value, accent = COLORS.text }) {
+function StatPill({ label, value, accent = COLORS.text, compact = false }) {
   return (
     <div
       style={{
         border: `1px solid ${COLORS.border}`,
         background: "linear-gradient(180deg, rgba(255,255,255,0.015) 0%, rgba(10,10,10,0.96) 100%)",
-        padding: "10px 12px",
-        minWidth: "150px",
+        padding: compact ? "8px 10px" : "10px 12px",
+        minWidth: compact ? "118px" : "150px",
+        flexShrink: 0,
       }}
     >
       <div
         style={{
-          fontSize: "10px",
+          fontSize: compact ? "9px" : "10px",
           letterSpacing: "2px",
           color: COLORS.textMuted,
           textTransform: "uppercase",
-          marginBottom: "6px",
+          marginBottom: compact ? "4px" : "6px",
         }}
       >
         {label}
@@ -132,7 +133,7 @@ function StatPill({ label, value, accent = COLORS.text }) {
       <div
         style={{
           fontFamily: DISPLAY_FONT,
-          fontSize: "18px",
+          fontSize: compact ? "15px" : "18px",
           letterSpacing: "0.5px",
           color: accent,
           textTransform: "uppercase",
@@ -190,6 +191,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL_SECONDS);
   const [isVisible, setIsVisible] = useState(true);
   const [copyMessage, setCopyMessage] = useState("");
+  const [isMobileLayout, setIsMobileLayout] = useState(false);
 
   const intervalRef = useRef(null);
   const hasItemsRef = useRef(false);
@@ -230,6 +232,31 @@ export default function MerchantBoard({ isOpen, onClose }) {
 
     return () => {
       document.removeEventListener("visibilitychange", syncVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 820px)");
+    const syncLayout = () => {
+      setIsMobileLayout(mediaQuery.matches);
+    };
+
+    syncLayout();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", syncLayout);
+      return () => {
+        mediaQuery.removeEventListener("change", syncLayout);
+      };
+    }
+
+    mediaQuery.addListener(syncLayout);
+    return () => {
+      mediaQuery.removeListener(syncLayout);
     };
   }, []);
 
@@ -366,6 +393,23 @@ export default function MerchantBoard({ isOpen, onClose }) {
     const sample = items.slice(0, 25);
     return Math.round(sample.reduce((total, item) => total + item.confidence, 0) / Math.max(sample.length, 1));
   }, [items]);
+  const mobileSummary = refreshing
+    ? "Refreshing the board..."
+    : `${readyCount.toLocaleString()} ready now · next refresh ${countdown}s`;
+  const headerCopy =
+    "Built into Mettle as an optional utility. It keeps its own watchlist, fetches only while this panel is open and visible, never touches your run save, and now filters out stale or thin spreads before ranking by confidence, margin, ROI, and liquidity.";
+  const statCards = isMobileLayout
+    ? [
+        { label: "Profitable", value: items.length.toLocaleString(), accent: COLORS.goldSoft },
+        { label: "Ready now", value: readyCount.toLocaleString(), accent: COLORS.green },
+        { label: "Lead profit", value: topScore ? `+${fmtGp(topScore.profit)}` : "--", accent: COLORS.green },
+      ]
+    : [
+        { label: "Profitable items", value: items.length.toLocaleString(), accent: COLORS.goldSoft },
+        { label: "Ready now", value: readyCount.toLocaleString(), accent: COLORS.green },
+        { label: "Lead pick profit", value: topScore ? `+${fmtGp(topScore.profit)}` : "--", accent: COLORS.green },
+        { label: "Avg confidence top 25", value: averageConfidence ? `${averageConfidence}%` : "--", accent: COLORS.blue },
+      ];
 
   function toggleWatch(itemId) {
     setWatchlist((current) =>
@@ -661,19 +705,29 @@ export default function MerchantBoard({ isOpen, onClose }) {
     },
     panel: {
       position: "fixed",
-      left: "50%",
-      bottom: "12px",
-      width: "min(1120px, calc(100vw - 24px))",
-      maxHeight: "calc(100vh - 24px)",
-      transform: isOpen ? "translate(-50%, 0)" : "translate(-50%, 105%)",
+      left: isMobileLayout ? 0 : "50%",
+      right: isMobileLayout ? 0 : "auto",
+      top: isMobileLayout ? 0 : "auto",
+      bottom: isMobileLayout ? 0 : "12px",
+      width: isMobileLayout ? "100vw" : "min(1120px, calc(100vw - 24px))",
+      height: isMobileLayout ? "100dvh" : "auto",
+      maxHeight: isMobileLayout ? "100dvh" : "calc(100vh - 24px)",
+      transform: isOpen
+        ? isMobileLayout
+          ? "translateY(0)"
+          : "translate(-50%, 0)"
+        : isMobileLayout
+          ? "translateY(105%)"
+          : "translate(-50%, 105%)",
       transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-      border: `1px solid ${COLORS.borderWarm}`,
+      border: isMobileLayout ? `1px solid ${COLORS.border}` : `1px solid ${COLORS.borderWarm}`,
       background:
         "radial-gradient(circle at top, rgba(212,175,55,0.08) 0%, rgba(12,12,12,0.98) 28%, rgba(7,7,7,0.99) 100%)",
       boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
       display: "flex",
       flexDirection: "column",
       overflow: "hidden",
+      overscrollBehavior: "contain",
       zIndex: 9999,
       color: COLORS.text,
       fontFamily: "'Courier New', monospace",
@@ -699,7 +753,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
           style={{
             display: "flex",
             justifyContent: "center",
-            padding: "10px 0 6px",
+            padding: isMobileLayout ? "calc(env(safe-area-inset-top) + 8px) 0 4px" : "10px 0 6px",
             cursor: "pointer",
           }}
           onClick={onClose}
@@ -716,7 +770,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
 
         <div
           style={{
-            padding: "0 20px 18px",
+            padding: isMobileLayout ? "0 14px 12px" : "0 20px 18px",
             borderBottom: `1px solid ${COLORS.border}`,
           }}
         >
@@ -724,19 +778,19 @@ export default function MerchantBoard({ isOpen, onClose }) {
             style={{
               display: "flex",
               justifyContent: "space-between",
-              gap: "16px",
-              alignItems: "flex-start",
+              gap: isMobileLayout ? "12px" : "16px",
+              alignItems: isMobileLayout ? "center" : "flex-start",
               flexWrap: "wrap",
             }}
           >
-            <div>
+            <div style={{ minWidth: 0, flex: "1 1 320px" }}>
               <div
                 style={{
                   fontSize: "10px",
-                  letterSpacing: "4px",
+                  letterSpacing: isMobileLayout ? "3px" : "4px",
                   color: COLORS.gold,
                   textTransform: "uppercase",
-                  marginBottom: "8px",
+                  marginBottom: isMobileLayout ? "6px" : "8px",
                 }}
               >
                 Merchant Utility
@@ -744,23 +798,29 @@ export default function MerchantBoard({ isOpen, onClose }) {
               <div
                 style={{
                   fontFamily: DISPLAY_FONT,
-                  fontSize: "28px",
+                  fontSize: isMobileLayout ? "20px" : "28px",
                   lineHeight: 1,
                   letterSpacing: "0.8px",
                   color: COLORS.goldSoft,
                   textTransform: "uppercase",
-                  marginBottom: "10px",
+                  marginBottom: isMobileLayout ? "6px" : "10px",
                 }}
               >
                 Grand Exchange Desk
               </div>
-              <div style={{ maxWidth: "640px", fontSize: "12px", color: COLORS.textDim, lineHeight: 1.7 }}>
-                Built into Mettle as an optional utility. It keeps its own watchlist, fetches only while this panel is open and visible,
-                never touches your run save, and now filters out stale or thin spreads before ranking by confidence, margin, ROI, and liquidity.
+              <div
+                style={{
+                  maxWidth: isMobileLayout ? "none" : "640px",
+                  fontSize: isMobileLayout ? "11px" : "12px",
+                  color: COLORS.textDim,
+                  lineHeight: isMobileLayout ? 1.5 : 1.7,
+                }}
+              >
+                {isMobileLayout ? mobileSummary : headerCopy}
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", flexShrink: 0 }}>
               <button
                 type="button"
                 onClick={() => loadBoard()}
@@ -779,29 +839,33 @@ export default function MerchantBoard({ isOpen, onClose }) {
             style={{
               display: "flex",
               gap: "10px",
-              flexWrap: "wrap",
-              marginTop: "18px",
+              flexWrap: isMobileLayout ? "nowrap" : "wrap",
+              marginTop: isMobileLayout ? "12px" : "18px",
+              overflowX: isMobileLayout ? "auto" : "visible",
+              paddingBottom: isMobileLayout ? "2px" : 0,
             }}
           >
-            <StatPill label="Profitable items" value={items.length.toLocaleString()} accent={COLORS.goldSoft} />
-            <StatPill label="Ready now" value={readyCount.toLocaleString()} accent={COLORS.green} />
-            <StatPill
-              label="Lead pick profit"
-              value={topScore ? `+${fmtGp(topScore.profit)}` : "--"}
-              accent={COLORS.green}
-            />
-            <StatPill label="Avg confidence top 25" value={averageConfidence ? `${averageConfidence}%` : "--"} accent={COLORS.blue} />
+            {statCards.map((card) => (
+              <StatPill
+                key={card.label}
+                label={card.label}
+                value={card.value}
+                accent={card.accent}
+                compact={isMobileLayout}
+              />
+            ))}
           </div>
         </div>
 
         <div
           style={{
-            padding: "14px 20px",
+            padding: isMobileLayout ? "12px 14px" : "14px 20px",
             borderBottom: `1px solid ${COLORS.border}`,
             display: "flex",
-            gap: "10px",
+            flexDirection: isMobileLayout ? "column" : "row",
+            gap: isMobileLayout ? "8px" : "10px",
             flexWrap: "wrap",
-            alignItems: "center",
+            alignItems: isMobileLayout ? "stretch" : "center",
           }}
         >
           <input
@@ -810,8 +874,8 @@ export default function MerchantBoard({ isOpen, onClose }) {
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search profitable items..."
             style={{
-              flex: "1 1 220px",
-              minWidth: "180px",
+              flex: isMobileLayout ? "1 1 auto" : "1 1 220px",
+              minWidth: isMobileLayout ? 0 : "180px",
               background: COLORS.panel,
               border: `1px solid ${COLORS.border}`,
               color: COLORS.text,
@@ -822,27 +886,38 @@ export default function MerchantBoard({ isOpen, onClose }) {
             }}
           />
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("all")}
-            style={styles.toolbarButton(activeTab === "all")}
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
           >
-            All items
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("watchlist")}
-            style={styles.toolbarButton(activeTab === "watchlist")}
-          >
-            Watchlist ({watchlist.length})
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("all")}
+              style={styles.toolbarButton(activeTab === "all")}
+            >
+              All items
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("watchlist")}
+              style={styles.toolbarButton(activeTab === "watchlist")}
+            >
+              Watchlist ({watchlist.length})
+            </button>
+          </div>
 
           <div
             style={{
               display: "flex",
               gap: "6px",
-              flexWrap: "wrap",
-              marginLeft: "auto",
+              flexWrap: "nowrap",
+              overflowX: "auto",
+              marginLeft: isMobileLayout ? 0 : "auto",
+              paddingBottom: isMobileLayout ? "2px" : 0,
             }}
           >
             {Object.keys(SORT_LABELS).map((key) => (
@@ -862,7 +937,11 @@ export default function MerchantBoard({ isOpen, onClose }) {
           style={{
             flex: 1,
             overflowY: "auto",
-            padding: "18px 20px 12px",
+            overscrollBehavior: "contain",
+            WebkitOverflowScrolling: "touch",
+            padding: isMobileLayout
+              ? "14px 14px calc(18px + env(safe-area-inset-bottom))"
+              : "18px 20px 12px",
             background: "linear-gradient(180deg, rgba(255,255,255,0.01) 0%, rgba(7,7,7,0.99) 100%)",
           }}
         >
