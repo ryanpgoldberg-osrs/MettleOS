@@ -25,6 +25,7 @@ export default function Home() {
   const [forceEntry, setForceEntry] = useState(false);
   const isClient = useSyncExternalStore(subscribe, () => true, () => false);
   const hasSave = useSyncExternalStore(subscribe, () => Boolean(loadSave()), () => false);
+  const theme = "light" as const;
 
   function handleEntryComplete(
     skillLevels: Record<string, number> | null,
@@ -61,9 +62,10 @@ export default function Home() {
         initialQuestState={entryData?.questState ?? null}
         initialDiaryState={entryData?.diaryState ?? null}
         onResetToEntry={handleResetToEntry}
+        theme={theme}
       />
     );
   }
 
-  return <EntryScreen onComplete={handleEntryComplete} />;
+  return <EntryScreen onComplete={handleEntryComplete} theme={theme} />;
 }

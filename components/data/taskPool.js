@@ -9,7 +9,7 @@ import {
   lowestSkill,
 } from "../utils/skillHelpers.js";
 import { bossLabel, skillLabel } from "../utils/labels.js";
-import { countStartedQuests } from "../utils/questProgress.js";
+import { countStartedQuests, hasCompletedAnyQuest } from "../utils/questProgress.js";
 import { normalizeQuestState } from "../utils/questSync.js";
 
 const SINGLE_SKILL_LEVEL_TARGETS = {
@@ -191,6 +191,56 @@ const MAJOR_UNLOCK_QUEST_POOL = [
   { id: "desert_treasure_i", label: "Desert Treasure I" },
 ];
 
+const FOUNDATION_UNLOCK_QUEST_POOL = [
+  { id: "x_marks_the_spot", label: "X Marks the Spot" },
+  { id: "below_ice_mountain", label: "Below Ice Mountain" },
+  { id: "client_of_kourend", label: "Client of Kourend" },
+  { id: "children_of_the_sun", label: "Children of the Sun" },
+  { id: "witchs_house", label: "Witch's House" },
+  { id: "waterfall_quest", label: "Waterfall Quest" },
+];
+
+const FREMENNIK_QUEST_POOL = [
+  { id: "the_fremennik_trials", label: "The Fremennik Trials" },
+  { id: "olafs_quest", label: "Olaf's Quest" },
+  { id: "the_fremennik_isles", label: "The Fremennik Isles" },
+  { id: "the_fremennik_exiles", label: "The Fremennik Exiles" },
+  { id: "lunar_diplomacy", label: "Lunar Diplomacy" },
+];
+
+const MYREQUE_QUEST_POOL = [
+  { id: "in_search_of_the_myreque", label: "In Search of the Myreque" },
+  { id: "in_aid_of_the_myreque", label: "In Aid of the Myreque" },
+  { id: "darkness_of_hallowvale", label: "Darkness of Hallowvale" },
+  { id: "a_taste_of_hope", label: "A Taste of Hope" },
+  { id: "sins_of_the_father", label: "Sins of the Father" },
+];
+
+const TROLL_QUEST_POOL = [
+  { id: "death_plateau", label: "Death Plateau" },
+  { id: "troll_stronghold", label: "Troll Stronghold" },
+  { id: "eadgars_ruse", label: "Eadgar's Ruse" },
+  { id: "my_arms_big_adventure", label: "My Arm's Big Adventure" },
+  { id: "making_friends_with_my_arm", label: "Making Friends with My Arm" },
+];
+
+const ELVEN_QUEST_POOL = [
+  { id: "underground_pass", label: "Underground Pass" },
+  { id: "regicide", label: "Regicide" },
+  { id: "roving_elves", label: "Roving Elves" },
+  { id: "mournings_end_part_i", label: "Mourning's End Part I" },
+  { id: "mournings_end_part_ii", label: "Mourning's End Part II" },
+  { id: "song_of_the_elves", label: "Song of the Elves" },
+];
+
+const DESERT_EPIC_QUEST_POOL = [
+  { id: "contact", label: "Contact!" },
+  { id: "devious_minds", label: "Devious Minds" },
+  { id: "beneath_cursed_sands", label: "Beneath Cursed Sands" },
+  { id: "desert_treasure_i", label: "Desert Treasure I" },
+  { id: "desert_treasure_ii", label: "Desert Treasure II" },
+];
+
 const QUEST_SERIES_CAPSTONE_POOL = [
   { id: "recipe_for_disaster", label: "Recipe for Disaster" },
   { id: "monkey_madness_ii", label: "Monkey Madness II" },
@@ -221,12 +271,24 @@ const GUTHIX_SPECIFIC_QUEST_TASKS = createSpecificQuestTasks("g", "Guthix", [
   { id: "lost_city", label: "Lost City", difficulty: "Medium", xp: 150 },
   { id: "the_grand_tree", label: "The Grand Tree", difficulty: "Medium", xp: 175 },
   { id: "priest_in_peril", label: "Priest in Peril", difficulty: "Medium", xp: 150 },
+  { id: "x_marks_the_spot", label: "X Marks the Spot", difficulty: "Easy", xp: 75 },
+  { id: "below_ice_mountain", label: "Below Ice Mountain", difficulty: "Easy", xp: 100 },
+  { id: "client_of_kourend", label: "Client of Kourend", difficulty: "Easy", xp: 100 },
+  { id: "children_of_the_sun", label: "Children of the Sun", difficulty: "Easy", xp: 100 },
+  { id: "witchs_house", label: "Witch's House", difficulty: "Medium", xp: 150 },
+  { id: "waterfall_quest", label: "Waterfall Quest", difficulty: "Medium", xp: 175 },
 ]);
 
 const SARADOMIN_SPECIFIC_QUEST_TASKS = createSpecificQuestTasks("s", "Saradomin", [
   { id: "heroes_quest", label: "Heroes' Quest", difficulty: "Hard", xp: 375 },
   { id: "underground_pass", label: "Underground Pass", difficulty: "Hard", xp: 425 },
   { id: "lunar_diplomacy", label: "Lunar Diplomacy", difficulty: "Hard", xp: 400 },
+  { id: "throne_of_miscellania", label: "Throne of Miscellania", difficulty: "Medium", xp: 275 },
+  { id: "royal_trouble", label: "Royal Trouble", difficulty: "Hard", xp: 375 },
+  { id: "horror_from_the_deep", label: "Horror from the Deep", difficulty: "Medium", xp: 250 },
+  { id: "family_crest", label: "Family Crest", difficulty: "Medium", xp: 275 },
+  { id: "ghosts_ahoy", label: "Ghosts Ahoy", difficulty: "Medium", xp: 300 },
+  { id: "troll_stronghold", label: "Troll Stronghold", difficulty: "Medium", xp: 275 },
 ]);
 
 const BANDOS_SPECIFIC_QUEST_TASKS = createSpecificQuestTasks("b", "Bandos", [
@@ -234,12 +296,22 @@ const BANDOS_SPECIFIC_QUEST_TASKS = createSpecificQuestTasks("b", "Bandos", [
   { id: "darkness_of_hallowvale", label: "Darkness of Hallowvale", difficulty: "Hard", xp: 500 },
   { id: "defender_of_varrock", label: "Defender of Varrock", difficulty: "Hard", xp: 525 },
   { id: "land_of_the_goblins", label: "Land of the Goblins", difficulty: "Medium", xp: 350 },
+  { id: "contact", label: "Contact!", difficulty: "Hard", xp: 475 },
+  { id: "devious_minds", label: "Devious Minds", difficulty: "Hard", xp: 500 },
+  { id: "a_taste_of_hope", label: "A Taste of Hope", difficulty: "Hard", xp: 525 },
+  { id: "roving_elves", label: "Roving Elves", difficulty: "Hard", xp: 475 },
+  { id: "the_temple_at_senntisten", label: "The Temple at Senntisten", difficulty: "Hard", xp: 550 },
 ]);
 
 const ZAMORAK_SPECIFIC_QUEST_TASKS = createSpecificQuestTasks("z", "Zamorak", [
   { id: "dream_mentor", label: "Dream Mentor", difficulty: "Hard", xp: 725 },
   { id: "beneath_cursed_sands", label: "Beneath Cursed Sands", difficulty: "Hard", xp: 750 },
   { id: "grim_tales", label: "Grim Tales", difficulty: "Hard", xp: 700 },
+  { id: "regicide", label: "Regicide", difficulty: "Hard", xp: 700 },
+  { id: "mournings_end_part_i", label: "Mourning's End Part I", difficulty: "Hard", xp: 725 },
+  { id: "eadgars_ruse", label: "Eadgar's Ruse", difficulty: "Hard", xp: 650 },
+  { id: "my_arms_big_adventure", label: "My Arm's Big Adventure", difficulty: "Hard", xp: 700 },
+  { id: "the_path_of_glouphrie", label: "The Path of Glouphrie", difficulty: "Hard", xp: 725 },
 ]);
 
 const ZAROS_SPECIFIC_QUEST_TASKS = createSpecificQuestTasks("zr", "Zaros", [
@@ -250,6 +322,67 @@ const ZAROS_SPECIFIC_QUEST_TASKS = createSpecificQuestTasks("zr", "Zaros", [
   { id: "making_friends_with_my_arm", label: "Making Friends with My Arm", difficulty: "Elite", xp: 1050 },
   { id: "perilous_moons", label: "Perilous Moons", difficulty: "Elite", xp: 1050 },
   { id: "the_curse_of_arrav", label: "The Curse of Arrav", difficulty: "Elite", xp: 1150 },
+  { id: "dragon_slayer_ii", label: "Dragon Slayer II", difficulty: "Elite", xp: 1200 },
+  { id: "monkey_madness_ii", label: "Monkey Madness II", difficulty: "Elite", xp: 1150 },
+  { id: "the_temple_at_senntisten", label: "The Temple at Senntisten", difficulty: "Elite", xp: 1100 },
+  { id: "a_taste_of_hope", label: "A Taste of Hope", difficulty: "Elite", xp: 1050 },
+]);
+
+function createSpecificBossTasks(prefix, tier, bosses) {
+  return bosses.map((boss, index) => {
+    const bossIds = boss.bossCompleteAnyOf ?? [boss.id];
+    const primaryBossId = boss.id ?? bossIds[0];
+    const title = boss.title ?? bossLabel(primaryBossId);
+    return {
+      id: `${prefix}_pvm_extra_${index + 1}`,
+      title,
+      category: boss.category ?? "PvM Intro",
+      tier,
+      difficulty: boss.difficulty,
+      xp: boss.xp,
+      repeatable: boss.repeatable ?? false,
+      bossCompleteAnyOf: bossIds,
+      requiresFn: boss.requiresFn ?? ((_s, kc) => (kc[primaryBossId] ?? 0) === 0),
+      objective: boss.objective ?? `Defeat ${title} for the first time`,
+    };
+  });
+}
+
+const SARADOMIN_SPECIFIC_BOSS_TASKS = createSpecificBossTasks("s", "Saradomin", [
+  { id: "king_black_dragon", difficulty: "Medium", xp: 250 },
+  { id: "chaos_elemental", difficulty: "Medium", xp: 250 },
+  { id: "deranged_archaeologist", difficulty: "Easy", xp: 175 },
+  { id: "kalphite_queen", difficulty: "Hard", xp: 400 },
+]);
+
+const BANDOS_SPECIFIC_BOSS_TASKS = createSpecificBossTasks("b", "Bandos", [
+  { id: "kraken", difficulty: "Medium", xp: 350 },
+  { id: "callisto", difficulty: "Hard", xp: 575 },
+  { id: "calvarion", difficulty: "Medium", xp: 350 },
+  { id: "abyssal_sire", difficulty: "Hard", xp: 525 },
+  { id: "skotizo", difficulty: "Medium", xp: 375 },
+]);
+
+const ZAMORAK_SPECIFIC_BOSS_TASKS = createSpecificBossTasks("z", "Zamorak", [
+  { id: "corporeal_beast", difficulty: "Hard", xp: 725 },
+  { id: "venenatis", difficulty: "Hard", xp: 725 },
+  { id: "vetion", difficulty: "Hard", xp: 725 },
+  { id: "araxxor", difficulty: "Elite", xp: 875 },
+  { id: "chambers_of_xeric_challenge_mode", title: "Chambers of Xeric: Challenge Mode", category: "PvM Endurance", difficulty: "Elite", xp: 900, objective: "Complete Chambers of Xeric: Challenge Mode once" },
+]);
+
+const ZAROS_SPECIFIC_BOSS_TASKS = createSpecificBossTasks("zr", "Zaros", [
+  { id: "theatre_of_blood_hard_mode", title: "Theatre of Blood: Hard Mode", category: "PvM Endurance", difficulty: "Elite", xp: 1200, objective: "Complete Theatre of Blood: Hard Mode once" },
+  { id: "tombs_of_amascut_expert", title: "Tombs of Amascut: Expert Mode", category: "PvM Endurance", difficulty: "Elite", xp: 1200, objective: "Complete Tombs of Amascut: Expert Mode once" },
+  { id: "phosanis_nightmare", title: "Phosani's Nightmare", difficulty: "Elite", xp: 1150 },
+  { id: "amoxliatl", difficulty: "Elite", xp: 1050 },
+  { id: "brutus", difficulty: "Elite", xp: 1050 },
+  { id: "doom_of_mokhaiotl", difficulty: "Elite", xp: 1100 },
+  { id: "shellbane_gryphon", difficulty: "Elite", xp: 1050 },
+  { id: "the_hueycoatl", title: "The Hueycoatl", difficulty: "Elite", xp: 1100 },
+  { id: "the_royal_titans", title: "The Royal Titans", difficulty: "Elite", xp: 1150 },
+  { id: "yama", difficulty: "Elite", xp: 1250 },
+  { id: "mimic", difficulty: "Elite", xp: 1050, objective: "Defeat the Mimic from a clue reward casket" },
 ]);
 
 const DIARY_REGIONS = [
@@ -387,6 +520,7 @@ export const TASK_POOL = [
     category:"PvM Intro", tier:"Guthix", difficulty:"Medium", xp:200, repeatable:true,
     objectiveFn: (s, kc) => { const b = lowestKCBoss(kc, GUTHIX_BOSSES, s); return `Kill ${bossLabel(b)} — you have ${kc[b] ?? 0} KC. Face it.`; },
     objective:"Kill any boss you have 0 KC on" },
+  { id:"g_pvm_9", title:"Adventurer's Ledger", category:"PvM Intro", tier:"Guthix", difficulty:"Easy", xp:125, repeatable:false, objective:"Complete 3 Easy Combat Achievement tasks" },
 
   // Quest (7)
   { id:"g_q_1", title:"The Forgotten Path",  category:"Quest", tier:"Guthix", difficulty:"Medium", xp:200, repeatable:true,  objective:"Complete 3 unfinished quests" },
@@ -402,6 +536,13 @@ export const TASK_POOL = [
     objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete a Guthix-aligned quest", questState, BALANCE_QUEST_POOL),
     objective:"Complete a Guthix-aligned quest" },
   { id:"g_q_7", title:"Unfinished Business", category:"Quest", tier:"Guthix", difficulty:"Easy",   xp:75,  repeatable:false, objective:"Complete the oldest incomplete quest on your account" },
+  { id:"g_q_8",
+    titleFn: (_s, _kc, questState) => themedQuestTitle("Foundations of the Realm", questState, FOUNDATION_UNLOCK_QUEST_POOL),
+    title:"Foundations of the Realm",
+    category:"Quest", tier:"Guthix", difficulty:"Medium", xp:150, repeatable:true,
+    questPoolAnyOf: FOUNDATION_UNLOCK_QUEST_POOL.map(({ id }) => id),
+    objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete an early unlock quest from the current pool", questState, FOUNDATION_UNLOCK_QUEST_POOL),
+    objective:"Complete an early unlock quest from the current pool" },
   ...GUTHIX_SPECIFIC_QUEST_TASKS,
 
   // Skill Gap (10)
@@ -471,6 +612,7 @@ export const TASK_POOL = [
     objective:"Train your lowest non-combat skill by 5 levels" },
 
   { id:"g_sk_10", title:"Economic Insight", category:"Economic", tier:"Guthix", difficulty:"Easy", xp:100, repeatable:true, objective:"Earn 100k GP from skilling" },
+  { id:"g_sk_11", title:"Sea Legs", category:"Skill Gap", tier:"Guthix", difficulty:"Easy", xp:125, repeatable:false, requiresFn:(s)=>s.sailing<20, objective:"Reach 20 Sailing" },
 
   // Exploration (5)
   { id:"g_ex_1", title:"The Deep",         category:"Exploration", tier:"Guthix", difficulty:"Easy",   xp:75,  repeatable:false, objective:"Enter Kalphite Lair" },
@@ -478,6 +620,10 @@ export const TASK_POOL = [
   { id:"g_ex_3", title:"Ancient Treasure", category:"Exploration", tier:"Guthix", difficulty:"Medium", xp:150, repeatable:true,  objective:"Open 5 clue scroll caskets" },
   { id:"g_ex_4", title:"The Unknown",      category:"Exploration", tier:"Guthix", difficulty:"Easy",   xp:75,  repeatable:true,  objective:"Visit three areas you have never entered before" },
   { id:"g_ex_5", title:"Merchant's Trial", category:"Economic",   tier:"Guthix", difficulty:"Easy",   xp:100, repeatable:true,  objective:"Flip or trade items for profit" },
+  { id:"g_ex_6", title:"First Charts",     category:"Exploration", tier:"Guthix", difficulty:"Easy",   xp:125, repeatable:true,  objective:"Complete 1 Beginner or Easy clue scroll" },
+  { id:"g_ex_7", title:"Fresh Slot",       category:"Exploration", tier:"Guthix", difficulty:"Easy",   xp:125, repeatable:true,  objective:"Fill 1 new Collection Log slot" },
+  { id:"g_ex_8", title:"Wintertodt Warm-Up", category:"Exploration", tier:"Guthix", difficulty:"Medium", xp:175, repeatable:false, requiresFn: (s, kc) => s.firemaking >= 50 && (kc.wintertodt ?? 0) === 0, objective:"Subdue Wintertodt once" },
+  { id:"g_ex_9", title:"Cove Rescue",        category:"Exploration", tier:"Guthix", difficulty:"Medium", xp:175, repeatable:false, requiresFn: (s, kc) => s.fishing >= 35 && (kc.tempoross ?? 0) === 0, objective:"Subdue Tempoross once" },
   ...EASY_DIARY_TASKS,
 
   // Endurance (5)
@@ -510,6 +656,8 @@ export const TASK_POOL = [
   { id:"s_pvm_8",  title:"Slayer Escalation",          category:"PvM Endurance", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true,  objective:"Complete 5 Slayer tasks in a row without skipping" },
   { id:"s_pvm_9",  title:"The King's Court",           category:"PvM Intro",     tier:"Saradomin", difficulty:"Hard",   xp:400, repeatable:false, objective:"Obtain any Barrows item" },
   { id:"s_pvm_10", title:"Wilderness Contract",        category:"PvM Intro",     tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:true,  objective:"Kill any wilderness boss once" },
+  { id:"s_pvm_11", title:"Proven Mechanics",           category:"PvM Endurance", tier:"Saradomin", difficulty:"Medium", xp:325, repeatable:false, objective:"Complete 5 Medium Combat Achievement tasks" },
+  ...SARADOMIN_SPECIFIC_BOSS_TASKS,
 
   { id:"s_q_1", title:"The Long Road",        category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:false, questPointsTarget:200, objective:"Reach 200 quest points" },
   { id:"s_q_2", title:"Dragon Slayer",         category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, questCompleteAnyOf:["dragon_slayer_i"], objective:"Complete Dragon Slayer I" },
@@ -552,6 +700,13 @@ export const TASK_POOL = [
       return `Complete 2 quests you have already started${startedCount > 0 ? ` (${startedCount} currently in progress)` : ""}`;
     },
     objective:"Complete 2 quests you have already started" },
+  { id:"s_q_10",
+    titleFn: (_s, _kc, questState) => themedQuestTitle("Northern Sagas", questState, FREMENNIK_QUEST_POOL),
+    title:"Northern Sagas",
+    category:"Quest", tier:"Saradomin", difficulty:"Hard", xp:425, repeatable:true,
+    questPoolAnyOf: FREMENNIK_QUEST_POOL.map(({ id }) => id),
+    objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete a Fremennik quest from the current pool", questState, FREMENNIK_QUEST_POOL),
+    objective:"Complete a Fremennik quest from the current pool" },
   ...SARADOMIN_SPECIFIC_QUEST_TASKS,
 
   { id:"s_sk_1",
@@ -599,6 +754,7 @@ export const TASK_POOL = [
     category:"Skill Gap", tier:"Saradomin", difficulty:"Hard", xp:400, repeatable:true,
     objectiveFn: (s) => { const skills = lowestNSkills(s,3,true); return `Bring ${skills.map(k=>`${skillLabel(k)} (${s[k]})`).join(", ")} within 10 levels of each other`; },
     objective:"Bring your three lowest skills within 10 levels of each other" },
+  { id:"s_sk_11", title:"Open Waters", category:"Skill Gap", tier:"Saradomin", difficulty:"Medium", xp:325, repeatable:false, requiresFn:(s)=>s.sailing<40, objective:"Reach 40 Sailing" },
 
   { id:"s_en_1", title:"The Long Watch",       category:"Endurance", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true, objective:"Complete a 2-hour uninterrupted grind session" },
   { id:"s_en_2", title:"Slayer Marathon",      category:"Endurance", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true, objective:"Complete 10 Slayer tasks total" },
@@ -613,6 +769,10 @@ export const TASK_POOL = [
   { id:"s_ex_3", title:"Fairy Network",       category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, objective:"Complete the quest chain to unlock the fairy ring network" },
   { id:"s_ex_4", title:"The God Wars",        category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, objective:"Enter God Wars Dungeon and kill any enemy inside" },
   { id:"s_ex_5", title:"Spirit Realm",        category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:250, repeatable:false, objective:"Complete the quest chain to unlock the Spirit Tree network" },
+  { id:"s_ex_6", title:"Clue Cartographer",   category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true,  objective:"Complete 2 Medium or Hard clue scrolls" },
+  { id:"s_ex_7", title:"Ledger Growth",       category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:325, repeatable:true,  objective:"Fill 2 new Collection Log slots" },
+  { id:"s_ex_8", title:"Guild Contract",      category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:275, repeatable:true,  requiresFn:(s)=>s.farming>=45, objective:"Complete 3 Farming Contracts" },
+  { id:"s_ex_9", title:"Rumour Board",        category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true,  requiresFn:(s)=>s.hunter>=46, objective:"Complete 3 Hunters' Rumours" },
   ...MEDIUM_DIARY_TASKS,
 
   // ══════════════ BANDOS ══════════════
@@ -643,6 +803,8 @@ export const TASK_POOL = [
     titleFn:(s,kc)=>{ const gwd=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana"]; const target=lowestKCBoss(kc, gwd, s); return `Sustained Assault: ${bossLabel(target)}`; },
     objectiveFn:(s,kc)=>{ const gwd=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana"]; const target=lowestKCBoss(kc, gwd, s); return `Kill ${bossLabel(target)} 5 times in one session (${kc[target]??0} KC)`; },
     objective:"Kill any GWD boss 5 times in one session" },
+  { id:"b_pvm_13", title:"War Ledger",          category:"PvM Endurance", tier:"Bandos", difficulty:"Hard",   xp:575, repeatable:false, objective:"Complete 5 Hard Combat Achievement tasks" },
+  ...BANDOS_SPECIFIC_BOSS_TASKS,
 
   { id:"b_q_1", title:"Monkey See",          category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:450, repeatable:false, questCompleteAnyOf:["monkey_madness_i", "monkey_madness_ii"], objective:"Complete Monkey Madness I or II" },
   { id:"b_q_2", title:"Recipe for Disaster", category:"Quest", tier:"Bandos", difficulty:"Elite",  xp:700, repeatable:false, questCompleteAnyOf:["recipe_for_disaster"], objective:"Complete Recipe for Disaster" },
@@ -666,6 +828,20 @@ export const TASK_POOL = [
     objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete an entire quest series from start to finish", questState, QUEST_SERIES_CAPSTONE_POOL),
     objective:"Complete an entire quest series from start to finish" },
   { id:"b_q_9", title:"Legends Bound",       category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:575, repeatable:false, questCompleteAnyOf:["legends_quest"], objective:"Complete Legends' Quest" },
+  { id:"b_q_10",
+    titleFn: (_s, _kc, questState) => themedQuestTitle("Shadows of Morytania", questState, MYREQUE_QUEST_POOL),
+    title:"Shadows of Morytania",
+    category:"Quest", tier:"Bandos", difficulty:"Hard", xp:600, repeatable:true,
+    questPoolAnyOf: MYREQUE_QUEST_POOL.map(({ id }) => id),
+    objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete a Myreque quest from the current pool", questState, MYREQUE_QUEST_POOL),
+    objective:"Complete a Myreque quest from the current pool" },
+  { id:"b_q_11",
+    titleFn: (_s, _kc, questState) => themedQuestTitle("Mountain March", questState, TROLL_QUEST_POOL),
+    title:"Mountain March",
+    category:"Quest", tier:"Bandos", difficulty:"Hard", xp:575, repeatable:true,
+    questPoolAnyOf: TROLL_QUEST_POOL.map(({ id }) => id),
+    objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete a troll-country quest from the current pool", questState, TROLL_QUEST_POOL),
+    objective:"Complete a troll-country quest from the current pool" },
   ...BANDOS_SPECIFIC_QUEST_TASKS,
 
   { id:"b_sk_1",  title:"Combat Ready",
@@ -690,6 +866,7 @@ export const TASK_POOL = [
     titleFn:(s)=>{ const sk=[...SKILLS].filter(x=>s[x]<80).sort((a,b)=>s[a]-s[b])[0]; return sk?`Skill Mastery: ${skillLabel(sk)}`:"Skill Mastery"; },
     objectiveFn:(s)=>{ const sk=[...SKILLS].filter(x=>s[x]<80).sort((a,b)=>s[a]-s[b])[0]; return sk?`Reach level 80 in ${skillLabel(sk)} (currently ${s[sk]})`:"Reach level 80 in any skill currently below 80"; },
     requiresFn:(s)=>SKILLS.some(sk=>s[sk]<80), objective:"Reach level 80 in any skill currently below 80" },
+  { id:"b_sk_11", title:"Broadside Discipline", category:"Skill Gap", tier:"Bandos", difficulty:"Hard", xp:575, repeatable:false, requiresFn:(s)=>s.sailing<60, objective:"Reach 60 Sailing" },
 
   { id:"b_en_1", title:"The Iron Will",       category:"Endurance", tier:"Bandos", difficulty:"Hard",  xp:650, repeatable:true, objective:"Complete a 3-hour uninterrupted grind session" },
   { id:"b_en_2", title:"Slayer Dedicated",    category:"Endurance", tier:"Bandos", difficulty:"Medium",xp:350, repeatable:true, objective:"Complete 25 Slayer tasks total" },
@@ -702,6 +879,10 @@ export const TASK_POOL = [
   { id:"b_ex_1", title:"The Gauntlet Awaits", category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:600, repeatable:false, requiresFn:(_,kc)=>(kc.the_gauntlet??0)===0, objective:"Unlock and enter The Gauntlet" },
   { id:"b_ex_2", title:"Ancient Arsenal",     category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:525, repeatable:false, objective:"Unlock Ancient Magicks and cast 100 spells" },
   { id:"b_ex_3", title:"The Slayer Ascent",   category:"Exploration", tier:"Bandos", difficulty:"Medium", xp:300, repeatable:false, objective:"Unlock a new Slayer master" },
+  { id:"b_ex_4", title:"Hard Clue Pursuit",   category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:550, repeatable:true,  objective:"Complete 3 Hard clue scrolls" },
+  { id:"b_ex_5", title:"Bossman's Ledger",    category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:575, repeatable:true,  objective:"Fill 3 new Collection Log slots" },
+  { id:"b_ex_6", title:"Rift Responder",      category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:525, repeatable:true,  requiresFn:(s,_kc,questState)=>s.runecrafting>=27 && hasCompletedAnyQuest(questState, ["temple_of_the_eye"]), objective:"Complete 3 Guardians of the Rift rounds" },
+  { id:"b_ex_7", title:"Giant Commission",    category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:525, repeatable:true,  requiresFn:(s,_kc,questState)=>s.smithing>=15 && hasCompletedAnyQuest(questState, ["sleeping_giants"]), objective:"Complete 5 Giants' Foundry commissions" },
   ...HARD_DIARY_TASKS,
 
   // ══════════════ ZAMORAK ══════════════
@@ -748,6 +929,8 @@ export const TASK_POOL = [
         : `Return to ${bossLabel(boss)} — it remains your lowest KC boss at ${current}.`;
     },
     objective:"Face your lowest-KC boss anywhere on the account" },
+  { id:"z_pvm_15", title:"Cruel Standards",       category:"PvM Endurance", tier:"Zamorak", difficulty:"Elite",  xp:850, repeatable:false, objective:"Complete 5 Elite Combat Achievement tasks" },
+  ...ZAMORAK_SPECIFIC_BOSS_TASKS,
 
   { id:"z_q_1", title:"275 Quest Points",    category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:650, repeatable:false, questPointsTarget:275, objective:"Reach 275 QP" },
   { id:"z_q_2",
@@ -783,6 +966,20 @@ export const TASK_POOL = [
   { id:"z_q_8", title:"Chainbreaker",        category:"Quest", tier:"Zamorak", difficulty:"Hard",   xp:750, repeatable:true,  objective:"Complete 2 Master or Grandmaster quests" },
   { id:"z_q_9", title:"Crystal Testament",   category:"Quest", tier:"Zamorak", difficulty:"Elite",  xp:850, repeatable:false, questCompleteAnyOf:["song_of_the_elves"], objective:"Complete Song of the Elves" },
   { id:"z_q_10", title:"Night at the Cathedral", category:"Quest", tier:"Zamorak", difficulty:"Elite", xp:825, repeatable:false, questCompleteAnyOf:["sins_of_the_father"], objective:"Complete Sins of the Father" },
+  { id:"z_q_11",
+    titleFn: (_s, _kc, questState) => themedQuestTitle("Elven Reckoning", questState, ELVEN_QUEST_POOL),
+    title:"Elven Reckoning",
+    category:"Quest", tier:"Zamorak", difficulty:"Elite", xp:850, repeatable:true,
+    questPoolAnyOf: ELVEN_QUEST_POOL.map(({ id }) => id),
+    objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete an elven quest from the current pool", questState, ELVEN_QUEST_POOL),
+    objective:"Complete an elven quest from the current pool" },
+  { id:"z_q_12",
+    titleFn: (_s, _kc, questState) => themedQuestTitle("Desert Dominion", questState, DESERT_EPIC_QUEST_POOL),
+    title:"Desert Dominion",
+    category:"Quest", tier:"Zamorak", difficulty:"Hard", xp:800, repeatable:true,
+    questPoolAnyOf: DESERT_EPIC_QUEST_POOL.map(({ id }) => id),
+    objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete a desert epic from the current pool", questState, DESERT_EPIC_QUEST_POOL),
+    objective:"Complete a desert epic from the current pool" },
   ...ZAMORAK_SPECIFIC_QUEST_TASKS,
 
   { id:"z_sk_1",
@@ -820,6 +1017,7 @@ export const TASK_POOL = [
       return formatAverageGapClosureObjective(sk, s[sk], avg, "Elite");
     },
     objective:"Close the largest remaining skill gap on your account" },
+  { id:"z_sk_11", title:"Storm Reader", category:"Skill Gap", tier:"Zamorak", difficulty:"Hard", xp:825, repeatable:false, requiresFn:(s)=>s.sailing<75, objective:"Reach 75 Sailing" },
 
   { id:"z_en_1", title:"The Long Campaign",    category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:700, repeatable:true, objective:"Complete 50 Slayer tasks total" },
   { id:"z_en_2", title:"Chaos Endurance",      category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:700, repeatable:true, objective:"Kill any Zamorak-aligned boss 30 times total" },
@@ -836,6 +1034,10 @@ export const TASK_POOL = [
   { id:"z_ex_4", title:"Ancient Secrets",        category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:950, repeatable:false, questCompleteAnyOf:["desert_treasure_ii"], objective:"Complete Desert Treasure II" },
   { id:"z_ex_5", title:"Farming Mastery",        category:"Exploration", tier:"Zamorak", difficulty:"Hard",   xp:550, repeatable:false, objective:"Unlock the Farming Guild" },
   { id:"z_ex_6", title:"The Grand Exchange Gamble",category:"Economic",  tier:"Zamorak", difficulty:"Hard",   xp:700, repeatable:true,  objective:"Earn 5M GP through merching or flipping" },
+  { id:"z_ex_7", title:"Elite Cartography",      category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:900, repeatable:true,  objective:"Complete 2 Elite clue scrolls" },
+  { id:"z_ex_8", title:"Black Ledger Growth",    category:"Exploration", tier:"Zamorak", difficulty:"Hard",   xp:800, repeatable:true,  objective:"Fill 5 new Collection Log slots" },
+  { id:"z_ex_9", title:"Sepulchre Run",          category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:900, repeatable:true,  requiresFn:(s,_kc,questState)=>s.agility>=52 && hasCompletedAnyQuest(questState, ["sins_of_the_father"]), objective:"Complete 1 Hallowed Sepulchre run" },
+  { id:"z_ex_10", title:"Housing Orders",        category:"Exploration", tier:"Zamorak", difficulty:"Hard",   xp:775, repeatable:true,  requiresFn:(s)=>s.construction>=50, objective:"Complete 5 Mahogany Homes contracts" },
 
   // ══════════════ ZAROS ══════════════
 
@@ -859,6 +1061,8 @@ export const TASK_POOL = [
   { id:"zr_pvm_8",  title:"Theatre Master",      category:"PvM Endurance", tier:"Zaros", difficulty:"Elite",  xp:1200, repeatable:true,  objective:"Complete Theatre of Blood 10 times" },
   { id:"zr_pvm_9",  title:"The Gauntlet",        category:"PvM Endurance", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Complete the Gauntlet or Corrupted Gauntlet" },
   { id:"zr_pvm_10", title:"Colosseum",           category:"PvM Intro",     tier:"Zaros", difficulty:"Elite",  xp:1400, repeatable:false, requiresFn:(_,kc)=>(kc.sol_heredit??0)===0, objective:"Attempt the Fortis Colosseum" },
+  { id:"zr_pvm_11", title:"Master's Ledger",     category:"PvM Endurance", tier:"Zaros", difficulty:"Elite",  xp:1300, repeatable:false, objective:"Complete 3 Master or Grandmaster Combat Achievement tasks" },
+  ...ZAROS_SPECIFIC_BOSS_TASKS,
 
   { id:"zr_q_3",
     titleFn: (_s, _kc, questState) => themedQuestTitle("The Last Chapter", questState, GRANDMASTER_QUEST_POOL),
@@ -877,6 +1081,13 @@ export const TASK_POOL = [
   { id:"zr_q_5", title:"Quest Cape",         category:"Quest",       tier:"Zaros", difficulty:"Elite",  xp:1800, repeatable:false, landmark:true, requiresQuestCape:true, objective:"Complete all quests" },
   { id:"zr_q_6", title:"Three Hundred Points", category:"Quest",     tier:"Zaros", difficulty:"Elite",  xp:1200, repeatable:false, questPointsTarget:300, objective:"Reach 300 quest points" },
   { id:"zr_q_7", title:"Guthix Awakens",        category:"Quest",    tier:"Zaros", difficulty:"Elite",  xp:1200, repeatable:false, questCompleteAnyOf:["while_guthix_sleeps"], objective:"Complete While Guthix Sleeps" },
+  { id:"zr_q_8",
+    titleFn: (_s, _kc, questState) => themedQuestTitle("The Last Great Quest", questState, GRANDMASTER_QUEST_POOL),
+    title:"The Last Great Quest",
+    category:"Quest", tier:"Zaros", difficulty:"Elite", xp:1300, repeatable:true,
+    questPoolAnyOf: GRANDMASTER_QUEST_POOL.map(({ id }) => id),
+    objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete one of the remaining great quests in the current pool", questState, GRANDMASTER_QUEST_POOL),
+    objective:"Complete one of the remaining great quests in the current pool" },
   ...ZAROS_SPECIFIC_QUEST_TASKS,
 
   { id:"zr_sk_1", title:"The 90 Club",
@@ -904,6 +1115,7 @@ export const TASK_POOL = [
       return formatAverageGapClosureObjective(sk, s[sk], avg, "Elite");
     },
     objective:"Eliminate the single largest remaining skill gap" },
+  { id:"zr_sk_8", title:"Master Mariner", category:"Skill Gap", tier:"Zaros", difficulty:"Elite", xp:1200, repeatable:false, requiresFn:(s)=>s.sailing<90, objective:"Reach 90 Sailing" },
 
   { id:"zr_en_1", title:"The Final Campaign",     category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1300, repeatable:true, objective:"Complete 100 Slayer tasks total" },
   { id:"zr_en_2", title:"Elite Endurance",        category:"Endurance", tier:"Zaros", difficulty:"Elite",  xp:1300, repeatable:true, objective:"Complete the Corrupted Gauntlet 5 times" },
@@ -913,6 +1125,10 @@ export const TASK_POOL = [
 
   { id:"zr_ex_1", title:"The Wilderness Throne", category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:true,  objective:"Kill Artio, Spindel, and Calvar'ion at least once each" },
   { id:"zr_ex_3", title:"The Final Frontier",    category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1200, repeatable:true,  objective:"Unlock and enter every major endgame area" },
+  { id:"zr_ex_4", title:"Master's Trail",        category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1200, repeatable:true,  objective:"Complete 1 Master clue scroll" },
+  { id:"zr_ex_5", title:"Completionist's Ledger",category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1300, repeatable:true,  objective:"Fill 8 new Collection Log slots" },
+  { id:"zr_ex_6", title:"Crystal Furnace",       category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1100, repeatable:false, requiresFn:(s,kc,questState)=>s.mining>=70 && s.smithing>=70 && hasCompletedAnyQuest(questState, ["song_of_the_elves"]) && (kc.zalcano??0)===0, objective:"Defeat Zalcano" },
+  { id:"zr_ex_7", title:"Hespori Harvest",      category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:false, requiresFn:(s,kc)=>s.farming>=65 && (kc.hespori??0)===0, objective:"Defeat Hespori" },
   ...ELITE_DIARY_TASKS,
 ];
 

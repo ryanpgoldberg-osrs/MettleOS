@@ -75,28 +75,29 @@ The live account model currently tracks:
 
 | Tier | Levels | Non-Trial Tasks | Theme |
 |---|---:|---:|---|
-| Guthix | 1–20 | 53 | Foundation, first weaknesses, first boss pressure |
-| Saradomin | 21–40 | 56 | Discipline, structure, first serious escalation |
-| Bandos | 41–60 | 57 | Combat force, raid pressure, broader bossing |
-| Zamorak | 61–80 | 51 | Chaos, modifiers, debt punishment, fork pressure |
-| Zaros | 81–99 | 48 | Mastery, pathing, finale shaping |
+| Guthix | 1–20 | 66 | Foundation, first weaknesses, first boss pressure |
+| Saradomin | 21–40 | 73 | Discipline, structure, first serious escalation |
+| Bandos | 41–60 | 75 | Combat force, raid pressure, broader bossing |
+| Zamorak | 61–80 | 69 | Chaos, modifiers, debt punishment, fork pressure |
+| Zaros | 81–99 | 70 | Mastery, pathing, finale shaping |
 
 Current total pool:
 
-- `265` non-trial tasks
+- `353` non-trial tasks
 - `10` Trials
-- `103` repeatable tasks
+- `363` total task-pool definitions
+- `126` repeatable tasks
 
 ### Task Categories
 
 | Category | Count |
 |---|---:|
 | Trial | 10 |
-| PvM Intro | 31 |
-| PvM Endurance | 23 |
-| Quest | 60 |
-| Exploration | 68 |
-| Skill Gap | 42 |
+| PvM Intro | 54 |
+| PvM Endurance | 30 |
+| Quest | 93 |
+| Exploration | 88 |
+| Skill Gap | 47 |
 | Endurance | 36 |
 | Economic | 5 |
 
