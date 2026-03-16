@@ -104,12 +104,12 @@
 <body>
   <h1>METTLE</h1>
   <div class="subtitle">Updated Design Document</div>
-  <div class="meta">Ryan Goldberg | March 14, 2026 | Living Document | v4</div>
+  <div class="meta">Ryan Goldberg | March 15, 2026 | Living Document | v4</div>
 
-  <p>This file is the current source-of-truth design summary for the repo at <span class="small">/Users/ryan/Documents/GitHub/MettleOS</span>. It replaces the earlier v4 draft by folding in everything added since then: synced quest and diary state, import/export flows, account sync contracts, a RuneLite plugin project, quest-aware drafting, seal-based deferred-task clearing, and deployment instrumentation.</p>
+  <p>This file is the current source-of-truth design summary for the repo at <span class="small">/Users/ryan/Documents/GitHub/MettleOS</span>. It rolls forward the earlier v4 draft with the current task pool expansion, sync-aware progression rules, RuneLite plugin work, save portability, and the built-in merchant utility.</p>
 
   <div class="callout">
-    <strong>Current state:</strong> Mettle is no longer just a Wise Old Man plus manual-entry prototype. It is now a local-save web app with multiple intake paths, quest-aware progression rules, save import/export, sync validation APIs, and a parallel RuneLite plugin effort that is becoming the long-term default account import path.
+    <strong>Current state:</strong> Mettle is now a local-save web app with multiple account intake paths, quest-aware task selection, save import/export, sync validation APIs, a companion RuneLite plugin project, and an optional GE merchant desk that lives inside the same product.
   </div>
 
   <h2>1. Current Position</h2>
@@ -119,47 +119,49 @@
     <li>A player-facing web product that generates account-specific tasks from real account state.</li>
   </ul>
   <p>The core idea has not changed: the account itself exposes what the player has avoided. Mettle reads that pattern, turns it into directed pressure, and tracks the answer over time.</p>
-  <p>The product language is now intentional and consistent. The content model, live UI, and save formats all use <strong>task</strong> terminology, while <strong>ledger</strong> remains the name for the broader run state and progression framing.</p>
+  <p>The product language is now intentionally aligned around <strong>task</strong> terminology, while <strong>ledger</strong> remains the name for the broader run state and progression surface.</p>
 
-  <h2>2. What Changed Since the Last Version</h2>
+  <h2>2. What Changed Recently</h2>
   <ul>
-    <li>Mettle now supports <strong>full account sync import</strong> in addition to Wise Old Man and manual entry.</li>
-    <li><strong>Quest state</strong> and <strong>achievement diary state</strong> are now first-class parts of the saved run.</li>
-    <li>The app can now <strong>import and export Mettle save files</strong>, with versioned save migration logic.</li>
-    <li>The draft generator is now <strong>quest-aware</strong> and can suppress objectives already satisfied by synced quest or boss progress.</li>
-    <li>Quest Cape is no longer only a manual late-game placeholder. It can now be detected from synced quest data.</li>
-    <li>Forks can now react to imported progress, including <strong>auto-resolving</strong> when both branches are already complete.</li>
-    <li>Seals gained a new use: <strong>clear a deferred task instantly</strong> without earning recovery XP.</li>
-    <li>The project now includes a dedicated <strong>RuneLite plugin workspace</strong>, sync schemas, build tooling, and a local dev launcher flow.</li>
-    <li>The web app now has <strong>Vercel Analytics</strong> and <strong>Vercel Speed Insights</strong> wired into the app shell.</li>
+    <li>The task pool has expanded materially, especially in Quest and Exploration content.</li>
+    <li>Mettle now supports full account sync import, quest-only sync import, and whole-run save import/export.</li>
+    <li>Quest state and achievement diary state are now first-class parts of the run model.</li>
+    <li>The draft generator is now quest-aware and can suppress objectives already satisfied by synced progress.</li>
+    <li>Quest Cape can now be detected from synced quest data.</li>
+    <li>Forks can react to imported quest or boss progress, including auto-resolution when both branches are already complete.</li>
+    <li>Seals can now clear a deferred task instantly.</li>
+    <li>The project now includes a dedicated RuneLite plugin workspace, sync schemas, and a local development launcher flow.</li>
+    <li>The web app now includes Vercel Analytics and Speed Insights.</li>
+    <li>Mettle now includes an optional built-in merchant utility for GE flipping.</li>
   </ul>
 
-  <h2>3. Current Player Experience</h2>
-  <h3>Entry and Intake Paths</h3>
+  <h2>3. Current Product Experience</h2>
+  <h3>Entry And Intake Paths</h3>
   <table>
-    <tr><th>Path</th><th>What It Does</th><th>Current Status</th></tr>
-    <tr><td>Wise Old Man</td><td>Fetches skills and boss KC through the app's player route</td><td>Live</td></tr>
-    <tr><td>Manual entry</td><td>Allows skills and boss KC to be entered directly</td><td>Live</td></tr>
-    <tr><td>Mettle account sync import</td><td>Imports skills, quests, diaries, and sync metadata from a Mettle JSON file, then enriches boss KC through Wise Old Man using the same RSN</td><td>Live</td></tr>
-    <tr><td>Mettle save import</td><td>Replaces the current local run with an exported Mettle save file</td><td>Live</td></tr>
-    <tr><td>Returning local run</td><td>Loads the last browser save automatically</td><td>Live</td></tr>
+    <tr><th>Path</th><th>What It Does</th><th>Status</th></tr>
+    <tr><td>Wise Old Man</td><td>Fetches skills and boss KC through the player route</td><td>Live</td></tr>
+    <tr><td>Manual entry</td><td>Allows direct skills and boss KC input</td><td>Live</td></tr>
+    <tr><td>Mettle account sync import</td><td>Imports skills, quests, diaries, and sync metadata, then enriches boss KC through Wise Old Man when available</td><td>Live</td></tr>
+    <tr><td>Mettle save import</td><td>Loads an exported Mettle run back into the browser</td><td>Live</td></tr>
+    <tr><td>Returning local run</td><td>Loads the saved run from local browser storage</td><td>Live</td></tr>
   </table>
 
-  <h3>Current Surface Areas</h3>
+  <h3>Current Surfaces</h3>
   <ul>
     <li><strong>Ledger:</strong> active task, draft state, debt queue, reckoning tasks, Trial reveals, Fork events, Landmarks, and draw blockers.</li>
     <li><strong>Stats:</strong> skill audit, boss ledger, sync summaries, quest state, diary status, path state, seal economy, and system trackers.</li>
-    <li><strong>History:</strong> full run archive with result type, XP earned, seals gained or spent, timestamps, and expanded details.</li>
+    <li><strong>History:</strong> full run archive with result type, XP earned, seals gained or spent, and timestamps.</li>
+    <li><strong>Merchant Desk:</strong> optional flip-tracking utility that opens over the current view without becoming part of the core run save.</li>
   </ul>
 
   <h3>Run Persistence</h3>
-  <p>The app still runs primarily as a local-save prototype, but the persistence model is more mature than before.</p>
   <table>
     <tr><th>Item</th><th>Current Behavior</th></tr>
     <tr><td>Browser save key</td><td><span class="small">mettle_run_v8</span></td></tr>
     <tr><td>Internal save version</td><td>4</td></tr>
-    <tr><td>Export format</td><td><span class="small">mettle-save</span> export payload, version 1</td></tr>
-    <tr><td>Migration handling</td><td>Legacy save shapes are normalized into the current structure on load/import</td></tr>
+    <tr><td>Run export format</td><td><span class="small">mettle-save</span> export payload, version 1</td></tr>
+    <tr><td>Merchant watchlist key</td><td><span class="small">mettle_merchant_watchlist_v1</span></td></tr>
+    <tr><td>Migration handling</td><td>Legacy run shapes are normalized into the current structure on load/import</td></tr>
   </table>
 
   <h2>4. Live System Design</h2>
@@ -176,15 +178,28 @@
   </table>
 
   <table>
-    <tr><th>Tier</th><th>Levels</th><th>Current Non-Trial Pool</th><th>Theme</th></tr>
-    <tr><td>Guthix</td><td>1-20</td><td>55</td><td>Foundation, first weaknesses, first boss pressure</td></tr>
-    <tr><td>Saradomin</td><td>21-40</td><td>58</td><td>Discipline, structure, first serious escalation</td></tr>
-    <tr><td>Bandos</td><td>41-60</td><td>59</td><td>Combat force, raid pressure, broader bossing</td></tr>
-    <tr><td>Zamorak</td><td>61-80</td><td>53</td><td>Chaos, modifiers, debt punishment, fork pressure</td></tr>
-    <tr><td>Zaros</td><td>81-99</td><td>50</td><td>Mastery, pathing, finale shaping</td></tr>
+    <tr><th>Tier</th><th>Levels</th><th>Non-Trial Tasks</th><th>Theme</th></tr>
+    <tr><td>Guthix</td><td>1-20</td><td>53</td><td>Foundation, first weaknesses, first boss pressure</td></tr>
+    <tr><td>Saradomin</td><td>21-40</td><td>56</td><td>Discipline, structure, first serious escalation</td></tr>
+    <tr><td>Bandos</td><td>41-60</td><td>57</td><td>Combat force, raid pressure, broader bossing</td></tr>
+    <tr><td>Zamorak</td><td>61-80</td><td>51</td><td>Chaos, modifiers, debt punishment, fork pressure</td></tr>
+    <tr><td>Zaros</td><td>81-99</td><td>48</td><td>Mastery, pathing, finale shaping</td></tr>
   </table>
 
-  <p>Total live content is now <strong>275 definitions</strong>: <strong>265 non-trial tasks</strong> and <strong>10 Trials</strong>.</p>
+  <p>Total live content is now <strong>275 definitions</strong>: <strong>265 non-trial tasks</strong> and <strong>10 Trials</strong>. Of the total pool, <strong>103 tasks are repeatable</strong>.</p>
+
+  <h3>Task Categories</h3>
+  <table>
+    <tr><th>Category</th><th>Count</th></tr>
+    <tr><td>Trial</td><td>10</td></tr>
+    <tr><td>PvM Intro</td><td>31</td></tr>
+    <tr><td>PvM Endurance</td><td>23</td></tr>
+    <tr><td>Quest</td><td>60</td></tr>
+    <tr><td>Exploration</td><td>68</td></tr>
+    <tr><td>Skill Gap</td><td>42</td></tr>
+    <tr><td>Endurance</td><td>36</td></tr>
+    <tr><td>Economic</td><td>5</td></tr>
+  </table>
 
   <h3>Unlocks</h3>
   <table>
@@ -206,9 +221,9 @@
     <tr><td>Final Trial</td><td>5</td><td>Level 99 ending draft</td></tr>
   </table>
 
-  <p>The original permanent-disappearance framing has stayed softened. Unchosen tasks leave the current draw but can return later unless completion, repeatability, or synced-account logic removes them from eligibility.</p>
+  <p>Unchosen tasks leave the current draw but can return later unless completion, repeatability, or synced-account logic removes them from eligibility.</p>
 
-  <h3>Debt, Cursed, Reckoning, and Recovery</h3>
+  <h3>Debt, Reckoning, And Seals</h3>
   <table>
     <tr><th>System</th><th>Current Rule</th></tr>
     <tr><td>Debt</td><td>Deferring a task adds it to the debt queue</td></tr>
@@ -221,44 +236,30 @@
     <tr><td>Recovery rewards</td><td>Debt and reckoning cleanup grants half XP, no seals, and no streak growth</td></tr>
   </table>
 
-  <p>There is now one important addition to the recovery loop: a deferred task can be cleared instantly for <strong>4 seals</strong>. This is a tactical escape valve, not a reward path. It spends currency and gives no recovery XP.</p>
+  <p>Seals now support four live actions: reroll draft, remove an active modifier, buy an extra draft choice, or clear a deferred task instantly.</p>
 
-  <h3>Modifiers and Seal Economy</h3>
   <table>
-    <tr><th>Mechanic</th><th>Current Rule</th></tr>
-    <tr><td>Modifier roll chance</td><td>About 35% of drafted tasks</td></tr>
-    <tr><td>Reroll draft</td><td>2 seals</td></tr>
-    <tr><td>Buy extra choice</td><td>5 seals</td></tr>
-    <tr><td>Remove active modifier</td><td>3 seals</td></tr>
-    <tr><td>Clear deferred task instantly</td><td>4 seals</td></tr>
-    <tr><td>Seal sources</td><td>Clean clears, streak bonuses, landmark rewards</td></tr>
+    <tr><th>Seal Use</th><th>Cost</th></tr>
+    <tr><td>Reroll draft</td><td>2</td></tr>
+    <tr><td>Remove active modifier</td><td>3</td></tr>
+    <tr><td>Clear deferred task instantly</td><td>4</td></tr>
+    <tr><td>Buy extra draft choice</td><td>5</td></tr>
   </table>
 
-  <h3>Trials, Forks, Landmarks, and Final Path</h3>
+  <h3>Trials, Forks, Landmarks, And Final Path</h3>
   <table>
     <tr><th>System</th><th>Current Behavior</th></tr>
-    <tr><td>Trials</td><td>10 total milestone Trials at levels 10, 20, 30, 40, 50, 60, 70, 80, 90, and 99</td></tr>
+    <tr><td>Trials</td><td>10 milestone Trials at levels 10, 20, 30, 40, 50, 60, 70, 80, 90, and 99</td></tr>
     <tr><td>Trial logic</td><td>Dynamic where possible, based on untouched or low-KC content</td></tr>
     <tr><td>Forks</td><td>4 major branch moments, now aware of synced progress</td></tr>
-    <tr><td>Landmarks</td><td>First 99, Quest Cape, Total 1900, First Raid Completion</td></tr>
+    <tr><td>Landmarks</td><td>First 99, Quest Cape, Total Level 1900, First Raid Completion</td></tr>
     <tr><td>Path assignment</td><td>Assigned automatically entering Zaros based on resolved history</td></tr>
     <tr><td>Final Trial</td><td>Generates a 5-task draft from the assigned path at level 99</td></tr>
   </table>
 
-  <p>Quest Cape has materially changed since the last draft of this doc. It is no longer just a manual workaround for Wise Old Man limits. If quest sync data says the cape is earned, the Landmark can now trigger from synced state. The manual button still matters as a fallback, but it is no longer the primary long-term plan.</p>
+  <p>Quest Cape is no longer just a manual fallback for Wise Old Man limitations. If synced quest data says the cape is earned, Mettle can detect and use that state directly. Forks now also react to synced progress and can auto-resolve when both branches are already complete.</p>
 
-  <p>Fork handling also changed in a meaningful way. When synced quest or boss data shows that a fork branch is already complete, the fork can narrow itself. If both sides are already complete, the fork auto-resolves instead of pretending the choice still exists.</p>
-
-  <h3>Current Fork Set</h3>
-  <table>
-    <tr><th>Fork</th><th>Option A</th><th>Option B</th><th>Trigger</th></tr>
-    <tr><td>The Ancient Path</td><td>Desert Treasure II</td><td>Dragon Slayer II</td><td>Level 65</td></tr>
-    <tr><td>The Elven Choice</td><td>Song of the Elves</td><td>Sins of the Father</td><td>Level 75</td></tr>
-    <tr><td>The Endgame</td><td>Tombs of Amascut (Full)</td><td>Theatre of Blood (Full)</td><td>Level 85</td></tr>
-    <tr><td>The Final Reckoning</td><td>The Inferno</td><td>The Nightmare</td><td>Level 92</td></tr>
-  </table>
-
-  <h2>5. Account Model and Sync Architecture</h2>
+  <h2>5. Account Model And Sync Architecture</h2>
   <h3>Tracked Account Surface</h3>
   <table>
     <tr><th>Data Type</th><th>Current Source</th><th>Status</th></tr>
@@ -273,48 +274,42 @@
   <table>
     <tr><th>Format</th><th>Purpose</th><th>Current Role</th></tr>
     <tr><td><span class="small">mettle-account-sync</span> v1</td><td>Full account snapshot contract for plugin-driven import</td><td>Primary long-term sync format</td></tr>
-    <tr><td><span class="small">mettle-quest-sync</span> v1</td><td>Quest-only bridge format</td><td>Development bridge and partial import path</td></tr>
+    <tr><td><span class="small">mettle-quest-sync</span> v1</td><td>Quest-only bridge format</td><td>Bridge and partial import path</td></tr>
     <tr><td><span class="small">mettle-save</span> v1</td><td>Whole-run export/import format</td><td>Browser save portability</td></tr>
   </table>
 
   <h3>Current Web-App Sync Flow</h3>
   <ol>
-    <li>Import a Mettle account sync JSON file from the entry screen or inside an existing run.</li>
-    <li>Parse and normalize skills, quests, diaries, and sync metadata locally.</li>
-    <li>Refresh Wise Old Man using the same RSN to enrich boss KC if possible.</li>
+    <li>Import a Mettle account sync JSON file from the entry screen or from an existing run.</li>
+    <li>Normalize skills, quests, diaries, and sync metadata locally.</li>
+    <li>Refresh Wise Old Man using the same RSN to enrich boss KC when possible.</li>
     <li>Save the merged state into the browser run.</li>
   </ol>
 
-  <p>The important architectural truth is that the plugin is becoming the best source for <strong>private progression state</strong> like quests and diaries, while Wise Old Man remains the easiest source for <strong>public stat and boss data</strong>. The current app is explicitly built to combine those two surfaces.</p>
+  <p>The plugin is becoming the best source for private progression state like quests and diaries, while Wise Old Man remains the easiest source for public stat and boss history. The app is now deliberately built to combine those two surfaces.</p>
 
   <h3>Validation APIs</h3>
   <ul>
     <li><strong>/api/account-sync</strong> validates and normalizes full account sync payloads.</li>
     <li><strong>/api/quest-sync</strong> validates and normalizes quest sync payloads.</li>
   </ul>
-  <p>Both routes are validation-only right now. They do not persist sync data because the app still runs on local browser saves rather than linked user accounts or server-side sessions.</p>
+  <p>Both routes are validation-only today. They do not persist sync data because Mettle still runs on local browser saves rather than linked user accounts or server-side sessions.</p>
 
-  <h2>6. Generator and Rule Logic</h2>
+  <h2>6. Generator And Rule Logic</h2>
   <h3>Core Inputs</h3>
   <ul>
     <li>24 tracked skills</li>
     <li>69 tracked bosses</li>
-    <li>Quest completion data</li>
-    <li>Quest point totals</li>
+    <li>quest completion data</li>
+    <li>quest point totals</li>
     <li>Quest Cape state</li>
-    <li>Achievement diary summaries</li>
-    <li>Recent draft history, debt state, streak state, favored state, and completed task history</li>
+    <li>achievement diary summaries</li>
+    <li>recent draft history, debt state, streak state, favored state, and completed task history</li>
   </ul>
 
   <h3>Quest-Aware Task Filtering</h3>
-  <p>This is one of the biggest design changes since the last update. The generator no longer treats quest progress as invisible. It now has rule-level awareness of:</p>
-  <ul>
-    <li>specific completed quests</li>
-    <li>quest point targets</li>
-    <li>Quest Cape completion</li>
-    <li>boss objectives already satisfied by synced boss KC</li>
-  </ul>
-  <p>That means Mettle is moving away from “interesting flavor around a public stats import” and toward a real account-state rules engine.</p>
+  <p>The generator no longer treats quest progress as invisible. It now has rule-level awareness of specific completed quests, quest point targets, Quest Cape completion, and boss objectives already satisfied by synced boss KC.</p>
+  <p>That moves Mettle away from “interesting flavor around a public stats import” and toward a real account-state rules engine.</p>
 
   <h3>Weighting Model</h3>
   <p>The weighting model still considers the same major account signals:</p>
@@ -330,35 +325,28 @@
   </ul>
   <p>The difference now is that synced quest and boss completion data can remove already-cleared objectives before weighting even starts.</p>
 
-  <h3>Dynamic Behavior That Matters Now</h3>
-  <ul>
-    <li>Dynamic Trials still pick from account state instead of one hard-coded ask wherever possible.</li>
-    <li>Quest-related tasks can be suppressed automatically if imported quest sync says they are already done.</li>
-    <li>Fork options can be marked unavailable or auto-resolved based on synced progress.</li>
-    <li>Quest Cape Landmarks can trigger from synced completion instead of relying only on manual input.</li>
-  </ul>
+  <h2>7. Merchant Utility</h2>
+  <p>Mettle now includes an optional built-in merchant desk for Grand Exchange flipping. It is intentionally isolated from the main task ledger so the core run logic stays clean.</p>
 
-  <h2>7. Live Content Inventory</h2>
   <table>
-    <tr><th>Category</th><th>Count</th></tr>
-    <tr><td>Trial</td><td>10</td></tr>
-    <tr><td>PvM Intro</td><td>31</td></tr>
-    <tr><td>PvM Endurance</td><td>23</td></tr>
-    <tr><td>Quest</td><td>31</td></tr>
-    <tr><td>Exploration</td><td>21</td></tr>
-    <tr><td>Skill Gap</td><td>42</td></tr>
-    <tr><td>Endurance</td><td>36</td></tr>
-    <tr><td>Economic</td><td>5</td></tr>
+    <tr><th>Area</th><th>Current Behavior</th></tr>
+    <tr><td>Trigger</td><td>Opens from the main navigation row inside the live app</td></tr>
+    <tr><td>Mounting</td><td>Lazy-mounted and only active while open</td></tr>
+    <tr><td>Polling</td><td>Only refreshes while open and the page is visible</td></tr>
+    <tr><td>Storage</td><td>Uses its own watchlist key and does not modify the main Mettle run save</td></tr>
+    <tr><td>Data route</td><td><span class="small">app/api/prices/route.ts</span></td></tr>
+    <tr><td>Data source</td><td>OSRS Wiki mapping, latest price, and 1-hour volume endpoints</td></tr>
+    <tr><td>Route behavior</td><td>Uses a short per-instance in-memory cache plus cache headers and returns trimmed merchant candidates rather than the full market list</td></tr>
   </table>
 
-  <p>The pool size has not exploded since the last draft, but the content <em>rules</em> have gotten smarter. Several existing quest and late-game tasks now carry quest-point or quest-completion metadata so synced progress can influence eligibility correctly.</p>
+  <p>The merchant desk is not part of the Mettle run model. It is a quality-of-life utility that lives in the same product so it can share the same deployment and brand surface without contaminating core progression logic.</p>
 
   <h2>8. RuneLite Plugin Project</h2>
-  <p>Mettle now includes a separate RuneLite plugin project under <span class="small">runelite-plugin/</span>. This is no longer just an idea in notes. It is a real project with build files, source code, a local dev flow, and an export panel.</p>
+  <p>Mettle now includes a separate RuneLite plugin project under <span class="small">runelite-plugin/</span>. This is a real workspace with build files, source code, a sidebar export panel, and a local dev-run flow.</p>
 
   <h3>Current Plugin Scope</h3>
   <ul>
-    <li>plugin entrypoint and configuration</li>
+    <li>plugin entrypoint and config</li>
     <li>sidebar panel for manual export</li>
     <li>quest completion collection</li>
     <li>achievement diary tier collection</li>
@@ -366,29 +354,17 @@
     <li>Gradle wrapper and local RuneLite development launcher flow</li>
   </ul>
 
-  <h3>Important Architecture Note</h3>
-  <p>Boss KC is still the weak link in the plugin story. The plugin contract includes boss data, but the current intended player flow is to let the web app re-fetch or enrich boss killcounts through Wise Old Man after import. In practice, the plugin owns the private progression layer while Wise Old Man still helps fill the public combat history layer.</p>
+  <p>Boss KC is still the weakest part of the plugin story. The current player flow is still to let the web app enrich boss killcounts through Wise Old Man after import. In practice, the plugin owns private progression state while Wise Old Man still helps fill the public combat-history layer.</p>
 
-  <h3>Contract and Repo Layout Added Since Last Update</h3>
+  <h2>9. Visual, Product, And Deployment Direction</h2>
+  <p>The visual direction remains one of Mettle's strongest differentiators. The app still aims to feel like a ceremonial ledger rather than a generic utility page. That direction is now reinforced by more product-like behavior:</p>
   <ul>
-    <li><span class="small">runelite-plugin/</span> - dedicated plugin workspace</li>
-    <li><span class="small">sync-contract/</span> - canonical account sync schema and example payload</li>
-    <li><span class="small">docs/mettle-account-sync-plan.md</span> - rollout and architecture notes</li>
-    <li><span class="small">docs/mettle-quest-sync-plan.md</span> - quest sync bridge notes</li>
+    <li>entry screen now explicitly supports account sync import</li>
+    <li>stats view includes synced account-state summaries</li>
+    <li>history records seals gained and seals spent, not just XP</li>
+    <li>the app shell includes Vercel Analytics and Speed Insights</li>
+    <li>the merchant desk lives inside the same UI instead of splintering into a separate tool</li>
   </ul>
-
-  <p>The project is now clearly split into two collaborating surfaces: the web app and the RuneLite companion.</p>
-
-  <h2>9. Visual, Product, and Deployment Direction</h2>
-  <p>The visual direction remains one of Mettle's strongest differentiators. The app still aims to feel like a dark ceremonial ledger rather than a generic utility page. That direction is now reinforced by stronger operational decisions too:</p>
-  <ul>
-    <li>entry screen now explicitly supports account sync import, not just stat lookup</li>
-    <li>stats view now includes synced account-state summaries</li>
-    <li>history view now records seals gained and seals spent, not just XP</li>
-    <li>the app shell now includes Vercel Analytics and Speed Insights</li>
-  </ul>
-
-  <p>This is a useful shift. Mettle is no longer only trying to look premium; it is beginning to behave like a deployable product with instrumentation.</p>
 
   <h2>10. Technical Implementation</h2>
   <table>
@@ -398,22 +374,23 @@
     <tr><td>Styling</td><td>Mostly inline styles; Tailwind remains installed but is not the primary styling path</td></tr>
     <tr><td>Analytics</td><td>Vercel Analytics and Speed Insights</td></tr>
     <tr><td>Public account data</td><td>Wise Old Man API</td></tr>
-    <tr><td>Private progression data</td><td>Mettle sync payloads imported into browser state</td></tr>
-    <tr><td>Persistence</td><td>Browser localStorage plus portable save import/export</td></tr>
+    <tr><td>Private progression data</td><td>Mettle sync contracts imported into browser state</td></tr>
+    <tr><td>Price data</td><td>OSRS Wiki price API through the internal prices route</td></tr>
+    <tr><td>Persistence</td><td>Browser localStorage plus portable run import/export</td></tr>
     <tr><td>Plugin stack</td><td>Separate Gradle-based RuneLite plugin project</td></tr>
   </table>
 
   <h3>Current Repo Shape</h3>
   <table>
     <tr><th>Path Area</th><th>Purpose</th></tr>
-    <tr><td>app/</td><td>Next.js shell and validation APIs</td></tr>
-    <tr><td>components/</td><td>ledger UI, drafting systems, sync parsing, persistence, and rule helpers</td></tr>
+    <tr><td>app/</td><td>Next.js shell, validation APIs, and prices route</td></tr>
+    <tr><td>components/</td><td>ledger UI, task systems, sync parsing, persistence, merchant desk, and helpers</td></tr>
     <tr><td>sync-contract/</td><td>canonical account sync schema and example payload</td></tr>
     <tr><td>runelite-plugin/</td><td>RuneLite companion plugin source, config, and build tooling</td></tr>
     <tr><td>docs/</td><td>design doc plus sync planning notes</td></tr>
   </table>
 
-  <h2>11. Live vs. Still Missing</h2>
+  <h2>11. Live Vs. Still Missing</h2>
   <h3>Live Now</h3>
   <ul>
     <li>Wise Old Man intake</li>
@@ -426,19 +403,20 @@
     <li>Quest Cape sync detection</li>
     <li>fork auto-resolution logic</li>
     <li>seal-based deferred-task clearing</li>
+    <li>merchant desk</li>
     <li>RuneLite plugin export scaffold and local launcher flow</li>
     <li>sync validation APIs</li>
     <li>Vercel deployment instrumentation</li>
   </ul>
 
-  <h3>Still Missing or Deliberately Deferred</h3>
+  <h3>Still Missing Or Deliberately Deferred</h3>
   <ul>
     <li>server-side user accounts</li>
     <li>persistent cloud save storage tied to a user identity</li>
     <li>direct plugin-to-web upload sessions</li>
     <li>shareable public Mettle profiles</li>
     <li>fully rule-backed diary-generated tasks</li>
-    <li>admin balancing tools and authoring tools for the content pool</li>
+    <li>admin balancing tools and content authoring tools</li>
     <li>finalized brand package for channel rollout, overlays, and crest states</li>
   </ul>
 
@@ -446,16 +424,16 @@
   <ol>
     <li><strong>Move from file import to linked sync.</strong> The plugin and contract work are far enough along that the next major milestone should be an authenticated or session-linked sync target.</li>
     <li><strong>Add server persistence.</strong> The local-save model has gone as far as it can before social sharing, cross-device continuity, and direct plugin upload are blocked.</li>
-    <li><strong>Promote diary and quest sync into more task rules.</strong> The data is now present; the next value comes from using more of it in generation.</li>
-    <li><strong>Build balancing tooling.</strong> The content pool is large enough that tuning by feel alone is no longer ideal.</li>
-    <li><strong>Keep terminology unified.</strong> Stay anchored on “task” language so future UI, docs, and save changes do not drift back into mixed naming.</li>
+    <li><strong>Promote diary and quest sync into more task rules.</strong> The data is already in the model; the next value comes from using more of it in generation.</li>
+    <li><strong>Build balancing tooling.</strong> The task pool is now large enough that tuning by feel alone is not ideal.</li>
+    <li><strong>Keep product surfaces aligned.</strong> Continue treating the merchant desk, sync system, and ledger as one deployment without letting secondary tools muddy the core run loop.</li>
   </ol>
 
   <h2>13. Summary</h2>
-  <p>Mettle is still the same product at its core: a personalized challenge system that turns account neglect into visible pressure. The difference is that the project now has a real second layer of infrastructure underneath it. It is no longer just a stylish prototype with weighted drafts. It now has import/export contracts, richer saved state, a plugin companion, and sync-aware rules.</p>
+  <p>Mettle is still the same product at its core: a personalized challenge system that turns account neglect into visible pressure. The difference is that the project now has a real second layer of infrastructure underneath it. It is no longer just a stylish prototype with weighted drafts. It now has import/export contracts, richer saved state, a plugin companion, a merchant utility, and sync-aware rules.</p>
 
-  <p>The project's center of gravity has shifted from “can this be a compelling format?” to “how quickly can the app, sync model, and creator package be brought into one polished system?” That is a good problem to have.</p>
+  <p>The center of gravity has shifted from “can this be a compelling format?” to “how quickly can the app, sync model, creator package, and side utilities be brought into one polished system?” That is the current stage of the project.</p>
 
-  <p class="small">Reference state for this document: repo HEAD on March 14, 2026, including web app changes after commit <span class="small">ee8682e</span>.</p>
+  <p class="small">Reference state for this document: repo HEAD on March 15, 2026, including the built-in merchant utility and expanded task pool.</p>
 </body>
 </html>

@@ -2,73 +2,105 @@
 
 > *Your account has been avoiding things. Mettle finds them, names them, and makes you face them.*
 
-Mettle is a custom skill layered on top of Old School RuneScape. It is both a YouTube/streaming format and a playable web tool that generates account-specific tasks from your actual stats and boss history.
+Mettle is a custom skill layered on top of Old School RuneScape. It is both a YouTube/streaming format and a playable web tool that generates account-specific tasks from your real account state.
 
-The core idea is simple: your account already tells a story about what you delay, ignore, and avoid. Mettle turns that story into a ledger.
+The app now uses **task** terminology consistently for the challenge unit, while **ledger** remains the name for the broader progression surface.
 
 ---
 
-## What Is Mettle?
+## What Mettle Is Now
 
-You enter your RSN. The app pulls your account through the Wise Old Man API, maps your skills and boss KC into a local account model, and drafts personalized tasks based on account gaps, untouched bosses, progression state, and recent history.
+Mettle is no longer just a Wise Old Man prototype with manual entry. The current app combines:
 
-You draft from a small set of tasks and choose one. The unchosen tasks fall out of the current draw and can return later. The chosen task becomes active. Complete it cleanly and you gain full rewards. Defer too many and you build debt. Push that too far and reckoning pressure begins to form around the categories you keep dodging.
+- a local-save ledger with drafting, debt, reckoning, Trials, Forks, Landmarks, and Final Trial paths
+- full account sync import for skills, quests, and diaries
+- save import/export for whole-run portability
+- a companion RuneLite plugin project for long-term sync
+- an optional built-in merchant utility for GE flipping
 
-Mettle tracks its own progression as **Mettle XP** across five deity tiers toward level 99. Along the way it introduces Trials, Forks, Landmarks, debt pressure, and finally a path-based Final Trial.
-
-The app now calls the main surface the **ledger**, not the board.
+The core loop is still the same: import your account, draw tasks based on what your account has neglected, clear them, and progress toward level 99.
 
 ---
 
 ## Current Product Flow
 
-1. Fresh visit: cold open landing -> RSN input or manual entry -> ledger.
-2. Returning visit: saved run detected in `localStorage` -> ledger opens immediately.
-3. Reset run: saved state is cleared and the app returns to the entry screen.
+1. Fresh visit: choose Wise Old Man, manual entry, or Mettle account sync import.
+2. Returning visit: a saved run in `localStorage` opens straight into the ledger.
+3. Existing run: import a new sync file, import/export a save, or continue your run.
+4. Optional: open the built-in merchant desk without leaving the app.
 
-Current save key:
+Current run save key:
 
 - `mettle_run_v8`
 
-## Built-In Merchant Utility
+Current merchant watchlist key:
 
-Mettle now also includes an optional, separate **merchant utility** for GE flipping. It is meant to live inside the same app so you do not need another repo, deployment, or domain just to keep a personal market tool around.
-
-How it works right now:
-
-- Access is through the main `LEDGER / STATS / HISTORY` navigation row after you load a run.
-- The merchant panel opens over the current screen and does not replace the ledger/stats/history views.
-- It keeps its own watchlist in `localStorage` and does **not** write into the main Mettle save.
-- It only fetches price data while the panel is open and the page is visible.
-- Price data comes through `app/api/prices/route.ts`, which uses a short in-memory cache plus cache headers. That reduces upstream load heavily, but it is not a single global cache across every server instance.
+- `mettle_merchant_watchlist_v1`
 
 ---
 
-## The Skill
-
-Mettle is framed as a custom 24th OSRS skill.
+## Account Model And Sync
 
 The live account model currently tracks:
 
 - `24` skills
 - `69` bosses
+- quest completion state
+- quest points and Quest Cape detection
+- achievement diary sync state
 
-### Tier Structure
+### Intake Paths
 
-| Tier | Levels | Current Pool | Theme |
+| Path | Purpose | Status |
+|---|---|---|
+| Wise Old Man | skills + boss KC import | Live |
+| Manual entry | direct skills + boss KC input | Live |
+| `mettle-account-sync` | skills + quests + diaries + metadata | Live |
+| `mettle-quest-sync` | quest-only bridge import | Live |
+| `mettle-save` | whole-run export/import | Live |
+
+### Current Sync Architecture
+
+- `app/api/account-sync/route.ts` validates full account sync payloads.
+- `app/api/quest-sync/route.ts` validates quest sync payloads.
+- Imported quest and diary state is saved into the local Mettle run.
+- Boss KC is still enriched through Wise Old Man when possible after account-sync import.
+- Direct plugin-to-web upload is **not** live yet because the app still uses local browser saves instead of linked server-side accounts.
+
+---
+
+## Task System
+
+### Live Pool
+
+| Tier | Levels | Non-Trial Tasks | Theme |
 |---|---:|---:|---|
-| Guthix | 1–20 | 55 tasks | Foundation, first avoidance patterns |
-| Saradomin | 21–40 | 58 tasks | Discipline, structure, first larger asks |
-| Bandos | 41–60 | 59 tasks | Combat escalation, account force |
-| Zamorak | 61–80 | 53 tasks | Chaos, punishment, pressure systems |
-| Zaros | 81–99 | 50 tasks | Mastery, pathing, endgame pressure |
+| Guthix | 1–20 | 53 | Foundation, first weaknesses, first boss pressure |
+| Saradomin | 21–40 | 56 | Discipline, structure, first serious escalation |
+| Bandos | 41–60 | 57 | Combat force, raid pressure, broader bossing |
+| Zamorak | 61–80 | 51 | Chaos, modifiers, debt punishment, fork pressure |
+| Zaros | 81–99 | 48 | Mastery, pathing, finale shaping |
 
-Total live pool:
+Current total pool:
 
 - `265` non-trial tasks
 - `10` Trials
+- `103` repeatable tasks
 
-### Mettle XP Curve
+### Task Categories
+
+| Category | Count |
+|---|---:|
+| Trial | 10 |
+| PvM Intro | 31 |
+| PvM Endurance | 23 |
+| Quest | 60 |
+| Exploration | 68 |
+| Skill Gap | 42 |
+| Endurance | 36 |
+| Economic | 5 |
+
+### XP Curve
 
 | Level | XP |
 |---|---:|
@@ -86,21 +118,7 @@ Tier gates:
 - `60`
 - `80`
 
-### Unlocks
-
-| Level | Unlock |
-|---|---|
-| 10 | Trials |
-| 20 | Draft (3 options) |
-| 40 | Endurance Tasks |
-| 60 | Elite modifiers |
-| 80 | Mythic pressure |
-
----
-
-## Draft System
-
-### Draft Sizes
+### Draft States
 
 | State | Draft Size |
 |---|---:|
@@ -110,56 +128,32 @@ Tier gates:
 | Hot Streak | 4 |
 | Final Trial | 5 |
 
-### Important Rules
+Important live rules:
 
-- Unchosen tasks are **not** permanently deleted. They only leave the current draw.
-- Most completed tasks leave the pool permanently.
-- Tasks marked `repeatable` can return later.
-- Recent draft history is suppressed to reduce repetition.
-- Favored state is currently granted by Trial completion, not by clearing debt.
+- Unchosen tasks leave the current draw but can return later.
+- Most completed non-repeatable tasks leave the pool permanently.
+- Quest-aware drafting now suppresses tasks already satisfied by synced quest or boss progress.
+- Favored state is granted for `5` draws after clearing a Trial.
 
----
+### Debt, Reckoning, And Seals
 
-## Debt, Cursed, Reckoning
-
-### Debt
-
-- Deferring a task moves it into the debt queue.
+- Deferring a task adds it to the debt queue.
 - Debt cap is `3`.
-- Hitting the cap forces cleanup before drafting can continue.
-- Tier advancement is blocked at gates if debt or reckoning is unresolved.
+- Any debt forces the run into a cursed 2-option draft state.
+- Reckoning warning starts at `2` defers in a category.
+- Reckoning triggers at `3` defers in a category.
+- Debt and reckoning recovery only grants half XP, no seals, and no streak growth.
 
-### Cursed
+Current seal uses:
 
-- Any debt puts the run into a cursed draft state.
-- Cursed drafts shrink to `2` options.
-- Deferring a task breaks favored state immediately.
+- reroll draft: `2` seals
+- remove active modifier: `3` seals
+- clear deferred task instantly: `4` seals
+- buy an extra draft choice: `5` seals
 
-### Reckoning
+### Trials, Forks, And Landmarks
 
-- Reckoning is category-based pressure triggered by repeated defers.
-- Warning starts at `2` defers in a category.
-- At `3`, a reckoning task can be created for that category.
-- Reckoning tasks must be cleared before drawing or advancing.
-
-### Debt / Reckoning Recovery Rewards
-
-Recovery is intentionally weaker than clean completion:
-
-- Clearing a deferred task gives **half XP**
-- Completing a reckoning task gives **half XP**
-- Neither gives seals
-- Neither increases streak
-
----
-
-## Trials, Forks, Landmarks
-
-### Trials
-
-Trials are milestone tasks that auto-trigger and bypass the normal draft.
-
-Live trial levels:
+Trials are milestone tasks that auto-trigger at:
 
 - `10`
 - `20`
@@ -172,12 +166,6 @@ Live trial levels:
 - `90`
 - `99` Final Trial
 
-Trials are dynamic where possible. Early and late trials can resolve against account state, boss history, and untouched content rather than always pointing at one fixed challenge.
-
-### Landmarks
-
-Landmarks auto-trigger when their condition is met, except where manual confirmation is required.
-
 Current landmarks:
 
 - First Level 99
@@ -185,13 +173,7 @@ Current landmarks:
 - Total Level 1900
 - First Raid Completion
 
-Quest Cape is currently manual because WOM data does not let the app verify full quest completion directly.
-
-### Forks
-
-Forks are rare, major choices where one branch is accepted and the other is permanently rejected.
-
-Current fork set:
+Current forks:
 
 | Fork | Option A | Option B | Tier |
 |---|---|---|---|
@@ -200,76 +182,29 @@ Current fork set:
 | The Endgame | Tombs of Amascut (Full) | Theatre of Blood (Full) | Zaros |
 | The Final Reckoning | The Inferno | The Nightmare | Zaros |
 
-### Final Trial Paths
-
-At the top end of the run, Mettle assigns a path from account history:
-
-- Warrior
-- Scholar
-- Survivor
-- Balanced
-
-Each path has its own `8`-task pool, and the Final Trial draws `5` from that pool.
+Quest Cape is no longer just a manual fallback. If synced quest data says the cape is earned, Mettle can now detect it directly. Forks also react to synced progress and can auto-resolve when both branches are already complete.
 
 ---
 
-## Task Categories
+## Merchant Utility
 
-| Category | Description |
-|---|---|
-| PvM Intro | First boss interactions, low-KC bosses, first real combat asks |
-| PvM Endurance | Sustained KC, harder PvM volume, repeated boss pressure |
-| Quest | Quest completions and major quest-chain asks |
-| Skill Gap | Dynamic skill-gap and account-average pressure |
-| Exploration | Unlocks, access, movement, area and system asks |
-| Endurance | Time-based, volume-based, or streak-based asks |
-| Economic | Profit, production, or trade-centered asks |
-| Trial | Milestone tasks that bypass the normal draft |
+Mettle now includes an optional built-in **merchant desk** for GE flipping.
 
----
+Current behavior:
 
-## Generator Logic
+- It opens from the main navigation row inside the app.
+- It is lazy-mounted and only polls while open and the page is visible.
+- It keeps its own watchlist in `localStorage` and does **not** write into the main Mettle run save.
+- It uses `app/api/prices/route.ts`, which fetches OSRS Wiki mapping, latest price, and 1-hour volume data.
+- The price route keeps a short in-memory cache and sends cache headers, but it is still per-instance rather than one shared global cache.
+- The client only receives trimmed merchant candidates instead of the full market payload.
 
-### Data Source
+Related files:
 
-RSN input -> local API route -> Wise Old Man refresh + fetch
-
-Current live pull includes:
-
-- all `24` tracked skills
-- tracked boss KC
-- normalized display name
-
-Manual entry is also supported for skills and boss KC.
-
-### Skill Gap Logic
-
-The app still uses account-average logic, but the task sizing is now more dynamic than the original pitch.
-
-Notable updates:
-
-- fixed `+5` style level-gain tasks were replaced with level-band scaling
-- high-level skill tasks can switch from levels to XP chunks
-- gap-closing tasks no longer always force a skill all the way to account average
-
-### Weighting
-
-Draft weighting currently considers:
-
-- tier eligibility
-- completion status
-- recent draft suppression
-- account skill gaps
-- combat average
-- touched boss count
-- total boss KC
-- boss-specific low-KC bonuses
-
-Bossing is now more account-aware:
-
-- fresh zero-KC accounts are pushed more toward intro bossing
-- endurance PvM is suppressed early
-- every tracked boss is capable of surfacing over time
+- `app/api/prices/route.ts`
+- `components/merchant/MerchantBoard.jsx`
+- `components/merchant/MerchantToggle.jsx`
+- `components/merchant/README.md`
 
 ---
 
@@ -279,15 +214,19 @@ Bossing is now more account-aware:
 |---|---|
 | Frontend + Hosting | Next.js on Vercel |
 | App Framework | React 19 + App Router |
-| Language | TypeScript + JSX components |
+| Language | TypeScript entry files plus JSX components |
 | Styling | Mostly inline styles |
-| Fonts | Self-hosted display fonts in `public/fonts` |
-| Data Source | Wise Old Man API |
+| Analytics | Vercel Analytics + Speed Insights |
+| Public account data | Wise Old Man API |
+| Private progression sync | Mettle sync contracts |
+| Price data | OSRS Wiki price API |
+| Plugin project | Gradle-based RuneLite plugin |
 
-Current note:
+Current notes:
 
-- Supabase is **not** part of the current implementation.
-- Tailwind is installed but the main app is styled primarily with inline styles.
+- Supabase is **not** part of the live implementation.
+- The app still uses local browser saves rather than server-side user accounts.
+- Tailwind is installed but the main product UI is still styled primarily with inline styles.
 
 ---
 
@@ -307,13 +246,7 @@ npm run lint
 npm run build
 ```
 
-### Environment Variables
-
-The current app does not require project-level environment variables for the core local flow shown in the repo.
-
-The Wise Old Man calls are made from the app route at:
-
-- `app/api/player/[rsn]/route.ts`
+The current app does not require project-level environment variables for the local flow shown in this repo.
 
 ---
 
@@ -321,20 +254,27 @@ The Wise Old Man calls are made from the app route at:
 
 ```text
 app/
-  api/player/[rsn]/route.ts   Wise Old Man refresh + normalized player payload
-  layout.tsx                  App shell
-  page.tsx                    Entry gating + main app mount
+  api/player/[rsn]/route.ts    Wise Old Man refresh + normalized player payload
+  api/account-sync/route.ts    Full account sync validation
+  api/quest-sync/route.ts      Quest sync validation
+  api/prices/route.ts          Merchant price aggregation + caching
+  layout.tsx                   App shell + analytics
+  page.tsx                     Entry gating + main app mount
 
 components/
-  EntryScreen.jsx             Cold open + RSN/manual intake
-  MettlePrototype.jsx         Main ledger experience
-  data/                       Task pool, tiers, forks, landmarks, final trial pools
-  systems/                    Drafting and progression logic
-  utils/                      Persistence, labels, modifiers, helpers
+  EntryScreen.jsx              Intake flow
+  MettlePrototype.jsx          Main ledger experience
+  merchant/                    Built-in merchant desk
+  data/taskPool.js             Task pool definitions
+  systems/                     Drafting and progression logic
+  utils/                       Sync parsing, persistence, modifiers, helpers
 
-public/fonts/
-  runescape_uf.*
-  Silkscreen-Regular.ttf
+runelite-plugin/
+  README.md                    Plugin build/run notes
+  src/main/java/...            Mettle sync plugin source
+
+sync-contract/
+  mettle-account-sync-v1.*     Canonical account sync schema + example
 ```
 
 ---
@@ -343,20 +283,23 @@ public/fonts/
 
 | Item | Status |
 |---|---|
-| Name and framing | ✅ Live |
-| Entry screen | ✅ Live |
-| Ledger UI | ✅ Live |
-| Wise Old Man intake | ✅ Live |
-| Manual stat fallback | ✅ Live |
-| Debt / cursed / reckoning loop | ✅ Live |
-| Trials | ✅ Live |
-| Forks | ✅ Live |
-| Landmarks | ✅ Live |
-| Final Trial paths | ✅ Live |
-| Dynamic skill-gap balancing | ✅ Live |
-| Mobile pass | ✅ Improved, ongoing |
-| README accuracy | ✅ Updated to current behavior |
+| Ledger UI | Live |
+| Wise Old Man intake | Live |
+| Manual stat fallback | Live |
+| Account sync import | Live |
+| Quest sync import | Live |
+| Save import/export | Live |
+| Debt / cursed / reckoning loop | Live |
+| Trials | Live |
+| Forks | Live |
+| Landmarks | Live |
+| Final Trial paths | Live |
+| Quest-aware drafting | Live |
+| Merchant desk | Live |
+| RuneLite plugin project | In active development |
+| Direct plugin upload | Not live yet |
+| Server-side accounts / cloud saves | Not live yet |
 
 ---
 
-*METTLE — living document, updated for the current app state.*
+*METTLE — living document, updated for the current repo state as of March 15, 2026.*
