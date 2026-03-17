@@ -23,6 +23,11 @@ import { LANDMARK_TASKS, getPendingLandmark } from "./data/landmarkDefs.js";
 import { FINAL_TRIAL_POOLS } from "./data/finalTrialDefs.js";
 import { TASK_POOL } from "./data/taskPool.js";
 import {
+  ACCUSATION_REFUSAL_DRAW_PENALTY,
+  ACCUSATION_SPACING_MIN,
+  buildAccusationCandidate,
+} from "./systems/accusationSystem.js";
+import {
   computePath,
   draftSizeFromStatus,
   generateDraft,
@@ -42,9 +47,11 @@ import {
   parseAccountSyncText,
   summarizeDiaryState,
 } from "./utils/accountSync.js";
-import { modifierXpBonus, sealsForTask, streakSealBonus, taskXp } from "./utils/modifiers.js";
+import { applyBossKcAdjustments, getBossKcAdjustments } from "./utils/bossProgress.js";
+import { getModifierForCategory, modifierXpBonus, sealsForTask, streakSealBonus, taskXp } from "./utils/modifiers.js";
 import { clearSave, exportSaveData, importSaveText, loadSave, writeSave } from "./utils/persistence.js";
 import { createEmptyQuestState, parseQuestSyncText, summarizeQuestState } from "./utils/questSync.js";
+import { applySkillLevelAdjustments, getSkillLevelAdjustments } from "./utils/skillProgress.js";
 import { accountAverage } from "./utils/skillHelpers.js";
 import { fetchPlayerSnapshotByRsn } from "./utils/womImport.js";
 import MerchantToggle from "./merchant/MerchantToggle.jsx";
@@ -116,6 +123,13 @@ function toDeferredQueueEntry(task) {
 
 function hasOwn(save, key) {
   return Object.prototype.hasOwnProperty.call(save, key);
+}
+
+function makeAccusationId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `acc_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 // ─────────────────────────────────────────────
@@ -207,6 +221,19 @@ export default function MettlePrototype({
   const [questState, setQuestState]                 = useState(initialQuestState ?? createEmptyQuestState());
   const [diaryState, setDiaryState]                 = useState(initialDiaryState ?? createEmptyDiaryState());
 
+  // ── ACCUSATION STATE
+  const [activeAccusation, setActiveAccusation] = useState(null);
+  const [pendingAccusationCandidate, setPendingAccusationCandidate] = useState(null);
+  const [accusationHistory, setAccusationHistory] = useState([]);
+  const [accusationSpacingMin, setAccusationSpacingMin] = useState(ACCUSATION_SPACING_MIN);
+  const [accusationRefusalCount, setAccusationRefusalCount] = useState(0);
+  const [completedTasksSinceLastAccusation, setCompletedTasksSinceLastAccusation] = useState(0);
+  const [lastAccusationAtTaskCount, setLastAccusationAtTaskCount] = useState(0);
+  const [accusationMemory, setAccusationMemory] = useState({});
+  const [accusationOpportunityCounts, setAccusationOpportunityCounts] = useState({ pvmIgnored: 0, skillGapIgnored: 0 });
+  const [accusationPenaltyDrawsRemaining, setAccusationPenaltyDrawsRemaining] = useState(0);
+  const [accusationForcedModifierReady, setAccusationForcedModifierReady] = useState(false);
+
   // ── LOAD
   useEffect(() => {
     if (hasInitialStats) return;
@@ -245,15 +272,26 @@ export default function MettlePrototype({
     if(hasOwn(save, "pathRevealed"))        setPathRevealed(save.pathRevealed);
     if(hasOwn(save, "questState"))          setQuestState(save.questState);
     if(hasOwn(save, "diaryState"))          setDiaryState(save.diaryState);
+    if(hasOwn(save, "activeAccusation"))    setActiveAccusation(save.activeAccusation);
+    if(hasOwn(save, "pendingAccusationCandidate")) setPendingAccusationCandidate(save.pendingAccusationCandidate);
+    if(hasOwn(save, "accusationHistory"))   setAccusationHistory(save.accusationHistory);
+    if(hasOwn(save, "accusationSpacingMin")) setAccusationSpacingMin(save.accusationSpacingMin);
+    if(hasOwn(save, "accusationRefusalCount")) setAccusationRefusalCount(save.accusationRefusalCount);
+    if(hasOwn(save, "completedTasksSinceLastAccusation")) setCompletedTasksSinceLastAccusation(save.completedTasksSinceLastAccusation);
+    if(hasOwn(save, "lastAccusationAtTaskCount")) setLastAccusationAtTaskCount(save.lastAccusationAtTaskCount);
+    if(hasOwn(save, "accusationMemory")) setAccusationMemory(save.accusationMemory);
+    if(hasOwn(save, "accusationOpportunityCounts")) setAccusationOpportunityCounts(save.accusationOpportunityCounts);
+    if(hasOwn(save, "accusationPenaltyDrawsRemaining")) setAccusationPenaltyDrawsRemaining(save.accusationPenaltyDrawsRemaining);
+    if(hasOwn(save, "accusationForcedModifierReady")) setAccusationForcedModifierReady(save.accusationForcedModifierReady);
   }, [hasInitialStats]);
 
   // ── SAVE
   useEffect(() => {
     if(!statsLoaded) return;
     writeSave({
-      skillLevels,bossKC,mettleXP,mettleSeals,streak,completedIds,history,deferredTasks,mustClearAll,draftHistory,currentDraft,draftMode,activeTask,activeView,statsLoaded,rsn,trialPhase,pendingTrialTask,categoryDeferCounts,reckoningTasks,reckoningTotals,favoredDrawsRemaining,completedForks,activeFork,forkPhase,completedLandmarks,activeLandmark,landmarkPhase,assignedPath,pathRevealed,questState,diaryState,
+      skillLevels,bossKC,mettleXP,mettleSeals,streak,completedIds,history,deferredTasks,mustClearAll,draftHistory,currentDraft,draftMode,activeTask,activeView,statsLoaded,rsn,trialPhase,pendingTrialTask,categoryDeferCounts,reckoningTasks,reckoningTotals,favoredDrawsRemaining,completedForks,activeFork,forkPhase,completedLandmarks,activeLandmark,landmarkPhase,assignedPath,pathRevealed,questState,diaryState,activeAccusation,pendingAccusationCandidate,accusationHistory,accusationSpacingMin,accusationRefusalCount,completedTasksSinceLastAccusation,lastAccusationAtTaskCount,accusationMemory,accusationOpportunityCounts,accusationPenaltyDrawsRemaining,accusationForcedModifierReady,
     });
-  }, [skillLevels,bossKC,mettleXP,mettleSeals,streak,completedIds,history,deferredTasks,mustClearAll,draftHistory,currentDraft,draftMode,activeTask,activeView,statsLoaded,rsn,trialPhase,pendingTrialTask,categoryDeferCounts,reckoningTasks,reckoningTotals,favoredDrawsRemaining,completedForks,activeFork,forkPhase,completedLandmarks,activeLandmark,landmarkPhase,assignedPath,pathRevealed,questState,diaryState]);
+  }, [skillLevels,bossKC,mettleXP,mettleSeals,streak,completedIds,history,deferredTasks,mustClearAll,draftHistory,currentDraft,draftMode,activeTask,activeView,statsLoaded,rsn,trialPhase,pendingTrialTask,categoryDeferCounts,reckoningTasks,reckoningTotals,favoredDrawsRemaining,completedForks,activeFork,forkPhase,completedLandmarks,activeLandmark,landmarkPhase,assignedPath,pathRevealed,questState,diaryState,activeAccusation,pendingAccusationCandidate,accusationHistory,accusationSpacingMin,accusationRefusalCount,completedTasksSinceLastAccusation,lastAccusationAtTaskCount,accusationMemory,accusationOpportunityCounts,accusationPenaltyDrawsRemaining,accusationForcedModifierReady]);
 
   const mettleLevel = xpToLevel(mettleXP);
   const currentTier = tierForLevel(mettleLevel);
@@ -274,6 +312,37 @@ export default function MettlePrototype({
   const warningCategories = Object.entries(categoryDeferCounts)
     .filter(([, count]) => count >= 2 && count < 3)
     .map(([cat]) => cat);
+  const completedTaskCountForAccusations = completedIds.filter(id => NON_TRIAL_TASK_IDS.has(id)).length;
+  const historyCountForAccusations = history.length;
+  const baseDraftSize = draftSizeFromStatus(draftStatus);
+  const effectiveDraftSize = Math.max(1, baseDraftSize - (accusationPenaltyDrawsRemaining > 0 ? 1 : 0));
+  const boardIsCalm =
+    !activeTask &&
+    !trialPhase &&
+    !pendingTrialTask &&
+    !pendingTrial &&
+    !activeFork &&
+    !activeLandmark &&
+    currentDraft.length === 0 &&
+    reckoningTasks.length === 0 &&
+    !mustClearAll &&
+    deferredTasks.length < 3 &&
+    !gateBlocked;
+
+  function getCurrentAccusationCandidate() {
+    return buildAccusationCandidate({
+      mettleLevel,
+      skillLevels,
+      bossKC,
+      deferredTasks,
+      categoryDeferCounts,
+      reckoningTotals,
+      accusationMemory,
+      completedTaskCount: completedTaskCountForAccusations,
+      historyCount: historyCountForAccusations,
+      opportunityCounts: accusationOpportunityCounts,
+    });
+  }
 
   useEffect(() => {
     if (trialPhase !== "revealed") {
@@ -295,6 +364,138 @@ export default function MettlePrototype({
     const timeout = setTimeout(() => setSaveFileMessage(""), 3000);
     return () => clearTimeout(timeout);
   }, [saveFileMessage]);
+
+  useEffect(() => {
+    if (!statsLoaded || activeAccusation || pendingAccusationCandidate) return;
+    if (completedTasksSinceLastAccusation < accusationSpacingMin) return;
+
+    const candidate = getCurrentAccusationCandidate();
+
+    if (candidate) {
+      setPendingAccusationCandidate(candidate);
+    }
+  }, [
+    statsLoaded,
+    activeAccusation,
+    pendingAccusationCandidate,
+    completedTasksSinceLastAccusation,
+    accusationSpacingMin,
+    mettleLevel,
+    skillLevels,
+    bossKC,
+    deferredTasks,
+    categoryDeferCounts,
+    reckoningTotals,
+    accusationMemory,
+    completedTaskCountForAccusations,
+    historyCountForAccusations,
+    accusationOpportunityCounts,
+  ]);
+
+  useEffect(() => {
+    if (!pendingAccusationCandidate || !boardIsCalm || activeAccusation) return;
+    const currentCandidate = getCurrentAccusationCandidate();
+    if (!currentCandidate || currentCandidate.key !== pendingAccusationCandidate.key) {
+      setPendingAccusationCandidate(currentCandidate ?? null);
+      return;
+    }
+
+    const issuedAt = Date.now();
+    const accusation = {
+      ...currentCandidate,
+      id: makeAccusationId(),
+      issuedAt,
+      status: "revealed",
+      responseOptions: ["accept", "defend", "refuse"],
+    };
+
+    setActiveAccusation(accusation);
+    setPendingAccusationCandidate(null);
+    setActiveView("board");
+    setAccusationMemory(prev => {
+      const current = prev?.[accusation.key] ?? {
+        key: accusation.key,
+        timesIssued: 0,
+        timesAccepted: 0,
+        timesDefended: 0,
+        timesRefused: 0,
+        timesResolved: 0,
+        lastIssuedAt: 0,
+        lastOutcome: null,
+      };
+      return {
+        ...prev,
+        [accusation.key]: {
+          ...current,
+          timesIssued: current.timesIssued + 1,
+          lastIssuedAt: issuedAt,
+          lastOutcome: "revealed",
+        },
+      };
+    });
+  }, [
+    pendingAccusationCandidate,
+    boardIsCalm,
+    activeAccusation,
+    mettleLevel,
+    skillLevels,
+    bossKC,
+    deferredTasks,
+    categoryDeferCounts,
+    reckoningTotals,
+    accusationMemory,
+    completedTaskCountForAccusations,
+    historyCountForAccusations,
+    accusationOpportunityCounts,
+  ]);
+
+  function recordCompletedTaskStep() {
+    setCompletedTasksSinceLastAccusation(prev => prev + 1);
+  }
+
+  function recordAccusationHistory(accusation, response, outcome, task = null) {
+    if (!accusation) return;
+    setAccusationHistory(prev => [{
+      id: accusation.id,
+      key: accusation.key,
+      title: accusation.title,
+      family: accusation.family,
+      severity: accusation.severity,
+      response,
+      outcome,
+      chargeText: accusation.chargeText,
+      evidence: accusation.evidence,
+      taskTitle: task?.title ?? null,
+      taskObjective: task?.objective ?? null,
+      timestamp: Date.now(),
+    }, ...prev]);
+  }
+
+  function finalizeAccusation(accusation, response, outcome, task = null) {
+    if (!accusation) return;
+    recordAccusationHistory(accusation, response, outcome, task);
+    setCompletedTasksSinceLastAccusation(0);
+    setLastAccusationAtTaskCount(history.length);
+    setActiveAccusation(null);
+    setAccusationMemory(prev => {
+      const current = prev?.[accusation.key] ?? {
+        key: accusation.key,
+        timesIssued: 0,
+        timesAccepted: 0,
+        timesDefended: 0,
+        timesRefused: 0,
+        timesResolved: 0,
+        lastIssuedAt: accusation.issuedAt ?? Date.now(),
+        lastOutcome: null,
+      };
+      const next = { ...current, lastOutcome: outcome };
+      if (response === "accept") next.timesAccepted += 1;
+      if (response === "defend") next.timesDefended += 1;
+      if (response === "refuse") next.timesRefused += 1;
+      if (outcome === "resolved" || outcome === "dismissed") next.timesResolved += 1;
+      return { ...prev, [accusation.key]: next };
+    });
+  }
 
   function openQuestSyncPicker() {
     setSaveFileMessage("");
@@ -353,7 +554,7 @@ export default function MettlePrototype({
       setSaveFileMessage("No save is available to export yet.");
       return;
     }
-    const slug = (rsn || "mettle-run")
+    const slug = (rsn || "mettle-ascent")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
@@ -363,7 +564,7 @@ export default function MettlePrototype({
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${slug || "mettle-run"}-${stamp}.json`;
+    anchor.download = `${slug || "mettle-ascent"}-${stamp}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
     setSaveFileMessage("Save file exported.");
@@ -378,7 +579,7 @@ export default function MettlePrototype({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (!window.confirm("Importing a save file will replace the current local run on this browser. Continue?")) {
+    if (!window.confirm("Importing a save file will replace the current local ascent on this browser. Continue?")) {
       return;
     }
     try {
@@ -409,6 +610,7 @@ export default function MettlePrototype({
 
   function drawTasks() {
     if (activeTask) return;
+    if (activeAccusation) return;
     if (mustClearAll || deferredTasks.length >= 3) return;
     if (reckoningTasks.length > 0) return;
     if (activeFork || activeLandmark) return;
@@ -455,13 +657,16 @@ export default function MettlePrototype({
     }
 
     const last5=draftHistory.slice(-5);
-    const draft=generateDraft(skillLevels,bossKC,completedIds,last5,deferredTasks,mettleLevel,null,streak,favoredDrawsRemaining,questState,diaryState);
+    const draft=generateDraft(skillLevels,bossKC,completedIds,last5,deferredTasks,mettleLevel,effectiveDraftSize,streak,favoredDrawsRemaining,questState,diaryState);
     setCurrentDraft(draft);
     setDraftMode("normal");
     setDraftHistory(prev=>[...prev,draft.map(w=>w.id)]);
     // Decrement favored draws if active
     if (favoredDrawsRemaining > 0) {
       setFavoredDrawsRemaining(prev => prev - 1);
+    }
+    if (accusationPenaltyDrawsRemaining > 0) {
+      setAccusationPenaltyDrawsRemaining(prev => Math.max(0, prev - 1));
     }
   }
 
@@ -514,9 +719,60 @@ export default function MettlePrototype({
   }
 
   function chooseTask(task) {
+    if (draftMode !== "final_trial" && currentDraft.length > 0) {
+      const hasPvmOption = currentDraft.some(draftTask => draftTask.category === "PvM Intro" || draftTask.category === "PvM Endurance");
+      const hasSkillGapOption = currentDraft.some(draftTask => draftTask.category === "Skill Gap");
+      setAccusationOpportunityCounts(prev => ({
+        pvmIgnored: prev.pvmIgnored + (hasPvmOption && task.category !== "PvM Intro" && task.category !== "PvM Endurance" ? 1 : 0),
+        skillGapIgnored: prev.skillGapIgnored + (hasSkillGapOption && task.category !== "Skill Gap" ? 1 : 0),
+      }));
+    }
     setCurrentDraft([]);
     setDraftMode("normal");
     setActiveTask({ ...task, acceptedAt: task.acceptedAt || Date.now() });
+  }
+
+  function launchAccusationTask(taskTemplate, responseType) {
+    if (!activeAccusation || !taskTemplate) return;
+
+    const nextTask = {
+      ...taskTemplate,
+      acceptedAt: Date.now(),
+      accusationTask: true,
+      accusationResponseType: responseType,
+      accusationSourceId: activeAccusation.id,
+      accusationKey: activeAccusation.key,
+      accusationTitle: activeAccusation.title,
+    };
+
+    if (responseType === "judgment" && accusationForcedModifierReady && !nextTask.modifier) {
+      const modifier = getModifierForCategory(nextTask.category, 1);
+      nextTask.modifier = modifier;
+      nextTask.objective = `${nextTask.objective} — MODIFIER: ${modifier}`;
+      setAccusationForcedModifierReady(false);
+    }
+
+    setActiveAccusation(prev => (prev ? { ...prev, status: responseType === "defense" ? "defended" : "accepted" } : prev));
+    setActiveTask(nextTask);
+  }
+
+  function acceptAccusation() {
+    if (!activeAccusation) return;
+    launchAccusationTask(activeAccusation.judgmentTask, "judgment");
+  }
+
+  function defendAccusation() {
+    if (!activeAccusation) return;
+    launchAccusationTask(activeAccusation.defenseTask, "defense");
+  }
+
+  function refuseAccusation() {
+    if (!activeAccusation) return;
+    const accusation = activeAccusation;
+    finalizeAccusation(accusation, "refuse", "unanswered");
+    setAccusationRefusalCount(prev => prev + 1);
+    setAccusationPenaltyDrawsRemaining(ACCUSATION_REFUSAL_DRAW_PENALTY);
+    setAccusationForcedModifierReady(true);
   }
 
   // ── FORK HANDLERS
@@ -539,6 +795,8 @@ export default function MettlePrototype({
       forkTitle: fork.title,
       chosenLabel: chosen.label,
       rejectedLabel: rejected.label,
+      bossCompleteAnyOf: chosen.bossCompleteAnyOf,
+      questCompleteAnyOf: chosen.questCompleteAnyOf,
     });
     setActiveFork(null);
     setForkPhase(null);
@@ -555,6 +813,7 @@ export default function MettlePrototype({
     setMettleSeals(prev => prev + sealsGained);
     setXpDrop({ amount: xpGained, id: Date.now() });
     setTimeout(() => setXpDrop(null), 1800);
+    recordCompletedTaskStep();
     setHistory(prev => [{ ...lm, result: "landmark", xpGained, sealsGained, timestamp: Date.now() }, ...prev]);
     setActiveLandmark(null);
     setLandmarkPhase(null);
@@ -585,19 +844,47 @@ export default function MettlePrototype({
     });
   }
 
+  function applyTaskBossProgress(task) {
+    const adjustments = getBossKcAdjustments(task, bossKC);
+    if (adjustments.length === 0) return adjustments;
+    setBossKC(prev => applyBossKcAdjustments(prev, adjustments));
+    setManualKC(prev => applyBossKcAdjustments(prev, adjustments));
+    return adjustments;
+  }
+
+  function applyTaskSkillProgress(task) {
+    const adjustments = getSkillLevelAdjustments(task, skillLevels);
+    if (adjustments.length === 0) return adjustments;
+    setSkillLevels(prev => applySkillLevelAdjustments(prev, adjustments));
+    setManualSkills(prev => applySkillLevelAdjustments(prev, adjustments));
+    return adjustments;
+  }
+
   function resolveActiveTask(result) {
     if (!activeTask) return;
     if (activeTask.trial && result === "defer") return;
+    if (activeTask.accusationResponseType === "defense" && result === "defer") return;
+
+    const linkedAccusation = activeAccusation && activeTask.accusationSourceId === activeAccusation.id
+      ? activeAccusation
+      : null;
+    const isAccusationTask = Boolean(activeTask.accusationTask);
+    const accusationResponse = activeTask.accusationResponseType === "defense" ? "defend" : "accept";
     let xpGained=0;
     let sealsGained=0;
     let nextStreak = streak;
-    if (result==="complete") {
+    let bossKcAdjustments = [];
+    let skillLevelAdjustments = [];
+
+    if (result==="complete" || result === "defense_complete") {
       xpGained=taskXp(activeTask);
-      sealsGained=sealsForTask(activeTask);
+      sealsGained=isAccusationTask ? 0 : sealsForTask(activeTask);
       nextStreak = streak + 1;
-      sealsGained += streakSealBonus(nextStreak);
-      if(!completedIds.includes(activeTask.id)) setCompletedIds(prev=>[...prev,activeTask.id]);
-      if (activeTask.sourceTrialId && !completedIds.includes(activeTask.sourceTrialId)) {
+      if (!isAccusationTask) {
+        sealsGained += streakSealBonus(nextStreak);
+      }
+      if(!isAccusationTask && !completedIds.includes(activeTask.id)) setCompletedIds(prev=>[...prev,activeTask.id]);
+      if (!isAccusationTask && activeTask.sourceTrialId && !completedIds.includes(activeTask.sourceTrialId)) {
         setCompletedIds(prev => [...prev, activeTask.sourceTrialId]);
       }
       setXpDrop({amount:taskXp(activeTask),id:Date.now()});
@@ -605,6 +892,12 @@ export default function MettlePrototype({
       // Grant Favored state for 5 draws after completing a Trial
       if (activeTask.trial) {
         setFavoredDrawsRemaining(prev => prev + 5);
+      }
+      skillLevelAdjustments = applyTaskSkillProgress(activeTask);
+      bossKcAdjustments = applyTaskBossProgress(activeTask);
+      recordCompletedTaskStep();
+      if (linkedAccusation) {
+        finalizeAccusation(linkedAccusation, accusationResponse, activeTask.accusationResponseType === "defense" ? "dismissed" : "resolved", activeTask);
       }
     } else if (result==="defer") {
       nextStreak = 0;
@@ -628,11 +921,57 @@ export default function MettlePrototype({
         // Reset the category defer count
         setCategoryDeferCounts(prev => ({ ...prev, [cat]: 0 }));
       }
+      if (linkedAccusation) {
+        finalizeAccusation(linkedAccusation, accusationResponse, "failed", activeTask);
+      }
+    } else if (result === "defense_fail") {
+      nextStreak = 0;
+      setFavoredDrawsRemaining(0);
+      if (linkedAccusation) {
+        const modifier = getModifierForCategory(linkedAccusation.judgmentTask.category, 1);
+        const forcedJudgment = {
+          ...linkedAccusation.judgmentTask,
+          acceptedAt: Date.now(),
+          accusationTask: true,
+          accusationResponseType: "judgment",
+          accusationSourceId: linkedAccusation.id,
+          accusationKey: linkedAccusation.key,
+          accusationTitle: linkedAccusation.title,
+          modifier,
+          objective: `${linkedAccusation.judgmentTask.objective} — MODIFIER: ${modifier}`,
+        };
+        setAccusationForcedModifierReady(false);
+        setAccusationMemory(prev => {
+          const current = prev?.[linkedAccusation.key] ?? {
+            key: linkedAccusation.key,
+            timesIssued: 0,
+            timesAccepted: 0,
+            timesDefended: 0,
+            timesRefused: 0,
+            timesResolved: 0,
+            lastIssuedAt: linkedAccusation.issuedAt ?? Date.now(),
+            lastOutcome: null,
+          };
+          return {
+            ...prev,
+            [linkedAccusation.key]: {
+              ...current,
+              timesDefended: current.timesDefended + 1,
+              lastOutcome: "defense_failed",
+            },
+          };
+        });
+        setStreak(nextStreak);
+        setHistory(prev => [{ ...activeTask, result, xpGained: 0, sealsGained: 0, baseXp: activeTask.xp, modifierXpBonus: modifierXpBonus(activeTask), streakAfter: nextStreak, timestamp: Date.now(), bossKcAdjustments, skillLevelAdjustments }, ...prev]);
+        setActiveAccusation(prev => (prev ? { ...prev, status: "accepted" } : prev));
+        setActiveTask(forcedJudgment);
+        return;
+      }
     }
     if(xpGained>0) setMettleXP(prev=>Math.min(MAX_METTLE_XP,prev+xpGained));
     if(sealsGained>0) setMettleSeals(prev=>prev+sealsGained);
     setStreak(nextStreak);
-    setHistory(prev=>[{...activeTask,result,xpGained,sealsGained,baseXp:activeTask.xp,modifierXpBonus:modifierXpBonus(activeTask),streakAfter:nextStreak,timestamp:Date.now()},...prev]);
+    setHistory(prev=>[{...activeTask,result,xpGained,sealsGained,baseXp:activeTask.xp,modifierXpBonus:modifierXpBonus(activeTask),streakAfter:nextStreak,timestamp:Date.now(),bossKcAdjustments,skillLevelAdjustments},...prev]);
     setActiveTask(null);
   }
 
@@ -647,9 +986,12 @@ export default function MettlePrototype({
     setMettleXP(prev=>Math.min(MAX_METTLE_XP,prev+xpGained));
     setStreak(nextStreak);
     if(!completedIds.includes(c.id)) setCompletedIds(prev=>[...prev,c.id]);
+    const skillLevelAdjustments = applyTaskSkillProgress(c);
+    const bossKcAdjustments = applyTaskBossProgress(c);
     setXpDrop({amount:xpGained,id:Date.now()});
     setTimeout(()=>setXpDrop(null),1800);
-    setHistory(prev=>[{...c,result:"debt_cleared",xpGained,sealsGained,baseXp:c.xp,modifierXpBonus:modifierXpBonus(c),streakAfter:nextStreak,timestamp:Date.now()},...prev]);
+    recordCompletedTaskStep();
+    setHistory(prev=>[{...c,result:"debt_cleared",xpGained,sealsGained,baseXp:c.xp,modifierXpBonus:modifierXpBonus(c),streakAfter:nextStreak,timestamp:Date.now(),bossKcAdjustments,skillLevelAdjustments},...prev]);
   }
 
   function clearDeferredTaskWithSeals(queueEntryId) {
@@ -682,9 +1024,12 @@ export default function MettlePrototype({
     setReckoningTasks(prev => prev.filter(x => x.id !== id));
     setMettleXP(prev => Math.min(MAX_METTLE_XP, prev + xpGained));
     setStreak(nextStreak);
+    const skillLevelAdjustments = applyTaskSkillProgress(rw);
+    const bossKcAdjustments = applyTaskBossProgress(rw);
     setXpDrop({ amount: xpGained, id: Date.now() });
     setTimeout(() => setXpDrop(null), 1800);
-    setHistory(prev => [{ ...rw, result: "reckoning_cleared", xpGained, sealsGained, baseXp:rw.xp, modifierXpBonus:modifierXpBonus(rw), streakAfter: nextStreak, timestamp: Date.now() }, ...prev]);
+    recordCompletedTaskStep();
+    setHistory(prev => [{ ...rw, result: "reckoning_cleared", xpGained, sealsGained, baseXp:rw.xp, modifierXpBonus:modifierXpBonus(rw), streakAfter: nextStreak, timestamp: Date.now(), bossKcAdjustments, skillLevelAdjustments }, ...prev]);
   }
 
   function failReckoningTask(id) {
@@ -711,6 +1056,10 @@ export default function MettlePrototype({
     setAssignedPath(null); setPathRevealed(false);
     setQuestState(createEmptyQuestState());
     setDiaryState(createEmptyDiaryState());
+    setActiveAccusation(null); setPendingAccusationCandidate(null); setAccusationHistory([]);
+    setAccusationSpacingMin(ACCUSATION_SPACING_MIN); setAccusationRefusalCount(0);
+    setCompletedTasksSinceLastAccusation(0); setLastAccusationAtTaskCount(0);
+    setAccusationMemory({}); setAccusationOpportunityCounts({ pvmIgnored: 0, skillGapIgnored: 0 }); setAccusationPenaltyDrawsRemaining(0); setAccusationForcedModifierReady(false);
     setMerchantOpen(false);
     setMerchantReady(false);
     setConfirmReset(false);
@@ -788,10 +1137,12 @@ export default function MettlePrototype({
   const hasReckonings = reckoningTasks.length > 0;
   const hasForkPending = !!activeFork;
   const hasLandmarkPending = !!activeLandmark;
-  const drawBlocked = mustClearAll || deferredTasks.length >= 3 || hasReckonings || gateBlocked || hasForkPending || hasLandmarkPending;
+  const hasActiveAccusation = !!activeAccusation && !activeTask;
+  const drawBlocked = mustClearAll || deferredTasks.length >= 3 || hasReckonings || gateBlocked || hasForkPending || hasLandmarkPending || hasActiveAccusation;
   let blockReason = "";
   if (hasForkPending) blockReason = "FORK TASK ACTIVE — CHOOSE A PATH";
   else if (hasLandmarkPending) blockReason = "LANDMARK ACTIVE — ACKNOWLEDGE TO CONTINUE";
+  else if (hasActiveAccusation) blockReason = "THE LEDGER HAS ISSUED AN ACCUSATION";
   else if (hasReckonings) blockReason = `CLEAR ${reckoningTasks.length} RECKONING TASK${reckoningTasks.length>1?"S":""} TO DRAW`;
   else if (mustClearAll) blockReason = `CLEAR ALL ${deferredTasks.length} DEFERRED TASKS TO DRAW`;
   else if (gateBlocked) blockReason = "CLEAR ALL DEBT & RECKONINGS TO ADVANCE PAST TIER GATE";
@@ -1058,7 +1409,7 @@ export default function MettlePrototype({
           </div>
           <div className={isLightTheme ? "mettle-osrs-inset" : undefined} style={s.railPanel}>
             <div>
-              <div className="mettle-osrs-label" style={{fontSize:"10px",letterSpacing:"4px",marginBottom:"8px",textTransform:"uppercase"}}>Run State</div>
+              <div className="mettle-osrs-label" style={{fontSize:"10px",letterSpacing:"4px",marginBottom:"8px",textTransform:"uppercase"}}>Ascent State</div>
               <div style={s.railValue}>{currentTier} Tier</div>
               <div style={{fontSize:"12px",color:statusColor,letterSpacing:"3px",marginTop:"8px",textTransform:"uppercase"}}>{draftStatus.replace("_"," ")}</div>
             </div>
@@ -1147,7 +1498,7 @@ export default function MettlePrototype({
                   </div>
                 ))}
               </div>
-              <button style={{...s.btn(true),padding:"10px 32px"}} onClick={confirmManualStats}>START RUN</button>
+              <button style={{...s.btn(true),padding:"10px 32px"}} onClick={confirmManualStats}>START ASCENT</button>
             </div>
           )}
         </div>
@@ -1190,7 +1541,7 @@ export default function MettlePrototype({
               <button style={{...s.btn(false),color:"#555"}} onClick={()=>setConfirmReset(false)}>CANCEL</button>
             </div>
           ) : (
-            <button style={{...s.btn(false),color:"#444"}} onClick={resetRun}>RESET RUN</button>
+            <button style={{...s.btn(false),color:"#444"}} onClick={resetRun}>RESET ASCENT</button>
           )}
         </div>
       )}
@@ -1238,6 +1589,13 @@ export default function MettlePrototype({
             </div>
           )}
 
+          {accusationPenaltyDrawsRemaining > 0 && (
+            <div style={{...s.sectionFrame,borderColor:"#7f1d1d",background:"#120707",fontSize:"11px",color:"#fca5a5",padding:"12px 16px"}}>
+              UNANSWERED ACCUSATION PENALTY — next {accusationPenaltyDrawsRemaining} draw{accusationPenaltyDrawsRemaining === 1 ? "" : "s"} lose 1 draft option.
+              {accusationForcedModifierReady ? " The next accepted Judgment Task also carries a forced modifier." : ""}
+            </div>
+          )}
+
           {/* PENDING TRIAL NOTICE */}
           {pendingTrial && !activeTask && !trialPhase && currentDraft.length === 0 && !activeFork && !activeLandmark && (
             <div style={{...s.sectionFrame,borderColor:"#d4af37",background:"#141008",fontSize:"11px",color:"#fbbf24",padding:"12px 16px"}}>
@@ -1250,6 +1608,43 @@ export default function MettlePrototype({
             <div style={{...s.sectionFrame,borderColor:"#6b21a8",background:"#0f0a14",fontSize:"11px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:"14px",flexWrap:"wrap",padding:"12px 16px"}}>
               <span style={{color:"#d8b4fe",letterSpacing:"2px"}}>PATH ASSIGNED: <span style={{color:"#fff",fontWeight:"700"}}>{assignedPath.toUpperCase()}</span></span>
               <span style={{color:"#555"}}>{pathRevealed ? "Final Trial path revealed" : "Final Trial pool locked at Level 99"}</span>
+            </div>
+          )}
+
+          {activeAccusation && !activeTask && !trialPhase && !activeFork && !activeLandmark && (
+            <div style={{...s.sectionFrame,borderColor:"#7f1d1d",background:"radial-gradient(circle at top, rgba(127,29,29,0.18) 0%, rgba(18,8,8,0.98) 42%, rgba(10,10,10,1) 100%)",padding:"30px 24px"}}>
+              <div style={{fontSize:"10px",letterSpacing:"6px",color:"#f87171",marginBottom:"12px",textAlign:"center"}}>ACCUSATION</div>
+              <div style={{display:"flex",justifyContent:"center",gap:"8px",flexWrap:"wrap",marginBottom:"18px"}}>
+                <span style={s.tag("#f87171")}>{activeAccusation.family.toUpperCase()}</span>
+                <span style={s.tag("#fca5a5")}>SEVERITY {activeAccusation.severity}</span>
+                <span style={s.tag(CAT_COLORS[activeAccusation.domainCategory] || "#888")}>{activeAccusation.domainCategory.toUpperCase()}</span>
+              </div>
+              <div style={{...s.displayBigTitle,fontSize:"30px",textAlign:"center",marginBottom:"16px"}}>{activeAccusation.title}</div>
+              <div style={{...s.objectiveBox,margin:"0 auto 16px",maxWidth:"700px"}}>
+                {activeAccusation.chargeText.map((line, index) => (
+                  <div key={`${activeAccusation.id}_${index}`} style={{fontSize:index === activeAccusation.chargeText.length - 1 ? "13px" : "16px",color:index === activeAccusation.chargeText.length - 1 ? "#fca5a5" : "#f3f4f6",lineHeight:"1.7",textAlign:"center",marginBottom:index === activeAccusation.chargeText.length - 1 ? 0 : 4}}>
+                    {line}
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",justifyContent:"center",gap:"6px",flexWrap:"wrap",marginBottom:"20px"}}>
+                {activeAccusation.evidence.map((line, index) => (
+                  <span key={`${activeAccusation.id}_evidence_${index}`} style={{...s.infoMeta,borderColor:"#4b1d1d",background:"#160b0b",color:"#fca5a5"}}>
+                    {line}
+                  </span>
+                ))}
+              </div>
+              <div style={{display:"flex",justifyContent:"center",gap:"10px",flexWrap:"wrap"}}>
+                <button style={s.btn(false,"#14380f","#4ade80")} onClick={acceptAccusation}>
+                  ACCEPT JUDGMENT
+                </button>
+                <button style={s.btn(false,"#111827","#93c5fd")} onClick={defendAccusation}>
+                  DEFEND THE ACCOUNT
+                </button>
+                <button style={s.btn(false,"#1a0a0a","#f87171")} onClick={refuseAccusation}>
+                  REFUSE JUDGMENT
+                </button>
+              </div>
             </div>
           )}
 
@@ -1348,7 +1743,7 @@ export default function MettlePrototype({
               <div style={{fontSize:"10px",letterSpacing:"6px",color:"#d4af37",marginBottom:"24px"}}>⚔ TRIAL OF METTLE ⚔</div>
               <div style={{fontSize:"14px",letterSpacing:"4px",color:"#fbbf24",marginBottom:"12px"}}>LEVEL {pendingTrialTask.triggerLevel}</div>
               <div style={{fontSize:"11px",color:"#666",marginBottom:"32px",maxWidth:"400px",margin:"0 auto 32px",lineHeight:"1.6"}}>
-                The ledger has watched your progress. A trial is ready. It cannot be skipped. It must be cleared before the run moves on.
+                The ledger has watched your progress. A trial is ready. It cannot be skipped. It must be cleared before the ascent moves on.
               </div>
               <button style={{padding:"14px 48px",fontFamily:"inherit",fontWeight:"700",fontSize:"14px",letterSpacing:"4px",background:"transparent",color:"#d4af37",border:"1px solid #d4af37",cursor:"pointer"}} onClick={revealTrial}>
                 REVEAL TRIAL
@@ -1457,15 +1852,21 @@ export default function MettlePrototype({
               </div>
             ) : (
               <div style={{...s.activeCard, borderColor: activeTask.reckoning ? "#6b21a8" : "#555"}}>
-                <div style={s.secHead}>ACTIVE TASK</div>
+                <div style={s.secHead}>{activeTask.accusationTask ? "ACTIVE ACCUSATION TASK" : "ACTIVE TASK"}</div>
                 <div style={{fontSize:"11px",marginBottom:"8px"}}>
                   <span style={s.tag(CAT_COLORS[activeTask.category]||"#555")}>{activeTask.category.toUpperCase()}</span>
                   <span style={s.tag(DIFF_COLORS[activeTask.difficulty])}>{activeTask.difficulty.toUpperCase()}</span>
                   <span style={s.tag(TIER_COLORS[activeTask.tier]||"#555")}>{activeTask.tier.toUpperCase()}</span>
+                  {activeTask.accusationTask && <span style={s.tag("#f87171")}>{activeTask.accusationResponseType === "defense" ? "DEFENSE TRIAL" : "JUDGMENT"}</span>}
                   <span style={s.tag("#555")}>{taskXp(activeTask)} XP</span>
                   {modifierXpBonus(activeTask) > 0 && <span style={s.tag("#fb923c")}>+{modifierXpBonus(activeTask)} MOD BONUS</span>}
                 </div>
                 <div style={{...s.displayCardTitle,marginBottom:"14px"}}>{activeTask.title}</div>
+                {activeTask.accusationTask && activeTask.accusationTitle && (
+                  <div style={{fontSize:"11px",letterSpacing:"2px",color:"#fca5a5",marginBottom:"14px",textTransform:"uppercase"}}>
+                    Issued from accusation: {activeTask.accusationTitle}
+                  </div>
+                )}
                 <div style={{...s.objectiveBox,margin:"0 0 16px",maxWidth:"760px",padding:"16px 18px 14px"}}>
                   <div style={{fontSize:"10px",letterSpacing:"4px",color:"#7a7a72",marginBottom:"10px",textTransform:"uppercase"}}>Assigned Objective</div>
                   <div style={{fontSize:"14px",color:"#d4d4d4",lineHeight:"1.75"}}>{activeTask.objective}</div>
@@ -1484,21 +1885,34 @@ export default function MettlePrototype({
                   </div>
                 )}
                 <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
-                  <button style={s.btn(false,"#14380f","#4ade80")} onClick={()=>resolveActiveTask("complete")}>
-                    ✓ COMPLETE (+{taskXp(activeTask)} XP)
-                  </button>
-                  <button style={s.btn(false,"#1a1a0a","#fbbf24")} onClick={()=>resolveActiveTask("defer")}
-                    disabled={deferredTasks.length>=3}>
-                    ⏸ DEFER ({deferredTasks.length}/3{deferredTasks.length>=3?" — FULL":""})
-                    {!activeTask.trial && categoryDeferCounts[activeTask.category] >= 2 && " ⚠ RECKONING"}
-                  </button>
+                  {activeTask.accusationResponseType === "defense" ? (
+                    <>
+                      <button style={s.btn(false,"#14380f","#4ade80")} onClick={()=>resolveActiveTask("defense_complete")}>
+                        ✓ COMPLETE DEFENSE (+{taskXp(activeTask)} XP)
+                      </button>
+                      <button style={s.btn(false,"#1a0a0a","#f87171")} onClick={()=>resolveActiveTask("defense_fail")}>
+                        ✗ FAIL DEFENSE
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button style={s.btn(false,"#14380f","#4ade80")} onClick={()=>resolveActiveTask("complete")}>
+                        ✓ {activeTask.accusationTask ? "COMPLETE JUDGMENT" : "COMPLETE"} (+{taskXp(activeTask)} XP)
+                      </button>
+                      <button style={s.btn(false,"#1a1a0a","#fbbf24")} onClick={()=>resolveActiveTask("defer")}
+                        disabled={deferredTasks.length>=3}>
+                        ⏸ {activeTask.accusationTask ? "DEFER JUDGMENT" : "DEFER"} ({deferredTasks.length}/3{deferredTasks.length>=3?" — FULL":""})
+                        {!activeTask.trial && categoryDeferCounts[activeTask.category] >= 2 && " ⚠ RECKONING"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )
           )}
 
           {/* ═══ DRAW / DRAFT ═══ */}
-          {!activeTask && !trialPhase && !activeFork && !activeLandmark && (
+          {!activeTask && !trialPhase && !activeFork && !activeLandmark && !activeAccusation && (
             <div>
               {currentDraft.length===0 ? (
                 <div className="mettle-mobile-center" style={s.drawShell}>
@@ -1515,15 +1929,17 @@ export default function MettlePrototype({
                     <div style={{textAlign:"center",maxWidth:"620px"}}>
                       <div style={{fontSize:"10px",color:pendingTrial?"#d4af37":draftStatus==="cursed"?"#fbbf24":draftStatus==="favored"?"#c4b5fd":draftStatus==="hot_streak"?"#fb923c":"#444",letterSpacing:"3px",marginBottom:"20px"}}>
                         {pendingTrial ? "⚔ TRIAL OF METTLE AWAITS — YOU CANNOT DRAFT AROUND IT"
-                          : draftStatus==="favored" ? `FAVORED · ${draftSizeFromStatus(draftStatus)} OPTIONS · ${favoredDrawsRemaining} DRAWS REMAINING`
-                          : draftStatus==="hot_streak" ? `🔥 HOT STREAK (${streak}) · ${draftSizeFromStatus(draftStatus)} OPTIONS`
-                          : `${draftStatus.toUpperCase()} · ${draftSizeFromStatus(draftStatus)} OPTIONS · UNCHOSEN TASKS RETURN LATER`}
+                          : draftStatus==="favored" ? `FAVORED · ${effectiveDraftSize} OPTIONS · ${favoredDrawsRemaining} DRAWS REMAINING`
+                          : draftStatus==="hot_streak" ? `🔥 HOT STREAK (${streak}) · ${effectiveDraftSize} OPTIONS`
+                          : `${draftStatus.toUpperCase()} · ${effectiveDraftSize} OPTIONS · UNCHOSEN TASKS RETURN LATER`}
                       </div>
                       <div className="mettle-mobile-center-title" style={{...s.displayCardTitle,fontSize:"30px",marginBottom:"12px"}}>{pendingTrial ? "Trial Ready" : "Draw Tasks"}</div>
                       <div style={{...s.sectionLead,margin:"0 auto 24px"}}>
                         {pendingTrial
                           ? "A trial has taken priority over normal drafts. Clear it before drawing new tasks."
-                          : "Each draft is a fresh read of your account. Choose one task and the others return to the pool."}
+                          : accusationPenaltyDrawsRemaining > 0
+                            ? "The board is calm, but the ledger still remembers the unanswered charge. Your next draws are narrowed until that pressure fades."
+                            : "Each draft is a fresh read of your account. Choose one task and the others return to the pool."}
                       </div>
                       <button style={{...s.btn(true),padding:"14px 48px",fontSize:"14px",letterSpacing:"4px",
                         fontFamily:displayFont,
@@ -1688,9 +2104,9 @@ export default function MettlePrototype({
               <div style={{fontSize:"11px",color:"#d8b4fe",letterSpacing:"2px",marginBottom:"8px"}}>FINAL TRIAL PATH</div>
               <div style={{fontSize:"14px",color:"#fff",fontWeight:"700",marginBottom:"4px"}}>The {assignedPath}</div>
               <div style={{fontSize:"11px",color:"#777"}}>
-                {assignedPath === "Warrior" && "PvM tasks dominated the run. Your finale pool draws from elite combat challenges."}
-                {assignedPath === "Scholar" && "Quest and Skill Gap tasks dominated the run. Your finale pool draws from mastery and knowledge."}
-                {assignedPath === "Survivor" && "Endurance and Exploration tasks dominated the run. Your finale pool draws from sustained pressure."}
+                {assignedPath === "Warrior" && "PvM tasks dominated the ascent. Your finale pool draws from elite combat challenges."}
+                {assignedPath === "Scholar" && "Quest and Skill Gap tasks dominated the ascent. Your finale pool draws from mastery and knowledge."}
+                {assignedPath === "Survivor" && "Endurance and Exploration tasks dominated the ascent. Your finale pool draws from sustained pressure."}
                 {assignedPath === "Balanced" && "No dominant category — even spread. Your finale draws from all paths."}
               </div>
             </div>
@@ -1734,6 +2150,29 @@ export default function MettlePrototype({
             <div style={{...s.displayCardTitle,fontSize:"24px",marginBottom:"8px"}}>{history.length} Tasks Resolved</div>
             {history.length===0 && <div style={{color:"#666",fontSize:"13px"}}>No tasks resolved yet.</div>}
           </div>
+          {accusationHistory.length > 0 && (
+            <div style={{...s.sectionFrame,borderColor:"#7f1d1d",background:"#120707"}}>
+              <div style={{...s.secHead,color:"#f87171"}}>ACCUSATION ARCHIVE</div>
+              {accusationHistory.slice(0, 8).map((entry, index) => (
+                <div key={`${entry.id}_${index}`} style={{padding:"10px 12px",background:"#0f0a0a",border:"1px solid #261212",marginBottom:index === Math.min(accusationHistory.length, 8) - 1 ? 0 : "8px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:"12px",marginBottom:"6px",flexWrap:"wrap"}}>
+                    <div style={{fontSize:"13px",color:"#f3f4f6"}}>{entry.title}</div>
+                    <div style={{fontSize:"10px",letterSpacing:"2px",color:"#fca5a5"}}>
+                      {entry.response?.toUpperCase()} · {entry.outcome?.replace(/_/g, " ").toUpperCase()}
+                    </div>
+                  </div>
+                  <div style={{fontSize:"11px",color:"#fca5a5",lineHeight:"1.7",marginBottom:"8px"}}>
+                    {Array.isArray(entry.chargeText) ? entry.chargeText.join(" ") : entry.chargeText}
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
+                    <span style={s.tag("#f87171")}>{entry.family?.toUpperCase()}</span>
+                    <span style={s.tag("#fca5a5")}>SEVERITY {entry.severity}</span>
+                    {entry.taskTitle && <span style={s.tag("#93c5fd")}>{entry.taskTitle.toUpperCase()}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           {history.map((c,i)=>{
             const rc = c.result==="complete"||c.result==="debt_cleared"||c.result==="debt_cleared_with_seals"||c.result==="reckoning_cleared"||c.result==="landmark"?"#4ade80"
               : c.result==="defer"||c.result==="reckoning_failed"?"#fbbf24":"#555";
