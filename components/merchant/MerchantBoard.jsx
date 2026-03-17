@@ -397,7 +397,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
     ? "Refreshing the board..."
     : `${readyCount.toLocaleString()} ready now · next refresh ${countdown}s`;
   const headerCopy =
-    "Built into Mettle as an optional utility. It keeps its own watchlist, fetches only while this panel is open and visible, never touches your run save, and now filters out stale or thin spreads before ranking by confidence, margin, ROI, and liquidity.";
+    "Built into Mettle as an optional utility. It keeps its own watchlist, fetches only while this panel is open and visible, never touches your ascent save, and now filters out stale or thin spreads before ranking by confidence, margin, ROI, and liquidity.";
   const statCards = isMobileLayout
     ? [
         { label: "Profitable", value: items.length.toLocaleString(), accent: COLORS.goldSoft },
@@ -1038,7 +1038,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
               label={activeTab === "watchlist" ? "Tracked items" : "Search results"}
               detail={
                 activeTab === "watchlist"
-                  ? "Your watchlist is stored separately from the run save."
+                  ? "Your watchlist is stored separately from the ascent save."
                   : `${filteredItems.length.toLocaleString()} matches`
               }
             >

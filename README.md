@@ -14,7 +14,7 @@ Mettle is no longer just a Wise Old Man prototype with manual entry. The current
 
 - a local-save ledger with drafting, debt, reckoning, Trials, Forks, Landmarks, and Final Trial paths
 - full account sync import for skills, quests, and diaries
-- save import/export for whole-run portability
+- save import/export for whole-ascent portability
 - a companion RuneLite plugin project for long-term sync
 - an optional built-in merchant utility for GE flipping
 
@@ -25,11 +25,11 @@ The core loop is still the same: import your account, draw tasks based on what y
 ## Current Product Flow
 
 1. Fresh visit: choose Wise Old Man, manual entry, or Mettle account sync import.
-2. Returning visit: a saved run in `localStorage` opens straight into the ledger.
-3. Existing run: import a new sync file, import/export a save, or continue your run.
+2. Returning visit: a saved ascent in `localStorage` opens straight into the ledger.
+3. Existing ascent: import a new sync file, import/export a save, or continue your ascent.
 4. Optional: open the built-in merchant desk without leaving the app.
 
-Current run save key:
+Current ascent save key:
 
 - `mettle_run_v8`
 
@@ -57,13 +57,13 @@ The live account model currently tracks:
 | Manual entry | direct skills + boss KC input | Live |
 | `mettle-account-sync` | skills + quests + diaries + metadata | Live |
 | `mettle-quest-sync` | quest-only bridge import | Live |
-| `mettle-save` | whole-run export/import | Live |
+| `mettle-save` | whole-ascent export/import | Live |
 
 ### Current Sync Architecture
 
 - `app/api/account-sync/route.ts` validates full account sync payloads.
 - `app/api/quest-sync/route.ts` validates quest sync payloads.
-- Imported quest and diary state is saved into the local Mettle run.
+- Imported quest and diary state is saved into the local Mettle ascent.
 - Boss KC is still enriched through Wise Old Man when possible after account-sync import.
 - Direct plugin-to-web upload is **not** live yet because the app still uses local browser saves instead of linked server-side accounts.
 
@@ -140,7 +140,7 @@ Important live rules:
 
 - Deferring a task adds it to the debt queue.
 - Debt cap is `3`.
-- Any debt forces the run into a cursed 2-option draft state.
+- Any debt forces the ascent into a cursed 2-option draft state.
 - Reckoning warning starts at `2` defers in a category.
 - Reckoning triggers at `3` defers in a category.
 - Debt and reckoning recovery only grants half XP, no seals, and no streak growth.
@@ -195,7 +195,7 @@ Current behavior:
 
 - It opens from the main navigation row inside the app.
 - It is lazy-mounted and only polls while open and the page is visible.
-- It keeps its own watchlist in `localStorage` and does **not** write into the main Mettle run save.
+- It keeps its own watchlist in `localStorage` and does **not** write into the main Mettle ascent save.
 - It uses `app/api/prices/route.ts`, which fetches OSRS Wiki mapping, latest price, and 1-hour volume data.
 - The price route keeps a short in-memory cache and sends cache headers, but it is still per-instance rather than one shared global cache.
 - The client only receives trimmed merchant candidates instead of the full market payload.

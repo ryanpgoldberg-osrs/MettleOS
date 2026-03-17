@@ -556,7 +556,7 @@ export default function EntryScreen({ onComplete, theme = "dark" }) {
                   <div style={s.topRail}>
                     <div style={s.codeBlock}>
                       <div style={s.docket}>METTLE / PERSONAL LEDGER</div>
-                      <div style={s.docket}>OSRS / TASK RUN</div>
+                      <div style={s.docket}>OSRS / TASK ASCENT</div>
                     </div>
                     <div style={s.sigilWrap}>
                       <div style={s.sigil}>✦</div>
@@ -573,12 +573,12 @@ export default function EntryScreen({ onComplete, theme = "dark" }) {
                   <h1 style={s.headline}>{"Mettle builds\nyour ledger."}</h1>
                   <div style={s.divider} />
                   <p style={s.body}>
-                    Import your stats, generate a task run, and work through the gaps your
+                    Import your stats, generate a task ascent, and work through the gaps your
                     account has left behind. Each ledger is personal to the account you load.
                   </p>
                 </div>
                 <div style={{ ...s.docket, color: "#444" }}>
-                  PRIVATE RUN STATE. SAVED IN THIS BROWSER.
+                  PRIVATE ASCENT STATE. SAVED IN THIS BROWSER.
                 </div>
               </div>
 
@@ -586,7 +586,7 @@ export default function EntryScreen({ onComplete, theme = "dark" }) {
                 <div>
                   <div style={s.asideLabel}>HOW IT WORKS</div>
                   <div style={s.asideTitle}>
-                    Import your account, generate tasks, and push through the run one draft at a
+                    Import your account, generate tasks, and push through the ascent one draft at a
                     time.
                   </div>
                   <div style={s.ledgerRow}>
@@ -604,9 +604,9 @@ export default function EntryScreen({ onComplete, theme = "dark" }) {
                     </div>
                   </div>
                   <div style={s.ledgerRow}>
-                    <div style={s.ledgerIndex}>03 / TRACK THE RUN</div>
+                    <div style={s.ledgerIndex}>03 / TRACK THE ASCENT</div>
                     <div style={s.ledgerBody}>
-                      Your run saves in this browser. Complete tasks, defer them, and manage the
+                      Your ascent saves in this browser. Complete tasks, defer them, and manage the
                       pressure that builds up.
                     </div>
                   </div>
@@ -633,7 +633,7 @@ export default function EntryScreen({ onComplete, theme = "dark" }) {
           <div style={s.frame}>
             <div className="entry-input-grid" style={s.inputShell}>
               <div className="entry-intro" style={s.inputIntro}>
-                <div style={s.inputLabel}>RUN SETUP</div>
+                <div style={s.inputLabel}>ASCENT SETUP</div>
                 <div style={s.inputTitle}>Start with your RuneScape name.</div>
                 <div style={s.inputCopy}>
                   Import a full Mettle sync file from the plugin for skills, quests, and diaries.
@@ -741,7 +741,7 @@ export default function EntryScreen({ onComplete, theme = "dark" }) {
                       ))}
                     </div>
                     <button type="button" style={s.manualBtn} onClick={confirmManualStats}>
-                      START RUN
+                      START ASCENT
                     </button>
                   </>
                 )}

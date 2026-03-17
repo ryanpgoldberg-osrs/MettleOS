@@ -2,7 +2,7 @@ import { createEmptyDiaryState, normalizeDiaryState } from "./accountSync.js";
 import { createEmptyQuestState, normalizeQuestState } from "./questSync.js";
 
 export const SAVE_KEY = "mettle_run_v8";
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 export const EXPORT_FORMAT_VERSION = 1;
 
 function toInternalSaveShape(parsed) {
@@ -109,10 +109,42 @@ function migrateSave(parsed) {
     };
   }
 
+  if (migrated.saveVersion < 5) {
+    return {
+      ...migrated,
+      saveVersion: SAVE_VERSION,
+      updatedAt: migrated.updatedAt || Date.now(),
+      questState: normalizeQuestState(migrated.questState),
+      diaryState: normalizeDiaryState(migrated.diaryState),
+      activeAccusation: migrated.activeAccusation ?? null,
+      pendingAccusationCandidate: migrated.pendingAccusationCandidate ?? null,
+      accusationHistory: Array.isArray(migrated.accusationHistory) ? migrated.accusationHistory : [],
+      accusationSpacingMin: typeof migrated.accusationSpacingMin === "number" ? migrated.accusationSpacingMin : 5,
+      accusationRefusalCount: typeof migrated.accusationRefusalCount === "number" ? migrated.accusationRefusalCount : 0,
+      completedTasksSinceLastAccusation: typeof migrated.completedTasksSinceLastAccusation === "number" ? migrated.completedTasksSinceLastAccusation : 0,
+      lastAccusationAtTaskCount: typeof migrated.lastAccusationAtTaskCount === "number" ? migrated.lastAccusationAtTaskCount : 0,
+      accusationMemory: migrated.accusationMemory && typeof migrated.accusationMemory === "object" ? migrated.accusationMemory : {},
+      accusationOpportunityCounts: migrated.accusationOpportunityCounts && typeof migrated.accusationOpportunityCounts === "object" ? migrated.accusationOpportunityCounts : { pvmIgnored: 0, skillGapIgnored: 0 },
+      accusationPenaltyDrawsRemaining: typeof migrated.accusationPenaltyDrawsRemaining === "number" ? migrated.accusationPenaltyDrawsRemaining : 0,
+      accusationForcedModifierReady: Boolean(migrated.accusationForcedModifierReady),
+    };
+  }
+
   return {
     ...migrated,
     questState: normalizeQuestState(migrated.questState),
     diaryState: normalizeDiaryState(migrated.diaryState),
+    activeAccusation: migrated.activeAccusation ?? null,
+    pendingAccusationCandidate: migrated.pendingAccusationCandidate ?? null,
+    accusationHistory: Array.isArray(migrated.accusationHistory) ? migrated.accusationHistory : [],
+    accusationSpacingMin: typeof migrated.accusationSpacingMin === "number" ? migrated.accusationSpacingMin : 5,
+    accusationRefusalCount: typeof migrated.accusationRefusalCount === "number" ? migrated.accusationRefusalCount : 0,
+    completedTasksSinceLastAccusation: typeof migrated.completedTasksSinceLastAccusation === "number" ? migrated.completedTasksSinceLastAccusation : 0,
+    lastAccusationAtTaskCount: typeof migrated.lastAccusationAtTaskCount === "number" ? migrated.lastAccusationAtTaskCount : 0,
+    accusationMemory: migrated.accusationMemory && typeof migrated.accusationMemory === "object" ? migrated.accusationMemory : {},
+    accusationOpportunityCounts: migrated.accusationOpportunityCounts && typeof migrated.accusationOpportunityCounts === "object" ? migrated.accusationOpportunityCounts : { pvmIgnored: 0, skillGapIgnored: 0 },
+    accusationPenaltyDrawsRemaining: typeof migrated.accusationPenaltyDrawsRemaining === "number" ? migrated.accusationPenaltyDrawsRemaining : 0,
+    accusationForcedModifierReady: Boolean(migrated.accusationForcedModifierReady),
   };
 }
 
@@ -240,6 +272,17 @@ export function exportSaveData(save) {
     forkPhase,
     activeLandmark,
     landmarkPhase,
+    activeAccusation,
+    pendingAccusationCandidate,
+    accusationHistory,
+    accusationSpacingMin,
+    accusationRefusalCount,
+    completedTasksSinceLastAccusation,
+    lastAccusationAtTaskCount,
+    accusationMemory,
+    accusationOpportunityCounts,
+    accusationPenaltyDrawsRemaining,
+    accusationForcedModifierReady,
     questState,
     diaryState,
   } = storedSave;
@@ -274,6 +317,12 @@ export function exportSaveData(save) {
       trialPhase: trialPhase || null,
       forkPhase: forkPhase || null,
       landmarkPhase: landmarkPhase || null,
+      accusationSpacingMin: typeof accusationSpacingMin === "number" ? accusationSpacingMin : 5,
+      accusationRefusalCount: accusationRefusalCount || 0,
+      completedTasksSinceLastAccusation: typeof completedTasksSinceLastAccusation === "number" ? completedTasksSinceLastAccusation : 0,
+      lastAccusationAtTaskCount: lastAccusationAtTaskCount || 0,
+      accusationPenaltyDrawsRemaining: accusationPenaltyDrawsRemaining || 0,
+      accusationForcedModifierReady: Boolean(accusationForcedModifierReady),
     },
     content: {
       completedTaskIds: completedTaskIds || [],
@@ -290,6 +339,11 @@ export function exportSaveData(save) {
       pendingTrialTask: pendingTrialTask || null,
       activeFork: activeFork || null,
       activeLandmark: activeLandmark || null,
+      activeAccusation: activeAccusation || null,
+      pendingAccusationCandidate: pendingAccusationCandidate || null,
+      accusationHistory: accusationHistory || [],
+      accusationMemory: accusationMemory || {},
+      accusationOpportunityCounts: accusationOpportunityCounts || { pvmIgnored: 0, skillGapIgnored: 0 },
       questState: questState || createEmptyQuestState(),
       diaryState: diaryState || createEmptyDiaryState(),
     },
