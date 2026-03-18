@@ -41,13 +41,19 @@ export async function GET(
   try {
 
     // Step 1 — trigger WOM update
-    await fetch(
+    const updateRes = await fetch(
       `https://api.wiseoldman.net/v2/players/${encodeURIComponent(rsn)}`,
       {
         method: "POST",
         headers: HEADERS
       }
     );
+    if (!updateRes.ok && ![404, 409, 429].includes(updateRes.status)) {
+      return NextResponse.json(
+        { error: `Wise Old Man update failed with ${updateRes.status}` },
+        { status: 502 }
+      );
+    }
 
     // Allow WOM time to process the update
     await delay(1200);
@@ -69,12 +75,6 @@ export async function GET(
     }
 
     const data = await res.json();
-
-    // DEBUG — raw attack skill snapshot
-    console.log(
-      "WOM ATTACK:",
-      JSON.stringify(data?.latestSnapshot?.data?.skills?.attack)
-    );
 
     const snapshot = data?.latestSnapshot?.data;
 

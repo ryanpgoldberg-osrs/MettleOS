@@ -104,12 +104,12 @@
 <body>
   <h1>METTLE</h1>
   <div class="subtitle">Updated Design Document</div>
-  <div class="meta">Ryan Goldberg | March 15, 2026 | Living Document | v4</div>
+  <div class="meta">Ryan Goldberg | March 18, 2026 | Living Document | v4</div>
 
-  <p>This file is the current source-of-truth design summary for the repo at <span class="small">/Users/ryan/Documents/GitHub/MettleOS</span>. It rolls forward the earlier v4 draft with the current task pool expansion, sync-aware progression rules, RuneLite plugin work, save portability, and the built-in merchant utility.</p>
+  <p>This file is the current source-of-truth design summary for the repo at <span class="small">/Users/ryan/Documents/GitHub/MettleOS</span>. It rolls forward the earlier v4 draft with the current task pool expansion, sync-aware progression rules, the live deployment at <span class="small">mettle.quest</span>, accusation-system pressure, RuneLite plugin work, save portability, and the built-in merchant utility.</p>
 
   <div class="callout">
-    <strong>Current state:</strong> Mettle is now a local-save web app with multiple account intake paths, quest-aware task selection, save import/export, sync validation APIs, a companion RuneLite plugin project, and an optional GE merchant desk that lives inside the same product.
+    <strong>Current state:</strong> Mettle is now a live local-save web app with multiple account intake paths, quest-aware task selection, accusation and judgment pressure, save import/export, sync validation APIs, a companion RuneLite plugin project, and an optional GE merchant desk that lives inside the same product.
   </div>
 
   <h2>1. Current Position</h2>
@@ -124,11 +124,13 @@
   <h2>2. What Changed Recently</h2>
   <ul>
     <li>The task pool has expanded materially, especially in Quest and Exploration content.</li>
+    <li>The live public deployment now sits at <span class="small">https://mettle.quest/</span>.</li>
     <li>Mettle now supports full account sync import, quest-only sync import, and whole-ascent save import/export.</li>
     <li>Quest state and achievement diary state are now first-class parts of the ascent model.</li>
     <li>The draft generator is now quest-aware and can suppress objectives already satisfied by synced progress.</li>
     <li>Quest Cape can now be detected from synced quest data.</li>
     <li>Forks can react to imported quest or boss progress, including auto-resolution when both branches are already complete.</li>
+    <li>An accusation system now escalates repeated avoidance into explicit Judgment or Defense tasks.</li>
     <li>Seals can now clear a deferred task instantly.</li>
     <li>The project now includes a dedicated RuneLite plugin workspace, sync schemas, and a local development launcher flow.</li>
     <li>The web app now includes Vercel Analytics and Speed Insights.</li>
@@ -148,9 +150,9 @@
 
   <h3>Current Surfaces</h3>
   <ul>
-    <li><strong>Ledger:</strong> active task, draft state, debt queue, reckoning tasks, Trial reveals, Fork events, Landmarks, and draw blockers.</li>
-    <li><strong>Stats:</strong> skill audit, boss ledger, sync summaries, quest state, diary status, path state, seal economy, and system trackers.</li>
-    <li><strong>History:</strong> full ascent archive with result type, XP earned, seals gained or spent, and timestamps.</li>
+    <li><strong>Ledger:</strong> active task, accusation reveals, draft state, debt queue, reckoning tasks, Trial reveals, Fork events, Landmarks, and draw blockers.</li>
+    <li><strong>Stats:</strong> skill audit, boss ledger, sync summaries, quest state, diary status, path state, seal economy, and accusation trackers.</li>
+    <li><strong>History:</strong> full ascent archive with result type, accusation outcomes, XP earned, seals gained or spent, and timestamps.</li>
     <li><strong>Merchant Desk:</strong> optional flip-tracking utility that opens over the current view without becoming part of the core ascent save.</li>
   </ul>
 
@@ -223,6 +225,19 @@
 
   <p>Unchosen tasks leave the current draw but can return later unless completion, repeatability, or synced-account logic removes them from eligibility.</p>
 
+  <h3>Accusation Layer</h3>
+  <p>The accusation system turns repeated avoidance into a direct charge from the ledger. It sits above normal drafting and only interrupts when the board is calm, so it reads as consequence rather than random noise.</p>
+  <table>
+    <tr><th>Area</th><th>Current Rule</th></tr>
+    <tr><td>Unlock gate</td><td>Requires level 20 and at least 10 completed tasks</td></tr>
+    <tr><td>Cadence</td><td>At least 5 completed tasks must pass between accusations</td></tr>
+    <tr><td>Current charge families</td><td>PvM retreat pressure, zero-KC Zulrah avoidance, zero-KC God Wars avoidance, and major skill-gap neglect</td></tr>
+    <tr><td>Responses</td><td>Accept Judgment, Defend the account, or Refuse Judgment</td></tr>
+    <tr><td>Refusal penalty</td><td>The next 2 draws lose 1 option, and the next accepted Judgment is primed with a forced modifier</td></tr>
+    <tr><td>Failed defense</td><td>Immediately converts into a forced Judgment task with a modifier</td></tr>
+    <tr><td>Rewards</td><td>Accusation tasks still grant XP but do not pay seals</td></tr>
+  </table>
+
   <h3>Debt, Reckoning, And Seals</h3>
   <table>
     <tr><th>System</th><th>Current Rule</th></tr>
@@ -263,8 +278,8 @@
   <h3>Tracked Account Surface</h3>
   <table>
     <tr><th>Data Type</th><th>Current Source</th><th>Status</th></tr>
-    <tr><td>Skills</td><td>Wise Old Man, manual entry, or account sync import</td><td>Live</td></tr>
-    <tr><td>Boss killcounts</td><td>Wise Old Man or imported sync payload, with WOM enrichment preferred</td><td>Live</td></tr>
+    <tr><td>Skills</td><td>Wise Old Man, manual entry, or account sync import, with the highest observed level kept when sync and WOM disagree</td><td>Live</td></tr>
+    <tr><td>Boss killcounts</td><td>Wise Old Man or imported sync payload, with WOM enrichment preferred and sync fallback retained</td><td>Live</td></tr>
     <tr><td>Quest completion state</td><td>Quest-only sync or full account sync</td><td>Live</td></tr>
     <tr><td>Achievement diary state</td><td>Full account sync</td><td>Live</td></tr>
     <tr><td>Quest Cape detection</td><td>Synced quest state</td><td>Live</td></tr>
@@ -282,14 +297,15 @@
   <ol>
     <li>Import a Mettle account sync JSON file from the entry screen or from an existing ascent.</li>
     <li>Normalize skills, quests, diaries, and sync metadata locally.</li>
-    <li>Refresh Wise Old Man using the same RSN to enrich boss KC when possible.</li>
+    <li>Refresh Wise Old Man using the same RSN to enrich boss KC and merge in any higher public skill levels when available.</li>
     <li>Save the merged state into the browser ascent.</li>
   </ol>
 
-  <p>The plugin is becoming the best source for private progression state like quests and diaries, while Wise Old Man remains the easiest source for public stat and boss history. The app is now deliberately built to combine those two surfaces.</p>
+  <p>The plugin is becoming the best source for private progression state like quests and diaries, while Wise Old Man remains the easiest source for public stat and boss history. The app is now deliberately built to combine those two surfaces, and account-sync import still succeeds even if the Wise Old Man enrichment pass is temporarily unavailable.</p>
 
   <h3>Validation APIs</h3>
   <ul>
+    <li><strong>/api/player/[rsn]</strong> triggers a Wise Old Man refresh and returns a normalized player payload for the web app.</li>
     <li><strong>/api/account-sync</strong> validates and normalizes full account sync payloads.</li>
     <li><strong>/api/quest-sync</strong> validates and normalizes quest sync payloads.</li>
   </ul>
@@ -336,6 +352,7 @@
     <tr><td>Storage</td><td>Uses its own watchlist key and does not modify the main Mettle ascent save</td></tr>
     <tr><td>Data route</td><td><span class="small">app/api/prices/route.ts</span></td></tr>
     <tr><td>Data source</td><td>OSRS Wiki mapping, latest price, and 1-hour volume endpoints</td></tr>
+    <tr><td>Item imagery</td><td>Uses remote RuneLite item icons through Next image configuration</td></tr>
     <tr><td>Route behavior</td><td>Uses a short per-instance in-memory cache plus cache headers and returns trimmed merchant candidates rather than the full market list</td></tr>
   </table>
 
@@ -359,8 +376,10 @@
   <h2>9. Visual, Product, And Deployment Direction</h2>
   <p>The visual direction remains one of Mettle's strongest differentiators. The app still aims to feel like a ceremonial ledger rather than a generic utility page. That direction is now reinforced by more product-like behavior:</p>
   <ul>
+    <li>the public deployment now lives at <span class="small">https://mettle.quest/</span></li>
     <li>entry screen now explicitly supports account sync import</li>
     <li>stats view includes synced account-state summaries</li>
+    <li>stats and history now expose accusation-state pressure instead of leaving that layer invisible</li>
     <li>history records seals gained and seals spent, not just XP</li>
     <li>the app shell includes Vercel Analytics and Speed Insights</li>
     <li>the merchant desk lives inside the same UI instead of splintering into a separate tool</li>
@@ -369,9 +388,10 @@
   <h2>10. Technical Implementation</h2>
   <table>
     <tr><th>Layer</th><th>Current Reality</th></tr>
-    <tr><td>Framework</td><td>Next.js 16 with App Router</td></tr>
-    <tr><td>UI runtime</td><td>React 19</td></tr>
+    <tr><td>Framework</td><td>Next.js 16.2 with App Router</td></tr>
+    <tr><td>UI runtime</td><td>React 19.2.4</td></tr>
     <tr><td>Styling</td><td>Mostly inline styles; Tailwind remains installed but is not the primary styling path</td></tr>
+    <tr><td>Images</td><td><span class="small">next/image</span> configured for remote RuneLite item-icon assets</td></tr>
     <tr><td>Analytics</td><td>Vercel Analytics and Speed Insights</td></tr>
     <tr><td>Public account data</td><td>Wise Old Man API</td></tr>
     <tr><td>Private progression data</td><td>Mettle sync contracts imported into browser state</td></tr>
@@ -402,6 +422,7 @@
     <li>quest-aware task suppression</li>
     <li>Quest Cape sync detection</li>
     <li>fork auto-resolution logic</li>
+    <li>accusation / judgment / defense pressure loop</li>
     <li>seal-based deferred-task clearing</li>
     <li>merchant desk</li>
     <li>RuneLite plugin export scaffold and local launcher flow</li>
@@ -430,10 +451,10 @@
   </ol>
 
   <h2>13. Summary</h2>
-  <p>Mettle is still the same product at its core: a personalized challenge system that turns account neglect into visible pressure. The difference is that the project now has a real second layer of infrastructure underneath it. It is no longer just a stylish prototype with weighted drafts. It now has import/export contracts, richer saved state, a plugin companion, a merchant utility, and sync-aware rules.</p>
+  <p>Mettle is still the same product at its core: a personalized challenge system that turns account neglect into visible pressure. The difference is that the project now has a real second layer of infrastructure underneath it. It is no longer just a stylish prototype with weighted drafts. It now has import/export contracts, richer saved state, accusation logic, a plugin companion, a merchant utility, and sync-aware rules.</p>
 
-  <p>The center of gravity has shifted from “can this be a compelling format?” to “how quickly can the app, sync model, creator package, and side utilities be brought into one polished system?” That is the current stage of the project.</p>
+  <p>The center of gravity has shifted from “can this be a compelling format?” to “how quickly can the app, sync model, judgment layer, creator package, and side utilities be brought into one polished system?” That is the current stage of the project.</p>
 
-  <p class="small">Reference state for this document: repo HEAD on March 15, 2026, including the built-in merchant utility and expanded task pool.</p>
+  <p class="small">Reference state for this document: repo HEAD on March 18, 2026, including the live deployment, accusation system, built-in merchant utility, and expanded task pool.</p>
 </body>
 </html>

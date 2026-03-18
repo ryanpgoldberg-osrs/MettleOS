@@ -61,7 +61,7 @@ export function computePath(history) {
   }
   const max = Math.max(cats.pvm, cats.scholar, cats.survivor);
   if (max === 0) return "Balanced";
-  const dominant = Object.entries(cats).filter(([_,v]) => v === max);
+  const dominant = Object.entries(cats).filter(([, v]) => v === max);
   if (dominant.length > 1) return "Balanced";
   if (dominant[0][0] === "pvm") return "Warrior";
   if (dominant[0][0] === "scholar") return "Scholar";
