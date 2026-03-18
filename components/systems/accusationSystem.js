@@ -106,15 +106,6 @@ function formatJudgmentSkillObjective(skill, level, average, difficulty) {
   return `Bring ${label} to level ${target.amount}. The ledger will not leave the gap open (currently ${level} vs avg ${average.toFixed(0)}).`;
 }
 
-function formatAverageGapClosureObjective(skill, level, average, difficulty) {
-  const target = resolveSingleSkillGainTarget(level, difficulty);
-  const label = skillLabel(skill);
-  if (target.unit === "xp") {
-    return `Gain ${target.amount.toLocaleString()} XP in ${label} toward your account average (currently ${level} vs avg ${average.toFixed(0)})`;
-  }
-  return `Close ${target.amount} level${target.amount === 1 ? "" : "s"} of the gap in ${label} (currently ${level} vs avg ${average.toFixed(0)})`;
-}
-
 function buildZulrahCandidate({ mettleLevel, skillLevels, bossKC, accusationMemory, opportunityCounts = {} }) {
   const combatAvg = averageCombat(skillLevels);
   if (combatAvg < 85 || (bossKC.zulrah ?? 0) > 0) return null;

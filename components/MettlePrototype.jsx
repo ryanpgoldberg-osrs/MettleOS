@@ -1,6 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   CLEAR_DEFERRED_COST,
   CAT_COLORS,
@@ -329,7 +329,7 @@ export default function MettlePrototype({
     deferredTasks.length < 3 &&
     !gateBlocked;
 
-  function getCurrentAccusationCandidate() {
+  const getCurrentAccusationCandidate = useEffectEvent(() => {
     return buildAccusationCandidate({
       mettleLevel,
       skillLevels,
@@ -342,7 +342,7 @@ export default function MettlePrototype({
       historyCount: historyCountForAccusations,
       opportunityCounts: accusationOpportunityCounts,
     });
-  }
+  });
 
   useEffect(() => {
     if (trialPhase !== "revealed") {
@@ -1120,7 +1120,6 @@ export default function MettlePrototype({
   const completedFinalTrialCount = completedIds.filter(id => FINAL_TRIAL_ID_SET.has(id)).length;
   const taskPoolCount = CONTENT_LIBRARY.draftPool;
   const currentPathFinalTrialPool = assignedPath ? (FINAL_TRIAL_POOLS[assignedPath] || []) : [];
-  const currentPathFinalTrialIds = new Set(currentPathFinalTrialPool.map(task => task.id));
   const questCapeLandmark = LANDMARK_TASKS.find(lm => lm.id === "landmark_quest_cape");
   const canTriggerQuestCape = !!questCapeLandmark && !completedLandmarks.includes(questCapeLandmark.id);
   const questSummary = summarizeQuestState(questState);

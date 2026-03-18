@@ -12,7 +12,7 @@ import { LANDMARK_TASKS } from "../data/landmarkDefs.js";
 import { TASK_POOL } from "../data/taskPool.js";
 import { getModifierForCategory, rollModifier } from "../utils/modifiers.js";
 import { isTaskObjectiveAlreadyComplete } from "../utils/questProgress.js";
-import { accountAverage, gapScores } from "../utils/skillHelpers.js";
+import { gapScores } from "../utils/skillHelpers.js";
 import { generateFinalTrialDraft, computePath as computePathFromPool } from "../data/finalTrialDefs.js";
 
 export function materializeTask(task, skillLevels, bossKC, questState = null, diaryState = null) {

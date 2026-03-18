@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 const DISPLAY_FONT = "'RuneScape UF', 'Silkscreen', 'Arial Black', 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif";
@@ -475,11 +476,12 @@ export default function MerchantBoard({ isOpen, onClose }) {
           }}
         >
           <div style={{ display: "flex", gap: "10px", minWidth: 0 }}>
-            <img
+            <Image
               src={`${ICON_BASE}/${item.id}.png`}
               alt={`${item.name} icon`}
               width="28"
               height="28"
+              unoptimized
               style={{
                 width: "28px",
                 height: "28px",

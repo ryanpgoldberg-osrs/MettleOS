@@ -2,6 +2,8 @@
 
 > *Your account has been avoiding things. Mettle finds them, names them, and makes you face them.*
 
+Live app: [https://mettle.quest/](https://mettle.quest/)
+
 Mettle is a custom skill layered on top of Old School RuneScape. It is both a YouTube/streaming format and a playable web tool that generates account-specific tasks from your real account state.
 
 The app now uses **task** terminology consistently for the challenge unit, while **ledger** remains the name for the broader progression surface.
@@ -12,7 +14,7 @@ The app now uses **task** terminology consistently for the challenge unit, while
 
 Mettle is no longer just a Wise Old Man prototype with manual entry. The current app combines:
 
-- a local-save ledger with drafting, debt, reckoning, Trials, Forks, Landmarks, and Final Trial paths
+- a local-save ledger with drafting, debt, reckoning, accusations, Trials, Forks, Landmarks, and Final Trial paths
 - full account sync import for skills, quests, and diaries
 - save import/export for whole-ascent portability
 - a companion RuneLite plugin project for long-term sync
@@ -63,8 +65,10 @@ The live account model currently tracks:
 
 - `app/api/account-sync/route.ts` validates full account sync payloads.
 - `app/api/quest-sync/route.ts` validates quest sync payloads.
+- `app/api/player/[rsn]/route.ts` triggers a Wise Old Man refresh before returning normalized player data.
 - Imported quest and diary state is saved into the local Mettle ascent.
-- Boss KC is still enriched through Wise Old Man when possible after account-sync import.
+- Account sync imports merge plugin skills with Wise Old Man by keeping the higher observed skill level for each stat when both sources are available.
+- Boss KC is still enriched through Wise Old Man when possible after account-sync import, but the sync import still succeeds if that refresh is unavailable.
 - Direct plugin-to-web upload is **not** live yet because the app still uses local browser saves instead of linked server-side accounts.
 
 ---
@@ -135,6 +139,16 @@ Important live rules:
 - Most completed non-repeatable tasks leave the pool permanently.
 - Quest-aware drafting now suppresses tasks already satisfied by synced quest or boss progress.
 - Favored state is granted for `5` draws after clearing a Trial.
+
+### Accusations, Judgment, And Defense
+
+- Accusations unlock after `10` completed tasks and level `20`.
+- They only surface when the board is calm and at least `5` completed tasks have passed since the last accusation.
+- Live accusation families currently cover PvM retreat pressure, zero-KC Zulrah avoidance, zero-KC God Wars avoidance, and major skill-gap neglect.
+- Each accusation offers `Accept Judgment`, `Defend The Account`, or `Refuse Judgment`.
+- Refusing an accusation narrows the next `2` draws by one option and primes the next accepted Judgment task with a forced modifier.
+- Failing a defense converts immediately into a forced Judgment task with a modifier.
+- Accusation tasks award XP, but they do not pay out seals.
 
 ### Debt, Reckoning, And Seals
 
@@ -213,8 +227,8 @@ Related files:
 
 | Layer | Technology |
 |---|---|
-| Frontend + Hosting | Next.js on Vercel |
-| App Framework | React 19 + App Router |
+| Frontend + Hosting | Next.js 16.2 on Vercel |
+| App Framework | React 19.2 + App Router |
 | Language | TypeScript entry files plus JSX components |
 | Styling | Mostly inline styles |
 | Analytics | Vercel Analytics + Speed Insights |
@@ -291,6 +305,7 @@ sync-contract/
 | Quest sync import | Live |
 | Save import/export | Live |
 | Debt / cursed / reckoning loop | Live |
+| Accusation / judgment / defense loop | Live |
 | Trials | Live |
 | Forks | Live |
 | Landmarks | Live |
@@ -303,4 +318,4 @@ sync-contract/
 
 ---
 
-*METTLE — living document, updated for the current repo state as of March 15, 2026.*
+*METTLE — living document, updated for the current repo state as of March 18, 2026.*

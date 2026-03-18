@@ -4,11 +4,11 @@ import { skillLabel } from "../utils/labels.js";
 
 export const LANDMARK_TASKS = [
   { id:"landmark_first_99", title:"First Level 99", category:"Landmark", tier:"Zaros", difficulty:"Elite", xp:1000,
-    conditionFn: (skills, _kc) => SKILLS.some(s => skills[s] >= 99),
+    conditionFn: (skills) => SKILLS.some(s => skills[s] >= 99),
     objectiveFn: (skills) => { const maxed = SKILLS.filter(s => skills[s] >= 99); return `You have reached 99 in ${maxed.map(skillLabel).join(", ")}. The ledger acknowledges mastery.`; },
     objective:"Reach level 99 in any skill." },
   { id:"landmark_quest_cape", title:"Quest Cape", category:"Landmark", tier:"Zaros", difficulty:"Elite", xp:1500, landmark:true,
-    conditionFn: (_skills, _kc, questState) => hasQuestCape(questState),
+    conditionFn: (...args) => hasQuestCape(args[2]),
     objective:"Complete all quests. One of the defining moments of any OSRS account." },
   { id:"landmark_total_1900", title:"Total Level 1900", category:"Landmark", tier:"Zaros", difficulty:"Elite", xp:1000,
     conditionFn: (skills) => { const total = Object.values(skills).reduce((a,b) => a+b, 0); return total >= 1900; },
@@ -30,23 +30,4 @@ export function getPendingLandmark(skillLevels, bossKC, completedLandmarks, ques
     }
   }
   return null;
-}
-
-// ─────────────────────────────────────────────
-// FINAL TRIAL PATH SYSTEM (Level 99)
-// ─────────────────────────────────────────────
-function computePath(history) {
-  const cats = { pvm:0, scholar:0, survivor:0 };
-  for (const h of history) {
-    if (h.category === "PvM Intro" || h.category === "PvM Endurance") cats.pvm++;
-    else if (h.category === "Quest" || h.category === "Skill Gap") cats.scholar++;
-    else if (h.category === "Endurance" || h.category === "Exploration") cats.survivor++;
-  }
-  const max = Math.max(cats.pvm, cats.scholar, cats.survivor);
-  if (max === 0) return "Balanced";
-  const dominant = Object.entries(cats).filter(([_,v]) => v === max);
-  if (dominant.length > 1) return "Balanced";
-  if (dominant[0][0] === "pvm") return "Warrior";
-  if (dominant[0][0] === "scholar") return "Scholar";
-  return "Survivor";
 }
