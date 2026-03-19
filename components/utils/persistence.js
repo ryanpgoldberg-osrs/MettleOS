@@ -66,14 +66,12 @@ function migrateLegacySave(parsed) {
 }
 
 function migrateSave(parsed) {
-  const migrated = migrateLegacySave(parsed);
+  let migrated = migrateLegacySave(parsed);
   if (!migrated) return null;
 
   if (migrated.saveVersion < 2) {
-    return {
+    migrated = {
       ...migrated,
-      saveVersion: SAVE_VERSION,
-      updatedAt: migrated.updatedAt || Date.now(),
       currentDraft: Array.isArray(migrated.currentDraft) ? migrated.currentDraft : [],
       draftMode: typeof migrated.draftMode === "string" ? migrated.draftMode : "normal",
       activeTask: migrated.activeTask ?? null,
@@ -84,54 +82,13 @@ function migrateSave(parsed) {
       forkPhase: typeof migrated.forkPhase === "string" ? migrated.forkPhase : null,
       activeLandmark: migrated.activeLandmark ?? null,
       landmarkPhase: typeof migrated.landmarkPhase === "string" ? migrated.landmarkPhase : null,
-      questState: normalizeQuestState(migrated.questState),
-      diaryState: normalizeDiaryState(migrated.diaryState),
-    };
-  }
-
-  if (migrated.saveVersion < 3) {
-    return {
-      ...migrated,
-      saveVersion: SAVE_VERSION,
-      updatedAt: migrated.updatedAt || Date.now(),
-      questState: normalizeQuestState(migrated.questState),
-      diaryState: normalizeDiaryState(migrated.diaryState),
-    };
-  }
-
-  if (migrated.saveVersion < 4) {
-    return {
-      ...migrated,
-      saveVersion: SAVE_VERSION,
-      updatedAt: migrated.updatedAt || Date.now(),
-      questState: normalizeQuestState(migrated.questState),
-      diaryState: normalizeDiaryState(migrated.diaryState),
-    };
-  }
-
-  if (migrated.saveVersion < 5) {
-    return {
-      ...migrated,
-      saveVersion: SAVE_VERSION,
-      updatedAt: migrated.updatedAt || Date.now(),
-      questState: normalizeQuestState(migrated.questState),
-      diaryState: normalizeDiaryState(migrated.diaryState),
-      activeAccusation: migrated.activeAccusation ?? null,
-      pendingAccusationCandidate: migrated.pendingAccusationCandidate ?? null,
-      accusationHistory: Array.isArray(migrated.accusationHistory) ? migrated.accusationHistory : [],
-      accusationSpacingMin: typeof migrated.accusationSpacingMin === "number" ? migrated.accusationSpacingMin : 5,
-      accusationRefusalCount: typeof migrated.accusationRefusalCount === "number" ? migrated.accusationRefusalCount : 0,
-      completedTasksSinceLastAccusation: typeof migrated.completedTasksSinceLastAccusation === "number" ? migrated.completedTasksSinceLastAccusation : 0,
-      lastAccusationAtTaskCount: typeof migrated.lastAccusationAtTaskCount === "number" ? migrated.lastAccusationAtTaskCount : 0,
-      accusationMemory: migrated.accusationMemory && typeof migrated.accusationMemory === "object" ? migrated.accusationMemory : {},
-      accusationOpportunityCounts: migrated.accusationOpportunityCounts && typeof migrated.accusationOpportunityCounts === "object" ? migrated.accusationOpportunityCounts : { pvmIgnored: 0, skillGapIgnored: 0 },
-      accusationPenaltyDrawsRemaining: typeof migrated.accusationPenaltyDrawsRemaining === "number" ? migrated.accusationPenaltyDrawsRemaining : 0,
-      accusationForcedModifierReady: Boolean(migrated.accusationForcedModifierReady),
     };
   }
 
   return {
     ...migrated,
+    saveVersion: SAVE_VERSION,
+    updatedAt: migrated.updatedAt || Date.now(),
     questState: normalizeQuestState(migrated.questState),
     diaryState: normalizeDiaryState(migrated.diaryState),
     activeAccusation: migrated.activeAccusation ?? null,

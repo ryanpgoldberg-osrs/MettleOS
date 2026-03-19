@@ -180,6 +180,7 @@ export default function MettlePrototype({
   const [activeTask,     setActiveTask]     = useState(null);
   const [activeView,     setActiveView]     = useState("board");
   const [xpDrop,         setXpDrop]         = useState(null);
+  const [levelUpNotice,  setLevelUpNotice]  = useState(null);
   const [merchantOpen, setMerchantOpen]     = useState(false);
   const [merchantReady, setMerchantReady]   = useState(false);
 
@@ -196,6 +197,9 @@ export default function MettlePrototype({
   const [saveFileMessage, setSaveFileMessage] = useState("");
   const importInputRef = useRef(null);
   const questSyncInputRef = useRef(null);
+  const prevMettleLevelRef = useRef(1);
+  const levelUpFeedbackReadyRef = useRef(false);
+  const levelUpTimeoutRef = useRef(null);
 
   // ── RECKONING STATE
   const [categoryDeferCounts, setCategoryDeferCounts] = useState({}); // { "PvM Intro": 2, "Quest": 1 }
@@ -364,6 +368,53 @@ export default function MettlePrototype({
     const timeout = setTimeout(() => setSaveFileMessage(""), 3000);
     return () => clearTimeout(timeout);
   }, [saveFileMessage]);
+
+  useEffect(() => {
+    return () => {
+      if (levelUpTimeoutRef.current) clearTimeout(levelUpTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!statsLoaded) {
+      prevMettleLevelRef.current = mettleLevel;
+      levelUpFeedbackReadyRef.current = false;
+      return;
+    }
+
+    if (!levelUpFeedbackReadyRef.current) {
+      prevMettleLevelRef.current = mettleLevel;
+      levelUpFeedbackReadyRef.current = true;
+      return;
+    }
+
+    const previousLevel = prevMettleLevelRef.current;
+    prevMettleLevelRef.current = mettleLevel;
+
+    if (mettleLevel <= previousLevel) return;
+
+    const previousTier = tierForLevel(previousLevel);
+    const nextTierReached = tierForLevel(mettleLevel);
+    const unlockedFeatures = METTLE_UNLOCKS
+      .filter(entry => entry.level > previousLevel && entry.level <= mettleLevel)
+      .map(entry => `Unlocked: ${entry.unlock}`);
+
+    if (nextTierReached !== previousTier) {
+      unlockedFeatures.unshift(`Tier reached: ${nextTierReached}`);
+    }
+    if (mettleLevel >= 99 && previousLevel < 99) {
+      unlockedFeatures.unshift("Maximum Mettle reached");
+    }
+
+    if (levelUpTimeoutRef.current) clearTimeout(levelUpTimeoutRef.current);
+    setLevelUpNotice({
+      id: Date.now(),
+      level: mettleLevel,
+      levelsGained: mettleLevel - previousLevel,
+      details: unlockedFeatures.slice(0, 2),
+    });
+    levelUpTimeoutRef.current = setTimeout(() => setLevelUpNotice(null), 2600);
+  }, [mettleLevel, statsLoaded]);
 
   useEffect(() => {
     if (!statsLoaded || activeAccusation || pendingAccusationCandidate) return;
@@ -1062,6 +1113,7 @@ export default function MettlePrototype({
     setAccusationMemory({}); setAccusationOpportunityCounts({ pvmIgnored: 0, skillGapIgnored: 0 }); setAccusationPenaltyDrawsRemaining(0); setAccusationForcedModifierReady(false);
     setMerchantOpen(false);
     setMerchantReady(false);
+    setLevelUpNotice(null);
     setConfirmReset(false);
     clearSave();
     onResetToEntry?.();
@@ -1175,6 +1227,74 @@ export default function MettlePrototype({
           pointer-events:none; z-index:9999;
           animation:xpFloat 1.8s ease-out forwards;
           letter-spacing:2px; white-space:nowrap;
+        }
+        @keyframes levelUpReveal {
+          0%   { opacity:0; transform:translate(-50%, 18px) scale(0.9); }
+          14%  { opacity:1; transform:translate(-50%, 0) scale(1.04); }
+          82%  { opacity:1; transform:translate(-50%, -10px) scale(1); }
+          100% { opacity:0; transform:translate(-50%, -20px) scale(0.96); }
+        }
+        @keyframes levelUpHalo {
+          0%   { opacity:0; transform:scale(0.7); }
+          22%  { opacity:0.9; transform:scale(1); }
+          100% { opacity:0; transform:scale(1.2); }
+        }
+        @keyframes levelCellPulse {
+          0%   { box-shadow:0 0 0 rgba(251,191,36,0); border-color:${isLightTheme ? "#5a4c3b" : "#1b1b18"}; }
+          30%  { box-shadow:0 0 28px rgba(251,191,36,0.28); border-color:#fbbf24; }
+          100% { box-shadow:0 0 0 rgba(251,191,36,0); border-color:${isLightTheme ? "#5a4c3b" : "#1b1b18"}; }
+        }
+        .level-up-banner {
+          position:fixed;
+          top:22%;
+          left:50%;
+          z-index:10000;
+          pointer-events:none;
+          animation:levelUpReveal 2.6s ease-out forwards;
+        }
+        .level-up-halo {
+          position:absolute;
+          inset:-12px;
+          border:1px solid rgba(251,191,36,0.35);
+          border-radius:0;
+          box-shadow:0 0 32px rgba(251,191,36,0.14);
+          animation:levelUpHalo 2.6s ease-out forwards;
+        }
+        .level-up-card {
+          position:relative;
+          min-width:min(90vw, 360px);
+          padding:18px 26px 16px;
+          border:1px solid rgba(251,191,36,0.8);
+          background:linear-gradient(180deg, rgba(43,27,3,0.96) 0%, rgba(15,12,8,0.98) 100%);
+          box-shadow:0 16px 40px rgba(0,0,0,0.45), 0 0 24px rgba(251,191,36,0.16);
+          text-align:center;
+          overflow:hidden;
+        }
+        .level-up-label {
+          font-size:10px;
+          letter-spacing:6px;
+          color:#fbbf24;
+          margin-bottom:8px;
+        }
+        .level-up-title {
+          font-size:34px;
+          font-weight:700;
+          color:#fff7d6;
+          letter-spacing:3px;
+          text-shadow:0 0 20px rgba(251,191,36,0.18);
+          line-height:1;
+        }
+        .level-up-subtitle {
+          margin-top:8px;
+          font-size:12px;
+          letter-spacing:3px;
+          color:#fcd34d;
+        }
+        .level-up-detail {
+          margin-top:10px;
+          font-size:11px;
+          color:#e5e7eb;
+          letter-spacing:1px;
         }
         @keyframes reckoningPulse {
           0%, 100% { border-color: #6b21a8; }
@@ -1375,6 +1495,21 @@ export default function MettlePrototype({
       `}</style>
 
       {xpDrop && <div key={xpDrop.id} className="xp-drop">+{xpDrop.amount.toLocaleString()} XP</div>}
+      {levelUpNotice && (
+        <div key={levelUpNotice.id} className="level-up-banner">
+          <div className="level-up-halo" />
+          <div className="level-up-card">
+            <div className="level-up-label">LEVEL UP</div>
+            <div className="level-up-title">LEVEL {String(levelUpNotice.level).padStart(2, "0")}</div>
+            {levelUpNotice.levelsGained > 1 && (
+              <div className="level-up-subtitle">+{levelUpNotice.levelsGained} LEVELS</div>
+            )}
+            {levelUpNotice.details.map((detail) => (
+              <div key={`${levelUpNotice.id}_${detail}`} className="level-up-detail">{detail}</div>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={s.shell}>
       {/* HEADER */}
       <div className={isLightTheme ? "mettle-osrs-panel" : undefined} style={s.header}>
@@ -1383,7 +1518,10 @@ export default function MettlePrototype({
             <div style={s.heroKicker}>Mettle / Personal Ledger</div>
             <div className="mettle-wordmark" style={{...s.displayHero,margin:"0 0 12px"}}>METTLE</div>
             <div className="mettle-summary-grid">
-              <div className={`mettle-summary-cell${isLightTheme ? " mettle-osrs-inset" : ""}`}>
+              <div
+                className={`mettle-summary-cell${isLightTheme ? " mettle-osrs-inset" : ""}`}
+                style={levelUpNotice ? { animation: "levelCellPulse 1.4s ease-out" } : undefined}
+              >
                 <div className="mettle-osrs-label" style={{fontSize:"10px",letterSpacing:"3px",textTransform:"uppercase"}}>Standing</div>
                 <strong>
                   <span style={{display:"block"}}>Level {String(mettleLevel).padStart(2,"0")}</span>

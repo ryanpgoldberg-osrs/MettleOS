@@ -35,9 +35,7 @@ export default function EntryScreen({ onComplete, theme = "dark" }) {
     setLoading(true);
     setFetchError("");
     try {
-      const res = await fetch(`/api/player/${encodeURIComponent(trimmed)}`);
-      if (!res.ok) throw new Error(`${res.status}`);
-      const data = await res.json();
+      const data = await fetchPlayerSnapshotByRsn(trimmed);
       const levels = {};
       SKILLS.forEach((skill) => {
         levels[skill] = data?.skills?.[skill] ?? 1;
@@ -47,8 +45,12 @@ export default function EntryScreen({ onComplete, theme = "dark" }) {
         kc[boss] = data?.bosses?.[boss] ?? 0;
       });
       onComplete(levels, kc, data?.rsn ?? trimmed, undefined, undefined);
-    } catch {
-      setFetchError("Couldn't load that player. Check the RSN or switch to manual entry.");
+    } catch (error) {
+      setFetchError(
+        error instanceof Error && error.message
+          ? error.message
+          : "Couldn't load that player. Check the RSN or switch to manual entry."
+      );
     } finally {
       setLoading(false);
     }
