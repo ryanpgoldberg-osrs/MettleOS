@@ -1,5 +1,3 @@
-https://mettle.quest/
-
 # METTLE — The OSRS Contract Skill
 
 > *Your account has been avoiding things. Mettle finds them, names them, and makes you face them.*
@@ -32,6 +30,7 @@ The core loop is still the same: import your account, draw tasks based on what y
 2. Returning visit: a saved ascent in `localStorage` opens straight into the ledger.
 3. Existing ascent: import a new sync file, import/export a save, or continue your ascent.
 4. Optional: open the built-in merchant desk without leaving the app.
+5. Level gains now trigger an in-app level-up banner that can call out tier breaks and unlocks.
 
 Current ascent save key:
 
@@ -67,10 +66,11 @@ The live account model currently tracks:
 
 - `app/api/account-sync/route.ts` validates full account sync payloads.
 - `app/api/quest-sync/route.ts` validates quest sync payloads.
-- `app/api/player/[rsn]/route.ts` triggers a Wise Old Man refresh before returning normalized player data.
+- `app/api/player/[rsn]/route.ts` now runs as a Node route with refresh timeouts, per-RSN hot/stale caching, in-flight request de-duplication, and structured retryable error responses.
 - Imported quest and diary state is saved into the local Mettle ascent.
 - Account sync imports merge plugin skills with Wise Old Man by keeping the higher observed skill level for each stat when both sources are available.
 - Boss KC is still enriched through Wise Old Man when possible after account-sync import, but the sync import still succeeds if that refresh is unavailable.
+- Entry import now surfaces the route's returned Wise Old Man error message instead of collapsing everything into one generic failure.
 - Direct plugin-to-web upload is **not** live yet because the app still uses local browser saves instead of linked server-side accounts.
 
 ---
@@ -233,6 +233,7 @@ Related files:
 | App Framework | React 19.2 + App Router |
 | Language | TypeScript entry files plus JSX components |
 | Styling | Mostly inline styles |
+| Testing | Vitest + jsdom |
 | Analytics | Vercel Analytics + Speed Insights |
 | Public account data | Wise Old Man API |
 | Private progression sync | Mettle sync contracts |
@@ -259,6 +260,8 @@ Open [http://localhost:3000](http://localhost:3000).
 Useful commands:
 
 ```bash
+npm test
+npm run test:watch
 npm run lint
 npm run build
 ```
@@ -285,6 +288,9 @@ components/
   data/taskPool.js             Task pool definitions
   systems/                     Drafting and progression logic
   utils/                       Sync parsing, persistence, modifiers, helpers
+
+tests/
+  *.test.ts                    Vitest coverage for sync, persistence, systems, and WOM route behavior
 
 runelite-plugin/
   README.md                    Plugin build/run notes
@@ -314,10 +320,11 @@ sync-contract/
 | Final Trial paths | Live |
 | Quest-aware drafting | Live |
 | Merchant desk | Live |
+| Vitest test harness | Live |
 | RuneLite plugin project | In active development |
 | Direct plugin upload | Not live yet |
 | Server-side accounts / cloud saves | Not live yet |
 
 ---
 
-*METTLE — living document, updated for the current repo state as of March 18, 2026.*
+*METTLE — living document, updated for the current repo state as of March 19, 2026.*

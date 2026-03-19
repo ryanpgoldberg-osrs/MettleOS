@@ -8,11 +8,14 @@ export async function fetchPlayerSnapshotByRsn(rsn) {
     cache: "no-store",
   });
 
+  const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(`Wise Old Man returned ${res.status}.`);
+    throw new Error(
+      typeof data?.error === "string" && data.error.trim()
+        ? data.error
+        : `Wise Old Man returned ${res.status}.`
+    );
   }
-
-  const data = await res.json();
   if (!data || typeof data !== "object") {
     throw new Error("Wise Old Man returned an invalid response.");
   }

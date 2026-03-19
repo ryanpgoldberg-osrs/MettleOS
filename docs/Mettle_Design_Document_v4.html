@@ -104,12 +104,12 @@
 <body>
   <h1>METTLE</h1>
   <div class="subtitle">Updated Design Document</div>
-  <div class="meta">Ryan Goldberg | March 18, 2026 | Living Document | v4</div>
+  <div class="meta">Ryan Goldberg | March 19, 2026 | Living Document | v4</div>
 
-  <p>This file is the current source-of-truth design summary for the repo at <span class="small">/Users/ryan/Documents/GitHub/MettleOS</span>. It rolls forward the earlier v4 draft with the current task pool expansion, sync-aware progression rules, the live deployment at <span class="small">mettle.quest</span>, accusation-system pressure, RuneLite plugin work, save portability, and the built-in merchant utility.</p>
+  <p>This file is the current source-of-truth design summary for the repo at <span class="small">/Users/ryan/Documents/GitHub/MettleOS</span>. It rolls forward the earlier v4 draft with the current task pool expansion, sync-aware progression rules, the live deployment at <span class="small">mettle.quest</span>, accusation-system pressure, the more resilient Wise Old Man intake route, the new test harness, RuneLite plugin work, save portability, and the built-in merchant utility.</p>
 
   <div class="callout">
-    <strong>Current state:</strong> Mettle is now a live local-save web app with multiple account intake paths, quest-aware task selection, accusation and judgment pressure, save import/export, sync validation APIs, a companion RuneLite plugin project, and an optional GE merchant desk that lives inside the same product.
+    <strong>Current state:</strong> Mettle is now a live local-save web app with multiple account intake paths, quest-aware task selection, accusation and judgment pressure, a cache-backed Wise Old Man import route, save import/export, sync validation APIs, a companion RuneLite plugin project, an automated test harness, and an optional GE merchant desk that lives inside the same product.
   </div>
 
   <h2>1. Current Position</h2>
@@ -126,12 +126,16 @@
     <li>The task pool has expanded materially, especially in Quest and Exploration content.</li>
     <li>The live public deployment now sits at <span class="small">https://mettle.quest/</span>.</li>
     <li>Mettle now supports full account sync import, quest-only sync import, and whole-ascent save import/export.</li>
+    <li>The Wise Old Man player route now uses hot/stale caching, in-flight request deduplication, timeouts, and structured retryable errors.</li>
+    <li>The entry flow now surfaces clearer Wise Old Man failure messages instead of a single generic fallback.</li>
     <li>Quest state and achievement diary state are now first-class parts of the ascent model.</li>
     <li>The draft generator is now quest-aware and can suppress objectives already satisfied by synced progress.</li>
     <li>Quest Cape can now be detected from synced quest data.</li>
     <li>Forks can react to imported quest or boss progress, including auto-resolution when both branches are already complete.</li>
     <li>An accusation system now escalates repeated avoidance into explicit Judgment or Defense tasks.</li>
     <li>Seals can now clear a deferred task instantly.</li>
+    <li>The main ledger now shows level-up ceremony feedback when the player crosses a Mettle level or unlock boundary.</li>
+    <li>The repo now includes a Vitest-based automated test harness for sync parsing, persistence, core systems, and the player route.</li>
     <li>The project now includes a dedicated RuneLite plugin workspace, sync schemas, and a local development launcher flow.</li>
     <li>The web app now includes Vercel Analytics and Speed Insights.</li>
     <li>Mettle now includes an optional built-in merchant utility for GE flipping.</li>
@@ -150,7 +154,7 @@
 
   <h3>Current Surfaces</h3>
   <ul>
-    <li><strong>Ledger:</strong> active task, accusation reveals, draft state, debt queue, reckoning tasks, Trial reveals, Fork events, Landmarks, and draw blockers.</li>
+    <li><strong>Ledger:</strong> active task, accusation reveals, level-up feedback, draft state, debt queue, reckoning tasks, Trial reveals, Fork events, Landmarks, and draw blockers.</li>
     <li><strong>Stats:</strong> skill audit, boss ledger, sync summaries, quest state, diary status, path state, seal economy, and accusation trackers.</li>
     <li><strong>History:</strong> full ascent archive with result type, accusation outcomes, XP earned, seals gained or spent, and timestamps.</li>
     <li><strong>Merchant Desk:</strong> optional flip-tracking utility that opens over the current view without becoming part of the core ascent save.</li>
@@ -163,7 +167,7 @@
     <tr><td>Internal save version</td><td>4</td></tr>
     <tr><td>Ascent export format</td><td><span class="small">mettle-save</span> export payload, version 1</td></tr>
     <tr><td>Merchant watchlist key</td><td><span class="small">mettle_merchant_watchlist_v1</span></td></tr>
-    <tr><td>Migration handling</td><td>Legacy ascent shapes are normalized into the current structure on load/import</td></tr>
+    <tr><td>Migration handling</td><td>Legacy ascent shapes and older save versions are normalized into the current structure on load/import</td></tr>
   </table>
 
   <h2>4. Live System Design</h2>
@@ -303,13 +307,13 @@
 
   <p>The plugin is becoming the best source for private progression state like quests and diaries, while Wise Old Man remains the easiest source for public stat and boss history. The app is now deliberately built to combine those two surfaces, and account-sync import still succeeds even if the Wise Old Man enrichment pass is temporarily unavailable.</p>
 
-  <h3>Validation APIs</h3>
+  <h3>Validation APIs And Player Route</h3>
   <ul>
-    <li><strong>/api/player/[rsn]</strong> triggers a Wise Old Man refresh and returns a normalized player payload for the web app.</li>
+    <li><strong>/api/player/[rsn]</strong> triggers a Wise Old Man refresh, enforces timeouts, caches hot and stale responses per RSN, deduplicates in-flight requests, and returns normalized player data plus route metadata.</li>
     <li><strong>/api/account-sync</strong> validates and normalizes full account sync payloads.</li>
     <li><strong>/api/quest-sync</strong> validates and normalizes quest sync payloads.</li>
   </ul>
-  <p>Both routes are validation-only today. They do not persist sync data because Mettle still runs on local browser saves rather than linked user accounts or server-side sessions.</p>
+  <p>The sync validation routes remain validation-only today. They do not persist sync data because Mettle still runs on local browser saves rather than linked user accounts or server-side sessions. The player route is different: it now behaves like a small reliability layer in front of Wise Old Man rather than a thin pass-through.</p>
 
   <h2>6. Generator And Rule Logic</h2>
   <h3>Core Inputs</h3>
@@ -378,9 +382,11 @@
   <ul>
     <li>the public deployment now lives at <span class="small">https://mettle.quest/</span></li>
     <li>entry screen now explicitly supports account sync import</li>
+    <li>Wise Old Man fetch failures now read more like real product errors and less like silent upstream breakage</li>
     <li>stats view includes synced account-state summaries</li>
     <li>stats and history now expose accusation-state pressure instead of leaving that layer invisible</li>
     <li>history records seals gained and seals spent, not just XP</li>
+    <li>the header now celebrates level gains and unlocks instead of only moving the numeric standing display</li>
     <li>the app shell includes Vercel Analytics and Speed Insights</li>
     <li>the merchant desk lives inside the same UI instead of splintering into a separate tool</li>
   </ul>
@@ -391,6 +397,7 @@
     <tr><td>Framework</td><td>Next.js 16.2 with App Router</td></tr>
     <tr><td>UI runtime</td><td>React 19.2.4</td></tr>
     <tr><td>Styling</td><td>Mostly inline styles; Tailwind remains installed but is not the primary styling path</td></tr>
+    <tr><td>Testing</td><td>Vitest with jsdom and targeted route/system coverage</td></tr>
     <tr><td>Images</td><td><span class="small">next/image</span> configured for remote RuneLite item-icon assets</td></tr>
     <tr><td>Analytics</td><td>Vercel Analytics and Speed Insights</td></tr>
     <tr><td>Public account data</td><td>Wise Old Man API</td></tr>
@@ -405,6 +412,7 @@
     <tr><th>Path Area</th><th>Purpose</th></tr>
     <tr><td>app/</td><td>Next.js shell, validation APIs, and prices route</td></tr>
     <tr><td>components/</td><td>ledger UI, task systems, sync parsing, persistence, merchant desk, and helpers</td></tr>
+    <tr><td>tests/</td><td>Vitest coverage for sync parsing, persistence, system rules, and the player route</td></tr>
     <tr><td>sync-contract/</td><td>canonical account sync schema and example payload</td></tr>
     <tr><td>runelite-plugin/</td><td>RuneLite companion plugin source, config, and build tooling</td></tr>
     <tr><td>docs/</td><td>design doc plus sync planning notes</td></tr>
@@ -424,9 +432,12 @@
     <li>fork auto-resolution logic</li>
     <li>accusation / judgment / defense pressure loop</li>
     <li>seal-based deferred-task clearing</li>
+    <li>cache-backed Wise Old Man player route with structured error responses</li>
+    <li>level-up ceremony feedback in the live UI</li>
     <li>merchant desk</li>
     <li>RuneLite plugin export scaffold and local launcher flow</li>
     <li>sync validation APIs</li>
+    <li>Vitest test harness</li>
     <li>Vercel deployment instrumentation</li>
   </ul>
 
@@ -451,10 +462,10 @@
   </ol>
 
   <h2>13. Summary</h2>
-  <p>Mettle is still the same product at its core: a personalized challenge system that turns account neglect into visible pressure. The difference is that the project now has a real second layer of infrastructure underneath it. It is no longer just a stylish prototype with weighted drafts. It now has import/export contracts, richer saved state, accusation logic, a plugin companion, a merchant utility, and sync-aware rules.</p>
+  <p>Mettle is still the same product at its core: a personalized challenge system that turns account neglect into visible pressure. The difference is that the project now has a real second layer of infrastructure underneath it. It is no longer just a stylish prototype with weighted drafts. It now has import/export contracts, richer saved state, accusation logic, a cache-backed Wise Old Man intake path, a plugin companion, a merchant utility, sync-aware rules, and a growing automated test story.</p>
 
-  <p>The center of gravity has shifted from “can this be a compelling format?” to “how quickly can the app, sync model, judgment layer, creator package, and side utilities be brought into one polished system?” That is the current stage of the project.</p>
+  <p>The center of gravity has shifted from “can this be a compelling format?” to “how quickly can the app, sync model, judgment layer, reliability layer, creator package, and side utilities be brought into one polished system?” That is the current stage of the project.</p>
 
-  <p class="small">Reference state for this document: repo HEAD on March 18, 2026, including the live deployment, accusation system, built-in merchant utility, and expanded task pool.</p>
+  <p class="small">Reference state for this document: repo HEAD on March 19, 2026, including the live deployment, resilient Wise Old Man route, automated tests, accusation system, built-in merchant utility, and expanded task pool.</p>
 </body>
 </html>
