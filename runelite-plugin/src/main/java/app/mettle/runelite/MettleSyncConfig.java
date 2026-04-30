@@ -1,8 +1,10 @@
 package app.mettle.runelite;
 
+import java.io.File;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.RuneLite;
 
 @ConfigGroup("mettlesync")
 public interface MettleSyncConfig extends Config
@@ -15,7 +17,7 @@ public interface MettleSyncConfig extends Config
     )
     default String exportDirectory()
     {
-        return System.getProperty("user.home") + "/Mettle Sync";
+        return new File(RuneLite.RUNELITE_DIR, "Mettle Sync").getPath();
     }
 
     @ConfigItem(
