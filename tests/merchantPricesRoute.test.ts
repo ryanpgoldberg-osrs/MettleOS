@@ -4,7 +4,7 @@ const now = 1710000000;
 const response = (data: unknown) => new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
 beforeEach(() => {
   vi.resetModules();
-  delete (globalThis as typeof globalThis & { __mettleMerchantCacheV2__?: unknown }).__mettleMerchantCacheV2__;
+  delete (globalThis as typeof globalThis & { __mettleMerchantCacheV3__?: unknown }).__mettleMerchantCacheV3__;
   vi.spyOn(Date, 'now').mockReturnValue(now * 1000);
 });
 async function load(hourly: unknown, short: unknown) {

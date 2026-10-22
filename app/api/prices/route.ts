@@ -25,12 +25,12 @@ type MerchantCache = {
 };
 
 const globalMerchantCache = globalThis as typeof globalThis & {
-  __mettleMerchantCacheV2__?: MerchantCache;
+  __mettleMerchantCacheV3__?: MerchantCache;
 };
 
 const cache =
-  globalMerchantCache.__mettleMerchantCacheV2__ ??
-  (globalMerchantCache.__mettleMerchantCacheV2__ = {
+  globalMerchantCache.__mettleMerchantCacheV3__ ??
+  (globalMerchantCache.__mettleMerchantCacheV3__ = {
     cachedAt: 0,
     mappingFetchedAt: 0,
     mappingById: {},

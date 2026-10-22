@@ -45,3 +45,28 @@ components/merchant/MerchantToggle.jsx
 - Confidence and profit are heuristic snapshot estimates conditional on both legs filling, not measured probabilities or guaranteed execution.
 
 Regression coverage: `tests/merchantEngine.test.ts` and `tests/merchantPricesRoute.test.ts`.
+
+## Result filters
+
+`merchantFilters.ts` defines screening rules shared by the board and regression tests. The filter panel supports signal/instability/bulk category, whole-batch capital bands, slower-side hourly flow, minimum buy price, minimum modeled after-tax batch profit, both-side quote age, F2P, tax-free, fresh hourly flow, and positive modeled quantity. Members includes F2P items. Filter chips can be removed individually; Clear filters restores all API-eligible candidates. Filters apply to search and watchlists too and do not change signals or scores. Filtered lists support Show more; counts and summary statistics reflect the filtered list.
+
+Defaults favor fresh, sized trades: 100+ gp price, 100+ hourly flow, both quotes within 30 minutes, at least one modeled item and current flow (five-minute estimates allowed). Cleaner spreads tightens to Ready, 500+ flow/hour both quotes within 10 minutes and non-estimated hourly flow. Capital bands filter the complete batch's cost; they do not resize the batch to a budget. Settings are scoped to the mounted panel and do not change the ascent save.
+
+See [07Flip research](../../docs/research/07flip-algorithm.md) for source findings and the limits of the comparison.
+
+## Execution details, bankroll, history and actual fills
+
+The sizing model now uses each side separately. Low-side (instant-sell) flow supports passive buys; high-side (instant-buy) flow supports passive sells. For participation P=0.05, buy flow Vb, sell flow Vs, quantity Q and timeframe T:
+
+- Minutes per item = 60/(Vb×P) + 60/(Vs×P).
+- Q = floor(min(buy limit, bankroll/buy price when set, T/minutes-per-item)).
+- Buy minutes = Q×60/(Vb×P); sell minutes = Q×60/(Vs×P).
+- Cycle minutes = max(5, ceil(buy minutes + sell minutes)). No-sized-batch legs are unavailable.
+
+Equal-side flow reproduces the original two-leg formula. Unequal flow no longer charges both legs the slower side's duration. Volumes, timing and participation remain assumptions, not measured execution probabilities. The Available bankroll input accepts exact whole gp; blank removes the cap and zero pauses sizing. Every dependent field (score, confidence, signal, risk, profit, capital and duration) is rebuilt before filtering/sorting. Each candidate uses that budget independently; the board does not allocate a bankroll across several candidates or subtract logged pending buys.
+
+Expanded cards request `/api/prices/history?itemId=...` on demand. The route uses canonical item metadata for tax exemptions and caches per-item hourly series for five minutes with a bounded 200-item cache and coalesced concurrent requests. It examines the last 24 completed UTC hour buckets, retains only buckets with both valid prices and positive volume on both sides, and reports after-tax profitable percentage, crossed percentage, median margin and observed coverage. Fewer than 12 observed hours is explicitly sparse; missing/stale history is not a persistence conclusion. Hourly averages are not simultaneous executable quotes. History is inspection context and does not change the live ranking.
+
+Start flip log snapshots the current model before fills. The separate `mettle_merchant_fills_v1` local-storage journal accepts timestamped buy/sell fills, supports partial fills, matches FIFO cost, taxes every sold item, and compares actual quantity, leg duration and realized net profit with the frozen model. The same-sold-quantity comparison separates changes in unit margin from incomplete sizing. Unsold inventory remains unrealized. Close unfilled, abandoned and partial attempts as well as successful trades. Completed duration ends at the last sell, not the later manual close click; overlapping legs do not get a misleading sequential sell duration. No results automatically recalibrate participation or establish a success rate.
+
+The journal validates saved records by replaying fills, refuses oversells and invalid/future/out-of-order fills, writes storage before showing success, preserves unreadable storage, detects conflicting edits in another tab, and supports JSON export. It is a manual browser-only journal, not RuneLite auto-import or cloud sync. Limits: 500 records / 200 fills per record. Test coverage spans engine resizing, historical sampling/API failures, FIFO accounting and storage validation.
