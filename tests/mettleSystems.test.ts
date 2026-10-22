@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_KC, DEFAULT_SKILLS } from "@/components/data/constants.js";
+import { TASK_POOL } from "@/components/data/taskPool.js";
 import { getPendingLandmark } from "@/components/data/landmarkDefs.js";
 import {
+  computeDraftWeight,
   draftSizeFromStatus,
   generateDraft,
   getDebtStatus,
+  getDraftSelectionKey,
   getPendingTrial,
   levelProgressPct,
   meetsRequirements,
@@ -74,5 +77,124 @@ describe("mettleSystems", () => {
 
     expect(draft).toHaveLength(3);
     expect(draft.every((task) => task.category !== "Quest")).toBe(true);
+  });
+
+  it("boosts personalized quest, diary, and raid tasks when synced state shows the gap", () => {
+    const questPoolTask = TASK_POOL.find((task) => task.id === "s_q_10");
+    const diaryTask = TASK_POOL.find((task) => task.id === "g_ex_10");
+    const raidTask = TASK_POOL.find((task) => task.id === "b_pvm_14");
+
+    expect(questPoolTask).toBeTruthy();
+    expect(diaryTask).toBeTruthy();
+    expect(raidTask).toBeTruthy();
+
+    const questWeightWithoutSync = computeDraftWeight(
+      questPoolTask,
+      DEFAULT_SKILLS,
+      DEFAULT_KC,
+      [],
+      [],
+      40,
+      null,
+      null
+    );
+    const questWeightWithSync = computeDraftWeight(
+      questPoolTask,
+      DEFAULT_SKILLS,
+      DEFAULT_KC,
+      [],
+      [],
+      40,
+      {
+        completedQuestIds: ["the_fremennik_trials"],
+        startedQuestIds: ["the_fremennik_isles"],
+      },
+      null
+    );
+
+    const diaryWeightWithoutSync = computeDraftWeight(
+      diaryTask,
+      DEFAULT_SKILLS,
+      DEFAULT_KC,
+      [],
+      [],
+      20,
+      null,
+      null
+    );
+    const diaryWeightWithSync = computeDraftWeight(
+      diaryTask,
+      DEFAULT_SKILLS,
+      DEFAULT_KC,
+      [],
+      [],
+      20,
+      null,
+      {
+        updatedAt: Date.now(),
+      }
+    );
+
+    const zeroRaidWeight = computeDraftWeight(
+      raidTask,
+      { ...DEFAULT_SKILLS, attack: 80, strength: 80, defence: 80 },
+      DEFAULT_KC,
+      [],
+      [],
+      60,
+      null,
+      null
+    );
+    const someRaidWeight = computeDraftWeight(
+      raidTask,
+      { ...DEFAULT_SKILLS, attack: 80, strength: 80, defence: 80 },
+      { ...DEFAULT_KC, chambers_of_xeric: 1 },
+      [],
+      [],
+      60,
+      null,
+      null
+    );
+
+    expect(questWeightWithSync).toBeGreaterThan(questWeightWithoutSync);
+    expect(diaryWeightWithSync).toBeGreaterThan(diaryWeightWithoutSync);
+    expect(zeroRaidWeight).toBeGreaterThan(someRaidWeight);
+  });
+
+  it("caps diary draws at one and suppresses duplicate started-quest prompts in the same draft", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    const draft = generateDraft(
+      { ...DEFAULT_SKILLS, attack: 90, strength: 90, defence: 90 },
+      DEFAULT_KC,
+      [],
+      [],
+      [],
+      90,
+      6,
+      0,
+      0,
+      {
+        startedQuestIds: [
+          "desert_treasure_ii",
+          "song_of_the_elves",
+          "dragon_slayer_ii",
+          "the_fremennik_exiles",
+        ],
+      },
+      {
+        updatedAt: Date.now(),
+      }
+    );
+
+    const diaryTasks = draft.filter(
+      (task) => task.diaryTierAnyOf || typeof task.diaryTierCountTarget === "number"
+    );
+    const startedQuestTasks = draft.filter(
+      (task) => getDraftSelectionKey(task) === "quest-started"
+    );
+
+    expect(diaryTasks.length).toBeLessThanOrEqual(1);
+    expect(startedQuestTasks.length).toBeLessThanOrEqual(1);
   });
 });

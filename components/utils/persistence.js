@@ -1,9 +1,11 @@
 import { createEmptyDiaryState, normalizeDiaryState } from "./accountSync.js";
 import { createEmptyQuestState, normalizeQuestState } from "./questSync.js";
+import { createAccusationOpportunityCounts } from "../systems/accusationSystem.js";
 
 export const SAVE_KEY = "mettle_run_v8";
 export const SAVE_VERSION = 5;
 export const EXPORT_FORMAT_VERSION = 1;
+export const SAVE_CHANGE_EVENT = "mettle:save-change";
 
 function toInternalSaveShape(parsed) {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
@@ -99,7 +101,7 @@ function migrateSave(parsed) {
     completedTasksSinceLastAccusation: typeof migrated.completedTasksSinceLastAccusation === "number" ? migrated.completedTasksSinceLastAccusation : 0,
     lastAccusationAtTaskCount: typeof migrated.lastAccusationAtTaskCount === "number" ? migrated.lastAccusationAtTaskCount : 0,
     accusationMemory: migrated.accusationMemory && typeof migrated.accusationMemory === "object" ? migrated.accusationMemory : {},
-    accusationOpportunityCounts: migrated.accusationOpportunityCounts && typeof migrated.accusationOpportunityCounts === "object" ? migrated.accusationOpportunityCounts : { pvmIgnored: 0, skillGapIgnored: 0 },
+    accusationOpportunityCounts: createAccusationOpportunityCounts(migrated.accusationOpportunityCounts),
     accusationPenaltyDrawsRemaining: typeof migrated.accusationPenaltyDrawsRemaining === "number" ? migrated.accusationPenaltyDrawsRemaining : 0,
     accusationForcedModifierReady: Boolean(migrated.accusationForcedModifierReady),
   };
@@ -142,6 +144,26 @@ export function loadSave() {
   }
 }
 
+function notifySaveChange() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(SAVE_CHANGE_EVENT));
+}
+
+export function subscribeToSaveChanges(callback) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const handleChange = () => callback();
+  window.addEventListener("storage", handleChange);
+  window.addEventListener(SAVE_CHANGE_EVENT, handleChange);
+
+  return () => {
+    window.removeEventListener("storage", handleChange);
+    window.removeEventListener(SAVE_CHANGE_EVENT, handleChange);
+  };
+}
+
 export function writeSave(data) {
   if (typeof window === "undefined") return;
   try {
@@ -155,6 +177,7 @@ export function writeSave(data) {
         updatedAt: Date.now(),
       })
     );
+    notifySaveChange();
   } catch {}
 }
 
@@ -162,6 +185,7 @@ export function clearSave() {
   if (typeof window === "undefined") return;
   try {
     localStorage.removeItem(SAVE_KEY);
+    notifySaveChange();
   } catch {}
 }
 
@@ -300,7 +324,7 @@ export function exportSaveData(save) {
       pendingAccusationCandidate: pendingAccusationCandidate || null,
       accusationHistory: accusationHistory || [],
       accusationMemory: accusationMemory || {},
-      accusationOpportunityCounts: accusationOpportunityCounts || { pvmIgnored: 0, skillGapIgnored: 0 },
+      accusationOpportunityCounts: createAccusationOpportunityCounts(accusationOpportunityCounts),
       questState: questState || createEmptyQuestState(),
       diaryState: diaryState || createEmptyDiaryState(),
     },

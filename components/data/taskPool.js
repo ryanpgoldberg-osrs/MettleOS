@@ -9,7 +9,11 @@ import {
   lowestSkill,
 } from "../utils/skillHelpers.js";
 import { bossLabel, skillLabel } from "../utils/labels.js";
-import { countStartedQuests, hasCompletedAnyQuest } from "../utils/questProgress.js";
+import {
+  countCompletedDiaryTiers,
+  countStartedQuests,
+  hasCompletedAnyQuest,
+} from "../utils/questProgress.js";
 import { normalizeQuestState } from "../utils/questSync.js";
 
 const SINGLE_SKILL_LEVEL_TARGETS = {
@@ -233,11 +237,27 @@ const ELVEN_QUEST_POOL = [
   { id: "song_of_the_elves", label: "Song of the Elves" },
 ];
 
+const GNOME_QUEST_POOL = [
+  { id: "tree_gnome_village", label: "Tree Gnome Village" },
+  { id: "the_grand_tree", label: "The Grand Tree" },
+  { id: "monkey_madness_i", label: "Monkey Madness I" },
+  { id: "the_path_of_glouphrie", label: "The Path of Glouphrie" },
+  { id: "monkey_madness_ii", label: "Monkey Madness II" },
+];
+
 const DESERT_EPIC_QUEST_POOL = [
   { id: "contact", label: "Contact!" },
   { id: "devious_minds", label: "Devious Minds" },
   { id: "beneath_cursed_sands", label: "Beneath Cursed Sands" },
   { id: "desert_treasure_i", label: "Desert Treasure I" },
+  { id: "desert_treasure_ii", label: "Desert Treasure II" },
+];
+
+const MAHJARRAT_QUEST_POOL = [
+  { id: "desert_treasure_i", label: "Desert Treasure I" },
+  { id: "the_temple_at_senntisten", label: "The Temple at Senntisten" },
+  { id: "while_guthix_sleeps", label: "While Guthix Sleeps" },
+  { id: "the_curse_of_arrav", label: "The Curse of Arrav" },
   { id: "desert_treasure_ii", label: "Desert Treasure II" },
 ];
 
@@ -483,6 +503,21 @@ function themedQuestObjective(fallbackObjective, questState, pool, lead = "Compl
   return nextQuest ? `${lead} ${nextQuest.label}` : fallbackObjective;
 }
 
+function startedQuestCleanupTitle(baseTitle, questState) {
+  const startedCount = countStartedQuests(questState);
+  return startedCount > 0 ? `${baseTitle}: ${startedCount} open` : baseTitle;
+}
+
+function startedQuestCleanupObjective(questState, targetCount = 1) {
+  const startedCount = countStartedQuests(questState);
+  return `Complete ${targetCount} quest${targetCount === 1 ? "" : "s"} you have already started${startedCount > 0 ? ` (${startedCount} currently in progress)` : ""}`;
+}
+
+function diaryCountObjective(diaryState, difficulty, targetCount) {
+  const completed = countCompletedDiaryTiers(diaryState, difficulty);
+  return `Complete ${targetCount} ${difficulty[0].toUpperCase() + difficulty.slice(1)} Achievement Diary tier${targetCount === 1 ? "" : "s"}${completed > 0 ? ` (${completed} already finished)` : ""}`;
+}
+
 export const TASK_POOL = [
 
   // ══════════════ GUTHIX ══════════════
@@ -543,6 +578,14 @@ export const TASK_POOL = [
     questPoolAnyOf: FOUNDATION_UNLOCK_QUEST_POOL.map(({ id }) => id),
     objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete an early unlock quest from the current pool", questState, FOUNDATION_UNLOCK_QUEST_POOL),
     objective:"Complete an early unlock quest from the current pool" },
+  { id:"g_q_9",
+    titleFn: (_s, _kc, questState) => startedQuestCleanupTitle("Open Threads", questState),
+    title:"Open Threads",
+    category:"Quest", tier:"Guthix", difficulty:"Easy", xp:100, repeatable:true,
+    questStartedCountTarget: 1,
+    requiresFn: (_s, _kc, questState) => countStartedQuests(questState) >= 1,
+    objectiveFn: (_s, _kc, questState) => startedQuestCleanupObjective(questState, 1),
+    objective:"Complete 1 quest you have already started" },
   ...GUTHIX_SPECIFIC_QUEST_TASKS,
 
   // Skill Gap (10)
@@ -624,6 +667,13 @@ export const TASK_POOL = [
   { id:"g_ex_7", title:"Fresh Slot",       category:"Exploration", tier:"Guthix", difficulty:"Easy",   xp:125, repeatable:true,  objective:"Fill 1 new Collection Log slot" },
   { id:"g_ex_8", title:"Wintertodt Warm-Up", category:"Exploration", tier:"Guthix", difficulty:"Medium", xp:175, repeatable:false, requiresFn: (s, kc) => s.firemaking >= 50 && (kc.wintertodt ?? 0) === 0, objective:"Subdue Wintertodt once" },
   { id:"g_ex_9", title:"Cove Rescue",        category:"Exploration", tier:"Guthix", difficulty:"Medium", xp:175, repeatable:false, requiresFn: (s, kc) => s.fishing >= 35 && (kc.tempoross ?? 0) === 0, objective:"Subdue Tempoross once" },
+  { id:"g_ex_10",
+    title:"Provincial Initiation",
+    category:"Exploration", tier:"Guthix", difficulty:"Medium", xp:150, repeatable:false,
+    diaryTierCountTarget: 1,
+    diaryDifficulty: "easy",
+    objectiveFn: (_s, _kc, _questState, diaryState) => diaryCountObjective(diaryState, "easy", 1),
+    objective:"Complete 1 Easy Achievement Diary tier" },
   ...EASY_DIARY_TASKS,
 
   // Endurance (5)
@@ -694,6 +744,7 @@ export const TASK_POOL = [
   { id:"s_q_9",
     title:"Loose Ends",
     category:"Quest", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:false,
+    questStartedCountTarget: 2,
     requiresFn: (_s, _kc, questState) => countStartedQuests(questState) >= 2,
     objectiveFn: (_s, _kc, questState) => {
       const startedCount = countStartedQuests(questState);
@@ -773,6 +824,13 @@ export const TASK_POOL = [
   { id:"s_ex_7", title:"Ledger Growth",       category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:325, repeatable:true,  objective:"Fill 2 new Collection Log slots" },
   { id:"s_ex_8", title:"Guild Contract",      category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:275, repeatable:true,  requiresFn:(s)=>s.farming>=45, objective:"Complete 3 Farming Contracts" },
   { id:"s_ex_9", title:"Rumour Board",        category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:300, repeatable:true,  requiresFn:(s)=>s.hunter>=46, objective:"Complete 3 Hunters' Rumours" },
+  { id:"s_ex_10",
+    title:"Regional Circuit",
+    category:"Exploration", tier:"Saradomin", difficulty:"Medium", xp:325, repeatable:false,
+    diaryTierCountTarget: 2,
+    diaryDifficulty: "medium",
+    objectiveFn: (_s, _kc, _questState, diaryState) => diaryCountObjective(diaryState, "medium", 2),
+    objective:"Complete 2 Medium Achievement Diary tiers" },
   ...MEDIUM_DIARY_TASKS,
 
   // ══════════════ BANDOS ══════════════
@@ -804,6 +862,14 @@ export const TASK_POOL = [
     objectiveFn:(s,kc)=>{ const gwd=["general_graardor","kreearra","kril_tsutsaroth","commander_zilyana"]; const target=lowestKCBoss(kc, gwd, s); return `Kill ${bossLabel(target)} 5 times in one session (${kc[target]??0} KC)`; },
     objective:"Kill any GWD boss 5 times in one session" },
   { id:"b_pvm_13", title:"War Ledger",          category:"PvM Endurance", tier:"Bandos", difficulty:"Hard",   xp:575, repeatable:false, objective:"Complete 5 Hard Combat Achievement tasks" },
+  { id:"b_pvm_14",
+    titleFn:(s,kc)=>{ const raids=["chambers_of_xeric","theatre_of_blood","tombs_of_amascut"]; const target=lowestKCBoss(kc, raids, s); return `Raid Ledger: ${bossLabel(target)}`; },
+    title:"Raid Ledger",
+    category:"PvM Intro", tier:"Bandos", difficulty:"Hard", xp:650, repeatable:false,
+    bossCompleteAnyOf:["chambers_of_xeric","theatre_of_blood","tombs_of_amascut"],
+    requiresFn:(_s,kc)=>["chambers_of_xeric","theatre_of_blood","tombs_of_amascut"].some((boss)=>(kc[boss]??0)===0),
+    objectiveFn:(s,kc)=>{ const raids=["chambers_of_xeric","theatre_of_blood","tombs_of_amascut"]; const target=lowestKCBoss(kc, raids, s); const current=kc[target]??0; return current===0?`Complete ${bossLabel(target)} for the first time — the raid ledger still shows 0 KC.`:`Return to ${bossLabel(target)} — it remains your lowest-KC raid at ${current}.`; },
+    objective:"Complete your lowest-KC raid" },
   ...BANDOS_SPECIFIC_BOSS_TASKS,
 
   { id:"b_q_1", title:"Monkey See",          category:"Quest", tier:"Bandos", difficulty:"Hard",   xp:450, repeatable:false, questCompleteAnyOf:["monkey_madness_i", "monkey_madness_ii"], objective:"Complete Monkey Madness I or II" },
@@ -842,6 +908,21 @@ export const TASK_POOL = [
     questPoolAnyOf: TROLL_QUEST_POOL.map(({ id }) => id),
     objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete a troll-country quest from the current pool", questState, TROLL_QUEST_POOL),
     objective:"Complete a troll-country quest from the current pool" },
+  { id:"b_q_12",
+    titleFn: (_s, _kc, questState) => startedQuestCleanupTitle("War Camp Loose Ends", questState),
+    title:"War Camp Loose Ends",
+    category:"Quest", tier:"Bandos", difficulty:"Hard", xp:625, repeatable:true,
+    questStartedCountTarget: 2,
+    requiresFn: (_s, _kc, questState) => countStartedQuests(questState) >= 2,
+    objectiveFn: (_s, _kc, questState) => startedQuestCleanupObjective(questState, 2),
+    objective:"Complete 2 quests you have already started" },
+  { id:"b_q_13",
+    titleFn: (_s, _kc, questState) => themedQuestTitle("Gnome Ascension", questState, GNOME_QUEST_POOL),
+    title:"Gnome Ascension",
+    category:"Quest", tier:"Bandos", difficulty:"Hard", xp:625, repeatable:true,
+    questPoolAnyOf: GNOME_QUEST_POOL.map(({ id }) => id),
+    objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete a gnome-line quest from the current pool", questState, GNOME_QUEST_POOL),
+    objective:"Complete a gnome-line quest from the current pool" },
   ...BANDOS_SPECIFIC_QUEST_TASKS,
 
   { id:"b_sk_1",  title:"Combat Ready",
@@ -883,6 +964,13 @@ export const TASK_POOL = [
   { id:"b_ex_5", title:"Bossman's Ledger",    category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:575, repeatable:true,  objective:"Fill 3 new Collection Log slots" },
   { id:"b_ex_6", title:"Rift Responder",      category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:525, repeatable:true,  requiresFn:(s,_kc,questState)=>s.runecrafting>=27 && hasCompletedAnyQuest(questState, ["temple_of_the_eye"]), objective:"Complete 3 Guardians of the Rift rounds" },
   { id:"b_ex_7", title:"Giant Commission",    category:"Exploration", tier:"Bandos", difficulty:"Hard",   xp:525, repeatable:true,  requiresFn:(s,_kc,questState)=>s.smithing>=15 && hasCompletedAnyQuest(questState, ["sleeping_giants"]), objective:"Complete 5 Giants' Foundry commissions" },
+  { id:"b_ex_8",
+    title:"Hard Province Circuit",
+    category:"Exploration", tier:"Bandos", difficulty:"Hard", xp:600, repeatable:false,
+    diaryTierCountTarget: 2,
+    diaryDifficulty: "hard",
+    objectiveFn: (_s, _kc, _questState, diaryState) => diaryCountObjective(diaryState, "hard", 2),
+    objective:"Complete 2 Hard Achievement Diary tiers" },
   ...HARD_DIARY_TASKS,
 
   // ══════════════ ZAMORAK ══════════════
@@ -980,6 +1068,14 @@ export const TASK_POOL = [
     questPoolAnyOf: DESERT_EPIC_QUEST_POOL.map(({ id }) => id),
     objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete a desert epic from the current pool", questState, DESERT_EPIC_QUEST_POOL),
     objective:"Complete a desert epic from the current pool" },
+  { id:"z_q_13",
+    titleFn: (_s, _kc, questState) => startedQuestCleanupTitle("Unfinished Campaign", questState),
+    title:"Unfinished Campaign",
+    category:"Quest", tier:"Zamorak", difficulty:"Elite", xp:875, repeatable:true,
+    questStartedCountTarget: 3,
+    requiresFn: (_s, _kc, questState) => countStartedQuests(questState) >= 3,
+    objectiveFn: (_s, _kc, questState) => startedQuestCleanupObjective(questState, 3),
+    objective:"Complete 3 quests you have already started" },
   ...ZAMORAK_SPECIFIC_QUEST_TASKS,
 
   { id:"z_sk_1",
@@ -1027,6 +1123,7 @@ export const TASK_POOL = [
   { id:"z_en_6", title:"Wilderness Veteran",   category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:750, repeatable:true, objective:"Survive 10 wilderness boss kills without dying" },
   { id:"z_en_7", title:"The Defer Collector",  category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:700, repeatable:true, objective:"Clear all deferred tasks within a single tier" },
   { id:"z_en_8", title:"Streak Master",        category:"Endurance", tier:"Zamorak", difficulty:"Hard",   xp:725, repeatable:true, objective:"Complete 7 tasks in a row without deferring" },
+  { id:"z_en_9", title:"Account Breadth",      category:"Endurance", tier:"Zamorak", difficulty:"Elite",  xp:900, repeatable:true, objective:"Kill 6 different bosses in one session" },
 
   { id:"z_ex_1", title:"Theatre Unlocked",       category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:900, repeatable:false, objective:"Complete Theatre of Blood entry mode with a modifier" },
   { id:"z_ex_2", title:"Tombs of Amascut",       category:"Exploration", tier:"Zamorak", difficulty:"Elite",  xp:900, repeatable:false, requiresFn:(_,kc)=>(kc.tombs_of_amascut??0)===0, objective:"Enter and complete Tombs of Amascut for the first time" },
@@ -1088,6 +1185,13 @@ export const TASK_POOL = [
     questPoolAnyOf: GRANDMASTER_QUEST_POOL.map(({ id }) => id),
     objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete one of the remaining great quests in the current pool", questState, GRANDMASTER_QUEST_POOL),
     objective:"Complete one of the remaining great quests in the current pool" },
+  { id:"zr_q_9",
+    titleFn: (_s, _kc, questState) => themedQuestTitle("Mahjarrat Reckoning", questState, MAHJARRAT_QUEST_POOL),
+    title:"Mahjarrat Reckoning",
+    category:"Quest", tier:"Zaros", difficulty:"Elite", xp:1325, repeatable:true,
+    questPoolAnyOf: MAHJARRAT_QUEST_POOL.map(({ id }) => id),
+    objectiveFn: (_s, _kc, questState) => themedQuestObjective("Complete a Mahjarrat-line quest from the current pool", questState, MAHJARRAT_QUEST_POOL),
+    objective:"Complete a Mahjarrat-line quest from the current pool" },
   ...ZAROS_SPECIFIC_QUEST_TASKS,
 
   { id:"zr_sk_1", title:"The 90 Club",
@@ -1129,6 +1233,13 @@ export const TASK_POOL = [
   { id:"zr_ex_5", title:"Completionist's Ledger",category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1300, repeatable:true,  objective:"Fill 8 new Collection Log slots" },
   { id:"zr_ex_6", title:"Crystal Furnace",       category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1100, repeatable:false, requiresFn:(s,kc,questState)=>s.mining>=70 && s.smithing>=70 && hasCompletedAnyQuest(questState, ["song_of_the_elves"]) && (kc.zalcano??0)===0, objective:"Defeat Zalcano" },
   { id:"zr_ex_7", title:"Hespori Harvest",      category:"Exploration", tier:"Zaros", difficulty:"Elite",  xp:1000, repeatable:false, requiresFn:(s,kc)=>s.farming>=65 && (kc.hespori??0)===0, objective:"Defeat Hespori" },
+  { id:"zr_ex_8",
+    title:"Imperial Provinces",
+    category:"Exploration", tier:"Zaros", difficulty:"Elite", xp:1325, repeatable:false,
+    diaryTierCountTarget: 2,
+    diaryDifficulty: "elite",
+    objectiveFn: (_s, _kc, _questState, diaryState) => diaryCountObjective(diaryState, "elite", 2),
+    objective:"Complete 2 Elite Achievement Diary tiers" },
   ...ELITE_DIARY_TASKS,
 ];
 

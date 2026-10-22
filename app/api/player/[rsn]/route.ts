@@ -38,6 +38,7 @@ const UPDATE_TIMEOUT_MS = 3_500;
 const SNAPSHOT_TIMEOUT_MS = 5_000;
 const HOT_CACHE_TTL_MS = 15_000;
 const STALE_CACHE_TTL_MS = 5 * 60_000;
+const MAX_CACHE_ENTRIES = 500;
 const RESPONSE_CACHE_CONTROL = "private, max-age=15, stale-while-revalidate=60";
 
 type SnapshotData = {
@@ -148,16 +149,46 @@ function normalizeError(error: unknown) {
 function readCacheEntry(cacheKey: string, maxAgeMs: number) {
   const cached = womCache.get(cacheKey);
   if (!cached) return null;
-  if (Date.now() - cached.cachedAt > maxAgeMs) return null;
+  const ageMs = Date.now() - cached.cachedAt;
+  if (ageMs > maxAgeMs) {
+    if (ageMs > STALE_CACHE_TTL_MS) {
+      womCache.delete(cacheKey);
+    }
+    return null;
+  }
   return cached;
 }
 
+function pruneExpiredCacheEntries(maxAgeMs = STALE_CACHE_TTL_MS) {
+  const cutoff = Date.now() - maxAgeMs;
+  for (const [cacheKey, cached] of womCache.entries()) {
+    if (cached.cachedAt <= cutoff) {
+      womCache.delete(cacheKey);
+    }
+  }
+}
+
+function trimCacheSize(maxEntries = MAX_CACHE_ENTRIES) {
+  if (womCache.size <= maxEntries) return;
+
+  const orderedEntries = [...womCache.entries()].sort(
+    (left, right) => left[1].cachedAt - right[1].cachedAt
+  );
+
+  for (const [cacheKey] of orderedEntries.slice(0, womCache.size - maxEntries)) {
+    womCache.delete(cacheKey);
+  }
+}
+
 function cacheSnapshot(cacheKey: string, data: SnapshotData) {
+  pruneExpiredCacheEntries();
+
   const entry = {
     cachedAt: Date.now(),
     data,
   };
   womCache.set(cacheKey, entry);
+  trimCacheSize();
   return entry;
 }
 
@@ -358,6 +389,8 @@ function normalizeSnapshot(data: unknown, fallbackRsn: string): SnapshotData {
 }
 
 async function loadPlayerSnapshot(rsn: string) {
+  pruneExpiredCacheEntries();
+
   const cacheKey = cacheKeyForRsn(rsn);
   const hotCache = readCacheEntry(cacheKey, HOT_CACHE_TTL_MS);
   if (hotCache) {

@@ -23,9 +23,14 @@ import { LANDMARK_TASKS, getPendingLandmark } from "./data/landmarkDefs.js";
 import { FINAL_TRIAL_POOLS } from "./data/finalTrialDefs.js";
 import { TASK_POOL } from "./data/taskPool.js";
 import {
-  ACCUSATION_REFUSAL_DRAW_PENALTY,
   ACCUSATION_SPACING_MIN,
   buildAccusationCandidate,
+  buildForcedJudgmentTask,
+  canEvaluateAccusationWindow,
+  createAccusationOpportunityCounts,
+  getAccusationRefusalPenalty,
+  isAccusationBoardCalm,
+  recordAccusationOpportunityChoice,
 } from "./systems/accusationSystem.js";
 import {
   computePath,
@@ -234,7 +239,7 @@ export default function MettlePrototype({
   const [completedTasksSinceLastAccusation, setCompletedTasksSinceLastAccusation] = useState(0);
   const [lastAccusationAtTaskCount, setLastAccusationAtTaskCount] = useState(0);
   const [accusationMemory, setAccusationMemory] = useState({});
-  const [accusationOpportunityCounts, setAccusationOpportunityCounts] = useState({ pvmIgnored: 0, skillGapIgnored: 0 });
+  const [accusationOpportunityCounts, setAccusationOpportunityCounts] = useState(() => createAccusationOpportunityCounts());
   const [accusationPenaltyDrawsRemaining, setAccusationPenaltyDrawsRemaining] = useState(0);
   const [accusationForcedModifierReady, setAccusationForcedModifierReady] = useState(false);
 
@@ -284,7 +289,7 @@ export default function MettlePrototype({
     if(hasOwn(save, "completedTasksSinceLastAccusation")) setCompletedTasksSinceLastAccusation(save.completedTasksSinceLastAccusation);
     if(hasOwn(save, "lastAccusationAtTaskCount")) setLastAccusationAtTaskCount(save.lastAccusationAtTaskCount);
     if(hasOwn(save, "accusationMemory")) setAccusationMemory(save.accusationMemory);
-    if(hasOwn(save, "accusationOpportunityCounts")) setAccusationOpportunityCounts(save.accusationOpportunityCounts);
+    if(hasOwn(save, "accusationOpportunityCounts")) setAccusationOpportunityCounts(createAccusationOpportunityCounts(save.accusationOpportunityCounts));
     if(hasOwn(save, "accusationPenaltyDrawsRemaining")) setAccusationPenaltyDrawsRemaining(save.accusationPenaltyDrawsRemaining);
     if(hasOwn(save, "accusationForcedModifierReady")) setAccusationForcedModifierReady(save.accusationForcedModifierReady);
   }, [hasInitialStats]);
@@ -320,18 +325,19 @@ export default function MettlePrototype({
   const historyCountForAccusations = history.length;
   const baseDraftSize = draftSizeFromStatus(draftStatus);
   const effectiveDraftSize = Math.max(1, baseDraftSize - (accusationPenaltyDrawsRemaining > 0 ? 1 : 0));
-  const boardIsCalm =
-    !activeTask &&
-    !trialPhase &&
-    !pendingTrialTask &&
-    !pendingTrial &&
-    !activeFork &&
-    !activeLandmark &&
-    currentDraft.length === 0 &&
-    reckoningTasks.length === 0 &&
-    !mustClearAll &&
-    deferredTasks.length < 3 &&
-    !gateBlocked;
+  const boardIsCalm = isAccusationBoardCalm({
+    activeTask,
+    trialPhase,
+    pendingTrialTask,
+    pendingTrial,
+    activeFork,
+    activeLandmark,
+    currentDraftLength: currentDraft.length,
+    reckoningTaskCount: reckoningTasks.length,
+    mustClearAll,
+    deferredTaskCount: deferredTasks.length,
+    gateBlocked,
+  });
 
   const getCurrentAccusationCandidate = useEffectEvent(() => {
     return buildAccusationCandidate({
@@ -417,8 +423,13 @@ export default function MettlePrototype({
   }, [mettleLevel, statsLoaded]);
 
   useEffect(() => {
-    if (!statsLoaded || activeAccusation || pendingAccusationCandidate) return;
-    if (completedTasksSinceLastAccusation < accusationSpacingMin) return;
+    if (!canEvaluateAccusationWindow({
+      statsLoaded,
+      activeAccusation,
+      pendingAccusationCandidate,
+      completedTasksSinceLastAccusation,
+      accusationSpacingMin,
+    })) return;
 
     const candidate = getCurrentAccusationCandidate();
 
@@ -646,16 +657,20 @@ export default function MettlePrototype({
     const trimmed=rsn.trim(); if(!trimmed) return;
     setLoading(true); setFetchError("");
     try {
-      const res=await fetch(`/api/player/${encodeURIComponent(trimmed)}`);
-      if(!res.ok) throw new Error(`${res.status}`);
-      const data=await res.json();
+      const data = await fetchPlayerSnapshotByRsn(trimmed);
       const levels={}; SKILLS.forEach(s=>{levels[s]=data?.skills?.[s]??1;});
       const resolvedRsn = data?.rsn ?? trimmed;
       setRsn(resolvedRsn);
       setSkillLevels(levels); setManualSkills(levels);
       const kc={}; KEY_BOSSES.forEach(b=>{kc[b]=data?.bosses?.[b]??0;});
       setBossKC(kc); setManualKC(kc); setStatsLoaded(true);
-    } catch { setFetchError("Couldn't load that player. Check the RSN or switch to manual entry."); }
+    } catch (error) {
+      setFetchError(
+        error instanceof Error && error.message
+          ? error.message
+          : "Couldn't load that player. Check the RSN or switch to manual entry."
+      );
+    }
     finally { setLoading(false); }
   }
 
@@ -771,12 +786,7 @@ export default function MettlePrototype({
 
   function chooseTask(task) {
     if (draftMode !== "final_trial" && currentDraft.length > 0) {
-      const hasPvmOption = currentDraft.some(draftTask => draftTask.category === "PvM Intro" || draftTask.category === "PvM Endurance");
-      const hasSkillGapOption = currentDraft.some(draftTask => draftTask.category === "Skill Gap");
-      setAccusationOpportunityCounts(prev => ({
-        pvmIgnored: prev.pvmIgnored + (hasPvmOption && task.category !== "PvM Intro" && task.category !== "PvM Endurance" ? 1 : 0),
-        skillGapIgnored: prev.skillGapIgnored + (hasSkillGapOption && task.category !== "Skill Gap" ? 1 : 0),
-      }));
+      setAccusationOpportunityCounts(prev => recordAccusationOpportunityChoice(prev, currentDraft, task));
     }
     setCurrentDraft([]);
     setDraftMode("normal");
@@ -820,10 +830,11 @@ export default function MettlePrototype({
   function refuseAccusation() {
     if (!activeAccusation) return;
     const accusation = activeAccusation;
+    const refusalPenalty = getAccusationRefusalPenalty();
     finalizeAccusation(accusation, "refuse", "unanswered");
     setAccusationRefusalCount(prev => prev + 1);
-    setAccusationPenaltyDrawsRemaining(ACCUSATION_REFUSAL_DRAW_PENALTY);
-    setAccusationForcedModifierReady(true);
+    setAccusationPenaltyDrawsRemaining(refusalPenalty.drawPenalty);
+    setAccusationForcedModifierReady(refusalPenalty.forcedModifierReady);
   }
 
   // ── FORK HANDLERS
@@ -979,18 +990,7 @@ export default function MettlePrototype({
       nextStreak = 0;
       setFavoredDrawsRemaining(0);
       if (linkedAccusation) {
-        const modifier = getModifierForCategory(linkedAccusation.judgmentTask.category, 1);
-        const forcedJudgment = {
-          ...linkedAccusation.judgmentTask,
-          acceptedAt: Date.now(),
-          accusationTask: true,
-          accusationResponseType: "judgment",
-          accusationSourceId: linkedAccusation.id,
-          accusationKey: linkedAccusation.key,
-          accusationTitle: linkedAccusation.title,
-          modifier,
-          objective: `${linkedAccusation.judgmentTask.objective} — MODIFIER: ${modifier}`,
-        };
+        const forcedJudgment = buildForcedJudgmentTask(linkedAccusation);
         setAccusationForcedModifierReady(false);
         setAccusationMemory(prev => {
           const current = prev?.[linkedAccusation.key] ?? {
@@ -1015,7 +1015,9 @@ export default function MettlePrototype({
         setStreak(nextStreak);
         setHistory(prev => [{ ...activeTask, result, xpGained: 0, sealsGained: 0, baseXp: activeTask.xp, modifierXpBonus: modifierXpBonus(activeTask), streakAfter: nextStreak, timestamp: Date.now(), bossKcAdjustments, skillLevelAdjustments }, ...prev]);
         setActiveAccusation(prev => (prev ? { ...prev, status: "accepted" } : prev));
-        setActiveTask(forcedJudgment);
+        if (forcedJudgment) {
+          setActiveTask(forcedJudgment);
+        }
         return;
       }
     }
@@ -1110,7 +1112,7 @@ export default function MettlePrototype({
     setActiveAccusation(null); setPendingAccusationCandidate(null); setAccusationHistory([]);
     setAccusationSpacingMin(ACCUSATION_SPACING_MIN); setAccusationRefusalCount(0);
     setCompletedTasksSinceLastAccusation(0); setLastAccusationAtTaskCount(0);
-    setAccusationMemory({}); setAccusationOpportunityCounts({ pvmIgnored: 0, skillGapIgnored: 0 }); setAccusationPenaltyDrawsRemaining(0); setAccusationForcedModifierReady(false);
+    setAccusationMemory({}); setAccusationOpportunityCounts(createAccusationOpportunityCounts()); setAccusationPenaltyDrawsRemaining(0); setAccusationForcedModifierReady(false);
     setMerchantOpen(false);
     setMerchantReady(false);
     setLevelUpNotice(null);

@@ -10,10 +10,25 @@ import {
 import { FORK_TASKS } from "../data/forkDefs.js";
 import { LANDMARK_TASKS } from "../data/landmarkDefs.js";
 import { TASK_POOL } from "../data/taskPool.js";
+import { normalizeDiaryState } from "../utils/accountSync.js";
 import { getModifierForCategory, rollModifier } from "../utils/modifiers.js";
-import { isTaskObjectiveAlreadyComplete } from "../utils/questProgress.js";
+import {
+  countCompletedDiaryTiers,
+  countCompletedQuestPool,
+  isTaskObjectiveAlreadyComplete,
+} from "../utils/questProgress.js";
 import { gapScores } from "../utils/skillHelpers.js";
+import { normalizeQuestState } from "../utils/questSync.js";
 import { generateFinalTrialDraft, computePath as computePathFromPool } from "../data/finalTrialDefs.js";
+
+const RAID_BOSSES = [
+  "chambers_of_xeric",
+  "chambers_of_xeric_challenge_mode",
+  "theatre_of_blood",
+  "theatre_of_blood_hard_mode",
+  "tombs_of_amascut",
+  "tombs_of_amascut_expert",
+];
 
 export function materializeTask(task, skillLevels, bossKC, questState = null, diaryState = null) {
   if (!task) return task;
@@ -138,13 +153,93 @@ export function generateReckoningTask(category, reckoningCount, mettleLevel, ski
   };
 }
 
-function computeWeight(task, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel, questState = null, diaryState = null) {
+function hasQuestSyncData(questState = null) {
+  const state = normalizeQuestState(questState);
+  return Boolean(
+    state.completedQuestIds.length ||
+    state.startedQuestIds.length ||
+    state.syncedQuestPoints !== null ||
+    state.manualQuestPoints !== null ||
+    state.updatedAt
+  );
+}
+
+function hasDiarySyncData(diaryState = null) {
+  const state = normalizeDiaryState(diaryState);
+  return Boolean(
+    state.completedTierIds.length ||
+    state.completedTaskIds.length ||
+    state.totalCompletedTasks !== null ||
+    state.updatedAt
+  );
+}
+
+function isDiaryTaskDefinition(task) {
+  return Boolean(task?.diaryTierAnyOf || typeof task?.diaryTierCountTarget === "number");
+}
+
+function extractTaskBossIds(task) {
+  return Array.isArray(task?.bossCompleteAnyOf) ? task.bossCompleteAnyOf : [];
+}
+
+function totalBossKc(bossKeys, bossKC = {}) {
+  return bossKeys.reduce((sum, boss) => sum + (bossKC?.[boss] ?? 0), 0);
+}
+
+export function collectDraftSignals(skillLevels, bossKC, questState = null, diaryState = null) {
+  const normalizedQuestState = normalizeQuestState(questState);
+  const normalizedDiaryState = normalizeDiaryState(diaryState);
+  const questPoints =
+    normalizedQuestState.manualQuestPoints ?? normalizedQuestState.syncedQuestPoints ?? 0;
+  const touchedBossCount = KEY_BOSSES.filter((boss) => (bossKC?.[boss] ?? 0) > 0).length;
+
+  return {
+    hasQuestSyncData: hasQuestSyncData(normalizedQuestState),
+    hasDiarySyncData: hasDiarySyncData(normalizedDiaryState),
+    startedQuestCount: normalizedQuestState.startedQuestIds.length,
+    startedQuestIds: new Set(normalizedQuestState.startedQuestIds),
+    completedQuestCount: normalizedQuestState.completedQuestIds.length,
+    questPoints,
+    completedDiaryTierCount: normalizedDiaryState.completedTierIds.length,
+    questCapeDetected: normalizedQuestState.questCapeDetected,
+    raidKcTotal: totalBossKc(RAID_BOSSES, bossKC),
+    touchedBossCount,
+  };
+}
+
+export function getDraftSelectionKey(task) {
+  if (!task || typeof task !== "object") return null;
+  if (isDiaryTaskDefinition(task)) return "diary";
+  if (task.category === "Quest") {
+    if (typeof task.questStartedCountTarget === "number") return "quest-started";
+    if (typeof task.questPointsTarget === "number") return "quest-points";
+    if (Array.isArray(task.questCompleteAnyOf) && task.questCompleteAnyOf.length > 0) {
+      return `quest-complete:${task.questCompleteAnyOf.join("|")}`;
+    }
+    if (Array.isArray(task.questPoolAnyOf) && task.questPoolAnyOf.length > 0) {
+      return `quest-pool:${task.questPoolAnyOf.join("|")}`;
+    }
+  }
+  return null;
+}
+
+export function computeDraftWeight(
+  task,
+  skillLevels,
+  bossKC,
+  completedIds,
+  suppressedIds,
+  mettleLevel,
+  questState = null,
+  diaryState = null
+) {
   if (task.trial) return 0;
   if (!task.repeatable && completedIds.includes(task.id)) return 0;
   if (suppressedIds.includes(task.id)) return 0;
   if (!meetsRequirements(task, skillLevels, bossKC, questState, diaryState)) return 0;
   if (TIER_ORDER.indexOf(task.tier) > TIER_ORDER.indexOf(tierForLevel(mettleLevel))) return 0;
 
+  const draftSignals = collectDraftSignals(skillLevels, bossKC, questState, diaryState);
   const gaps = gapScores(skillLevels);
   const maxGap = Math.max(...Object.values(gaps));
   const combatAvg = (skillLevels.attack + skillLevels.strength + skillLevels.defence) / 3;
@@ -193,6 +288,71 @@ function computeWeight(task, skillLevels, bossKC, completedIds, suppressedIds, m
     if (untouchedBosses > 0) weight *= 1.6 + Math.min(untouchedBosses / 40, 0.8);
     if (freshBossingAccount) weight *= 0.8;
   }
+
+  if (task.category === "Quest" && draftSignals.hasQuestSyncData) {
+    weight *= 1.15;
+
+    if (typeof task.questStartedCountTarget === "number" && draftSignals.startedQuestCount >= task.questStartedCountTarget) {
+      weight *= 1.35 + Math.min(draftSignals.startedQuestCount * 0.15, 0.75);
+    }
+
+    if (Array.isArray(task.questPoolAnyOf) && task.questPoolAnyOf.length > 0) {
+      const completedFromPool = countCompletedQuestPool(questState, task.questPoolAnyOf);
+      const remainingFromPool = Math.max(0, task.questPoolAnyOf.length - completedFromPool);
+      if (remainingFromPool > 0) {
+        weight *= 1.1 + Math.min(remainingFromPool / task.questPoolAnyOf.length, 0.85);
+      }
+    }
+
+    if (Array.isArray(task.questCompleteAnyOf) && task.questCompleteAnyOf.length > 0) {
+      const targetedStartedQuests = task.questCompleteAnyOf.filter((questId) =>
+        draftSignals.startedQuestIds.has(questId)
+      ).length;
+      if (targetedStartedQuests > 0) {
+        weight *= 1.5 + targetedStartedQuests * 0.15;
+      }
+    }
+
+    if (typeof task.questPointsTarget === "number") {
+      const missingQuestPoints = Math.max(0, task.questPointsTarget - draftSignals.questPoints);
+      if (missingQuestPoints <= 10) weight *= 1.4;
+      else if (missingQuestPoints <= 25) weight *= 1.2;
+    }
+  }
+
+  if (isDiaryTaskDefinition(task) && draftSignals.hasDiarySyncData) {
+    weight *= 1.1;
+
+    if (Array.isArray(task.diaryTierAnyOf) && task.diaryTierAnyOf.length > 0) {
+      weight *= 1.4;
+    }
+
+    if (typeof task.diaryTierCountTarget === "number") {
+      const completedCount = countCompletedDiaryTiers(diaryState, task.diaryDifficulty ?? null);
+      const remainingCount = Math.max(0, task.diaryTierCountTarget - completedCount);
+      if (remainingCount > 0) {
+        weight *= 1.2 + Math.min(remainingCount * 0.2, 0.8);
+      }
+    }
+  }
+
+  const targetBossIds = extractTaskBossIds(task);
+  if (
+    targetBossIds.length > 0 &&
+    (task.category === "PvM Intro" || task.category === "PvM Endurance")
+  ) {
+    const zeroKcTargets = targetBossIds.filter((boss) => (bossKC?.[boss] ?? 0) === 0).length;
+    if (zeroKcTargets === targetBossIds.length) weight *= 1.75;
+    else if (zeroKcTargets > 0) weight *= 1.25;
+  }
+
+  if (
+    draftSignals.raidKcTotal === 0 &&
+    targetBossIds.some((boss) => RAID_BOSSES.includes(boss))
+  ) {
+    weight *= 1.45;
+  }
+
   return Math.max(0.1, weight);
 }
 
@@ -203,7 +363,7 @@ export function generateDraft(skillLevels, bossKC, completedIds, recentDraftHist
 
   const weighted = TASK_POOL
     .filter(w => !w.trial)
-    .map(w => ({ ...w, weight: computeWeight(w, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel, questState, diaryState) }))
+    .map(w => ({ ...w, weight: computeDraftWeight(w, skillLevels, bossKC, completedIds, suppressedIds, mettleLevel, questState, diaryState) }))
     .filter(w => w.weight > 0);
 
   if (weighted.length === 0) return [];
@@ -211,6 +371,8 @@ export function generateDraft(skillLevels, bossKC, completedIds, recentDraftHist
   const pool = [...weighted];
   const selected = [];
   const seenObjectives = new Set();
+  const seenSelectionKeys = new Set();
+  let diaryTaskCount = 0;
 
   for (let i = 0; i < Math.min(draftSize, pool.length); i++) {
     const total = pool.reduce((sum, current) => sum + current.weight, 0);
@@ -223,7 +385,18 @@ export function generateDraft(skillLevels, bossKC, completedIds, recentDraftHist
     idx = Math.min(idx, pool.length - 1);
 
     const task = materializeTask(pool[idx], skillLevels, bossKC, questState, diaryState);
+    const selectionKey = getDraftSelectionKey(task);
     if (seenObjectives.has(task.objective)) {
+      pool.splice(idx, 1);
+      i--;
+      continue;
+    }
+    if (selectionKey && seenSelectionKeys.has(selectionKey)) {
+      pool.splice(idx, 1);
+      i--;
+      continue;
+    }
+    if (isDiaryTaskDefinition(task) && diaryTaskCount >= 1) {
       pool.splice(idx, 1);
       i--;
       continue;
@@ -236,6 +409,8 @@ export function generateDraft(skillLevels, bossKC, completedIds, recentDraftHist
     }
 
     seenObjectives.add(task.objective);
+    if (selectionKey) seenSelectionKeys.add(selectionKey);
+    if (isDiaryTaskDefinition(task)) diaryTaskCount += 1;
     selected.push(task);
     pool.splice(idx, 1);
   }
