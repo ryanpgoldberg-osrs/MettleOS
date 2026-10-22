@@ -103,7 +103,7 @@ function saveWatchlist(nextWatchlist) {
 }
 
 function sortItems(sortBy, left, right) {
-  if (sortBy === "profit") return right.profit - left.profit;
+  if (sortBy === "profit") return right.expectedProfit - left.expectedProfit;
   if (sortBy === "roi") return right.roi - left.roi;
   if (sortBy === "volume") return right.volume - left.volume;
   return right.score - left.score;
@@ -378,7 +378,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
   const longShots = useMemo(
     () =>
       filteredItems
-        .filter((item) => item.signal === "Wait" && item.confidence >= 40 && item.profit >= 300)
+        .filter((item) => item.signal === "Wait")
         .slice(0, 8),
     [filteredItems]
   );
@@ -398,17 +398,17 @@ export default function MerchantBoard({ isOpen, onClose }) {
     ? "Refreshing the board..."
     : `${readyCount.toLocaleString()} ready now · next refresh ${countdown}s`;
   const headerCopy =
-    "Built into Mettle as an optional utility. It keeps its own watchlist, fetches only while this panel is open and visible, never touches your ascent save, and now filters out stale or thin spreads before ranking by confidence, margin, ROI, and liquidity.";
+    "Built into Mettle as an optional utility. It keeps its own watchlist, fetches only while this panel is open and visible, never touches your ascent save, and models a 30-minute, medium-risk flip using 5% of the slower trade side, time for both legs, and 2% tax. Profit is a batch estimate conditional on both legs filling.";
   const statCards = isMobileLayout
     ? [
         { label: "Profitable", value: items.length.toLocaleString(), accent: COLORS.goldSoft },
         { label: "Ready now", value: readyCount.toLocaleString(), accent: COLORS.green },
-        { label: "Lead profit", value: topScore ? `+${fmtGp(topScore.profit)}` : "--", accent: COLORS.green },
+        { label: "Lead profit", value: topScore ? `+${fmtGp(topScore.expectedProfit)}` : "--", accent: COLORS.green },
       ]
     : [
         { label: "Profitable items", value: items.length.toLocaleString(), accent: COLORS.goldSoft },
         { label: "Ready now", value: readyCount.toLocaleString(), accent: COLORS.green },
-        { label: "Lead pick profit", value: topScore ? `+${fmtGp(topScore.profit)}` : "--", accent: COLORS.green },
+        { label: "Lead pick profit", value: topScore ? `+${fmtGp(topScore.expectedProfit)}` : "--", accent: COLORS.green },
         { label: "Avg confidence top 25", value: averageConfidence ? `${averageConfidence}%` : "--", accent: COLORS.blue },
       ];
 
@@ -582,7 +582,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
               textTransform: "uppercase",
             }}
           >
-            {item.confidence} confidence
+            {item.confidence}% heuristic confidence
           </span>
           <span
             style={{
@@ -644,8 +644,8 @@ export default function MerchantBoard({ isOpen, onClose }) {
             </button>
           </div>
           <div>
-            <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Profit</div>
-            <div style={{ color: COLORS.green }}>+{fmtGp(item.profit)}</div>
+            <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Modeled batch profit</div>
+            <div style={{ color: COLORS.green }}>+{fmtGp(item.expectedProfit)}</div>
           </div>
           <div>
             <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>ROI</div>
@@ -655,6 +655,10 @@ export default function MerchantBoard({ isOpen, onClose }) {
           </div>
         </div>
 
+        <div style={{ color: COLORS.textDim, fontSize: "11px", marginBottom: "10px" }}>
+          {item.expectedQuantity.toLocaleString()} items · {item.planMinutes}m plan · {item.recommendationRisk} risk
+          {!item.hasRecentVolume ? " · Sizing paused: delayed volume" : " · Assumes both legs fill"}
+        </div>
         {isExpanded ? (
           <div
             style={{
@@ -671,7 +675,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
               <div style={{ color: COLORS.red }}>{fmtGp(item.tax)}</div>
             </div>
             <div>
-              <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Volume / hr</div>
+              <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Slower side / hr{item.volumeEstimated ? " (estimate)" : ""}</div>
               <div style={{ color: COLORS.text }}>{fmtGp(item.volume)}</div>
             </div>
             <div>
@@ -976,7 +980,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
             </div>
           ) : null}
 
-          {!loading && hasItems && activeTab === "all" && !normalizedSearch ? (
+          {!loading && hasItems && activeTab === "all" && !normalizedSearch && sortBy === "score" ? (
             <>
               {readyNow.length ? (
                 <Section label="Ready now" detail="High-confidence picks with decent freshness and volume">
@@ -1035,9 +1039,9 @@ export default function MerchantBoard({ isOpen, onClose }) {
             </>
           ) : null}
 
-          {!loading && hasItems && (activeTab === "watchlist" || normalizedSearch) ? (
+          {!loading && hasItems && (activeTab === "watchlist" || normalizedSearch || sortBy !== "score") ? (
             <Section
-              label={activeTab === "watchlist" ? "Tracked items" : "Search results"}
+              label={activeTab === "watchlist" ? "Tracked items" : normalizedSearch ? "Search results" : `${SORT_LABELS[sortBy]} ranking`}
               detail={
                 activeTab === "watchlist"
                   ? "Your watchlist is stored separately from the ascent save."

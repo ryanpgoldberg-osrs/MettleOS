@@ -32,3 +32,16 @@ components/merchant/MerchantToggle.jsx
 
 - The route uses the project GitHub URL in the `User-Agent` string so it is not shipping with a fake placeholder contact.
 - If you want a different surfacing later, the cleanest swap is changing only the trigger placement in `MettlePrototype.jsx`.
+
+## MettleApps algorithm sync
+
+`marketEngine.ts` ports the Merchant engine's default 30-minute, medium-risk strategy, including its confidence and score weights. The web panel currently keeps that strategy fixed; native profile controls are not ported.
+
+- Latest low/high trades remain paired; hourly averages only measure price instability.
+- Tax is 2%, rounded down, capped at 5M per item, with the source engine's confirmed Mind rune and energy-potion exemptions.
+- Flow uses the slower side. Quantity assumes 5% participation and divides the plan between buying and selling, capped by the buy limit. The engine also accepts a bankroll for sizing.
+- Server timestamps govern flow freshness. Delayed/missing hourly flow falls back to five-minute flow scaled to an hourly estimate; expired flow pauses sizing but retains fresh quotes with Wait.
+- Readiness uses modeled batch profit, quote freshness, instability, flow, and assessed risk. Profit sorting ranks that displayed batch estimate before truncation and preserves global order.
+- Confidence and profit are heuristic snapshot estimates conditional on both legs filling, not measured probabilities or guaranteed execution.
+
+Regression coverage: `tests/merchantEngine.test.ts` and `tests/merchantPricesRoute.test.ts`.
