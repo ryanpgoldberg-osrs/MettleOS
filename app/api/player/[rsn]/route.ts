@@ -401,11 +401,6 @@ async function loadPlayerSnapshot(rsn: string) {
   return pendingRequest;
 }
 
-export function __resetWomCacheForTests() {
-  womCache.clear();
-  womInflight.clear();
-}
-
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ rsn: string }> }

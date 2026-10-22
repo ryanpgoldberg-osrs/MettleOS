@@ -2,7 +2,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
-import { __resetWomCacheForTests, GET } from "@/app/api/player/[rsn]/route.ts";
+import { GET } from "@/app/api/player/[rsn]/route";
+import { __resetWomCacheForTests } from "./womTestState";
 
 function makeJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
