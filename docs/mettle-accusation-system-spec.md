@@ -196,6 +196,7 @@ Used when the account is obviously steering around content it should be ready fo
 
 Examples:
 
+- raid-ready account, zero raid completions
 - high combat, never fought Zulrah
 - Bandos tier reached, never entered God Wars
 - endgame stats, zero wilderness boss interaction
@@ -208,6 +209,7 @@ Examples:
 
 - total level is high, but one major skill remains far behind
 - quest progression stalled despite broad account readiness
+- diary progress stalled despite repeated regional prompts
 
 ### 3. Cowardice Accusations
 
@@ -702,6 +704,7 @@ Recommended saved fields:
 - `completedTasksSinceLastAccusation`
 - `lastAccusationAtTaskCount`
 - `accusationMemory`
+- `accusationOpportunityCounts`
 
 Suggested save shape:
 
@@ -714,7 +717,13 @@ Suggested save shape:
   accusationRefusalCount: number,
   completedTasksSinceLastAccusation: number,
   lastAccusationAtTaskCount: number,
-  accusationMemory: Record<string, AccusationMemoryEntry>
+  accusationMemory: Record<string, AccusationMemoryEntry>,
+  accusationOpportunityCounts: {
+    pvmIgnored: number,
+    skillGapIgnored: number,
+    questIgnored: number,
+    diaryIgnored: number
+  }
 }
 ```
 

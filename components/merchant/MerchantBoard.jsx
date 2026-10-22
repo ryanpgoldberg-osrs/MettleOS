@@ -1,6 +1,10 @@
 "use client";
 
 import Image from "next/image";
+import { parseBankroll, resizeMerchantItem } from "./marketEngine";
+import MarginHistory from "./MerchantHistoryPanel";
+import TradeJournal, { useTradeJournal } from "./MerchantFillJournal";
+import { FILTER_FIELDS, CLEAR_FILTERS, DEFAULT_FILTERS, CLEANER_FILTERS, matchesMerchantFilters } from "./merchantFilters";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 const DISPLAY_FONT = "'RuneScape UF', 'Silkscreen', 'Arial Black', 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif";
@@ -103,7 +107,7 @@ function saveWatchlist(nextWatchlist) {
 }
 
 function sortItems(sortBy, left, right) {
-  if (sortBy === "profit") return right.profit - left.profit;
+  if (sortBy === "profit") return right.expectedProfit - left.expectedProfit;
   if (sortBy === "roi") return right.roi - left.roi;
   if (sortBy === "volume") return right.volume - left.volume;
   return right.score - left.score;
@@ -180,6 +184,10 @@ function Section({ label, detail, children }) {
 
 export default function MerchantBoard({ isOpen, onClose }) {
   const [items, setItems] = useState([]);
+  const [bankrollInput, setBankrollInput] = useState("");
+  const [bankroll, setBankroll] = useState(undefined);
+  const [bankrollError, setBankrollError] = useState("");
+  const journal = useTradeJournal();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -187,6 +195,9 @@ export default function MerchantBoard({ isOpen, onClose }) {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [sortBy, setSortBy] = useState("score");
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(36);
   const [expandedId, setExpandedId] = useState(null);
   const [cachedAt, setCachedAt] = useState(0);
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL_SECONDS);
@@ -351,8 +362,13 @@ export default function MerchantBoard({ isOpen, onClose }) {
 
   const normalizedSearch = deferredSearch.trim().toLowerCase();
 
+  const modeledItems = useMemo(() => items.flatMap((item) => {
+    const resized = resizeMerchantItem(item, bankroll);
+    return resized ? [resized] : [];
+  }), [items, bankroll]);
+
   const filteredItems = useMemo(() => {
-    let nextItems = items;
+    let nextItems = modeledItems.filter((item) => matchesMerchantFilters(item, filters));
 
     if (normalizedSearch) {
       nextItems = nextItems.filter((item) =>
@@ -365,7 +381,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
     }
 
     return [...nextItems].sort((left, right) => sortItems(sortBy, left, right));
-  }, [activeTab, items, normalizedSearch, sortBy, watchSet]);
+  }, [activeTab, modeledItems, normalizedSearch, sortBy, watchSet, filters]);
 
   const readyNow = useMemo(
     () => filteredItems.filter((item) => item.signal === "Flip").slice(0, 8),
@@ -378,39 +394,59 @@ export default function MerchantBoard({ isOpen, onClose }) {
   const longShots = useMemo(
     () =>
       filteredItems
-        .filter((item) => item.signal === "Wait" && item.confidence >= 40 && item.profit >= 300)
+        .filter((item) => item.signal === "Wait")
         .slice(0, 8),
     [filteredItems]
   );
-  const surfacedItems = useMemo(() => filteredItems.slice(0, 36), [filteredItems]);
+  const surfacedItems = useMemo(() => filteredItems.slice(0, visibleCount), [filteredItems, visibleCount]);
 
-  const topScore = items[0];
+  const topScore = filteredItems[0];
   const readyCount = useMemo(
-    () => items.filter((item) => item.signal === "Flip").length,
-    [items]
+    () => filteredItems.filter((item) => item.signal === "Flip").length,
+    [filteredItems]
   );
   const averageConfidence = useMemo(() => {
-    if (!items.length) return 0;
-    const sample = items.slice(0, 25);
+    if (!filteredItems.length) return 0;
+    const sample = filteredItems.slice(0, 25);
     return Math.round(sample.reduce((total, item) => total + item.confidence, 0) / Math.max(sample.length, 1));
-  }, [items]);
+  }, [filteredItems]);
   const mobileSummary = refreshing
     ? "Refreshing the board..."
     : `${readyCount.toLocaleString()} ready now · next refresh ${countdown}s`;
   const headerCopy =
-    "Built into Mettle as an optional utility. It keeps its own watchlist, fetches only while this panel is open and visible, never touches your ascent save, and now filters out stale or thin spreads before ranking by confidence, margin, ROI, and liquidity.";
+    "Built into Mettle as an optional utility. It keeps its own watchlist, fetches only while this panel is open and visible, never touches your ascent save, and models a 30-minute, medium-risk flip using 5% of each trade side, time for both legs, and 2% tax. Profit is a batch estimate conditional on both legs filling.";
   const statCards = isMobileLayout
     ? [
-        { label: "Profitable", value: items.length.toLocaleString(), accent: COLORS.goldSoft },
+        { label: "Profitable", value: filteredItems.length.toLocaleString(), accent: COLORS.goldSoft },
         { label: "Ready now", value: readyCount.toLocaleString(), accent: COLORS.green },
-        { label: "Lead profit", value: topScore ? `+${fmtGp(topScore.profit)}` : "--", accent: COLORS.green },
+        { label: "Lead profit", value: topScore ? `+${fmtGp(topScore.expectedProfit)}` : "--", accent: COLORS.green },
       ]
     : [
-        { label: "Profitable items", value: items.length.toLocaleString(), accent: COLORS.goldSoft },
+        { label: "Profitable items", value: filteredItems.length.toLocaleString(), accent: COLORS.goldSoft },
         { label: "Ready now", value: readyCount.toLocaleString(), accent: COLORS.green },
-        { label: "Lead pick profit", value: topScore ? `+${fmtGp(topScore.profit)}` : "--", accent: COLORS.green },
+        { label: "Lead pick profit", value: topScore ? `+${fmtGp(topScore.expectedProfit)}` : "--", accent: COLORS.green },
         { label: "Avg confidence top 25", value: averageConfidence ? `${averageConfidence}%` : "--", accent: COLORS.blue },
       ];
+
+  const activeFilters = FILTER_FIELDS.flatMap((field) => {
+    if (filters[field.key] === CLEAR_FILTERS[field.key]) return [];
+    const option = field.options.find(([value]) => value === filters[field.key]);
+    return [{ key: field.key, label: `${field.label}: ${option?.[1] ?? filters[field.key]}` }];
+  }).concat([
+    ...(filters.taxFree ? [{ key: "taxFree", label: "Tax-free only" }] : []),
+    ...(filters.freshFlow ? [{ key: "freshFlow", label: "Fresh hourly flow" }] : []),
+    ...(filters.sizedOnly ? [{ key: "sizedOnly", label: "At least one modeled item" }] : []),
+  ]);
+  function applyBankroll(event) {
+    event.preventDefault();
+    try {
+      setBankroll(parseBankroll(bankrollInput)); setBankrollError(""); setVisibleCount(36);
+    } catch (error) { setBankrollError(error.message); }
+  }
+  function updateFilter(key, value) {
+    setFilters((current) => ({ ...current, [key]: value }));
+    setVisibleCount(36);
+  }
 
   function toggleWatch(itemId) {
     setWatchlist((current) =>
@@ -582,7 +618,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
               textTransform: "uppercase",
             }}
           >
-            {item.confidence} confidence
+            {item.confidence}% heuristic confidence
           </span>
           <span
             style={{
@@ -644,8 +680,8 @@ export default function MerchantBoard({ isOpen, onClose }) {
             </button>
           </div>
           <div>
-            <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Profit</div>
-            <div style={{ color: COLORS.green }}>+{fmtGp(item.profit)}</div>
+            <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Modeled batch profit</div>
+            <div style={{ color: COLORS.green }}>+{fmtGp(item.expectedProfit)}</div>
           </div>
           <div>
             <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>ROI</div>
@@ -655,6 +691,13 @@ export default function MerchantBoard({ isOpen, onClose }) {
           </div>
         </div>
 
+        <div style={{ color: COLORS.textDim, fontSize: "11px", marginBottom: "10px" }}>
+          {item.expectedQuantity.toLocaleString()} items · {item.planMinutes}m plan · {item.recommendationRisk} risk
+          {!item.hasRecentVolume ? " · Sizing paused: delayed volume" : item.volumeEstimated ? " · 5m flow estimate · Assumes both legs fill" : " · Assumes both legs fill"}
+        </div>
+        <div style={{ color: COLORS.textDim, fontSize: "11px", lineHeight: 1.6, marginBottom: "10px" }}>
+          Buy quote {formatAgeLabel(item.buyAgeMinutes)} ago · Sell quote {formatAgeLabel(item.sellAgeMinutes)} ago
+        </div>
         {isExpanded ? (
           <div
             style={{
@@ -667,11 +710,28 @@ export default function MerchantBoard({ isOpen, onClose }) {
             }}
           >
             <div>
-              <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Tax</div>
+              <div style={{ color: COLORS.textMuted }}>Buy fill flow / hr</div>
+              <div>{fmtExactGp(item.buyVolume)}{item.volumeEstimated ? " (estimate)" : ""}</div>
+              <div>Instant sells into passive buys</div>
+            </div>
+            <div>
+              <div style={{ color: COLORS.textMuted }}>Sell fill flow / hr</div>
+              <div>{fmtExactGp(item.sellVolume)}{item.volumeEstimated ? " (estimate)" : ""}</div>
+              <div>Instant buys from passive sells</div>
+            </div>
+            <div><div style={{ color: COLORS.textMuted }}>Modeled buy leg</div>{item.expectedBuyMinutes === null ? "No sized batch" : item.expectedBuyMinutes < 1 ? "<1m" : `~${item.expectedBuyMinutes.toFixed(1)}m`}</div>
+            <div><div style={{ color: COLORS.textMuted }}>Modeled sell leg</div>{item.expectedSellMinutes === null ? "No sized batch" : item.expectedSellMinutes < 1 ? "<1m" : `~${item.expectedSellMinutes.toFixed(1)}m`}</div>
+            <p style={{ gridColumn: "1 / -1", margin: 0 }}>Assumes 5% participation on each side and sequential buy then sell; cycle ~{item.expectedDurationMinutes}m{item.expectedQuantity ? " (5m minimum)" : " / sizing paused"}. These are flow estimates, not a view of the GE queue.</p>
+            <div>
+              <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Batch capital</div>
+              <div style={{ color: COLORS.text }}>{fmtGp(item.capitalRequired)}</div>
+            </div>
+            <div>
+              <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Tax per item</div>
               <div style={{ color: COLORS.red }}>{fmtGp(item.tax)}</div>
             </div>
             <div>
-              <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Volume / hr</div>
+              <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Slower side / hr{item.volumeEstimated ? " (estimate)" : ""}</div>
               <div style={{ color: COLORS.text }}>{fmtGp(item.volume)}</div>
             </div>
             <div>
@@ -683,11 +743,13 @@ export default function MerchantBoard({ isOpen, onClose }) {
               <div style={{ color: COLORS.text }}>{item.limit > 0 ? fmtGp(item.limit) : "--"}</div>
             </div>
             <div>
-              <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Limit profit</div>
+              <div style={{ color: COLORS.textMuted, marginBottom: "3px" }}>Full buy-limit profit</div>
               <div style={{ color: COLORS.blue }}>
                 {item.limitProfit > 0 ? fmtGp(item.limitProfit) : "--"}
               </div>
             </div>
+            <MarginHistory key={item.id} itemId={item.id} />
+            <button type="button" disabled={item.expectedQuantity <= 0 || !journal.loaded} style={{ ...styles.toolbarButton(false), gridColumn: "1 / -1" }} onClick={() => { journal.start(item); setActiveTab("journal"); }}>Start flip log</button>
           </div>
         ) : null}
       </article>
@@ -871,6 +933,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
           }}
         >
           <input
+            aria-label="Search Merchant items"
             type="text"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -910,6 +973,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
             >
               Watchlist ({watchlist.length})
             </button>
+            <button type="button" onClick={() => setActiveTab("journal")} style={styles.toolbarButton(activeTab === "journal")}>Fill log ({journal.trades.length})</button>
           </div>
 
           <div
@@ -947,7 +1011,49 @@ export default function MerchantBoard({ isOpen, onClose }) {
             background: "linear-gradient(180deg, rgba(255,255,255,0.01) 0%, rgba(7,7,7,0.99) 100%)",
           }}
         >
-          {loading && !hasItems ? (
+          <form aria-label="Bankroll sizing" onSubmit={applyBankroll} style={{ marginBottom: "18px", fontSize: "12px", lineHeight: 1.6 }}>
+            <label htmlFor="merchant-bankroll">Available bankroll (gp)</label>
+            <div style={{ display: "flex", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
+              <input id="merchant-bankroll" inputMode="numeric" value={bankrollInput} onChange={(event) => setBankrollInput(event.target.value)} placeholder="Blank = no budget cap" style={{ minWidth: 0, flex: "1 1 180px", background: COLORS.panel, color: COLORS.text, border: `1px solid ${COLORS.border}`, padding: "8px", font: "inherit" }} />
+              <button type="submit" style={styles.toolbarButton(false)}>Apply bankroll</button>
+            </div>
+            <p role="status">{bankroll === undefined ? "Sizing without a bankroll cap." : `Sizing each candidate against ${fmtExactGp(bankroll)} gp.`} This is a per-item budget, not a portfolio allocation. {bankroll === undefined ? "" : "Zero is a valid budget and pauses sizing."}</p>
+            {bankrollError ? <p role="alert" style={{ color: COLORS.red }}>{bankrollError} The previously applied budget is still active.</p> : null}
+          </form>
+          {activeTab === "journal" ? <TradeJournal journal={journal} /> : null}
+          <section hidden={activeTab === "journal"} aria-label="Merchant filters" style={{ marginBottom: "18px" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+              <button type="button" aria-expanded={filtersOpen} aria-controls="merchant-filter-controls" onClick={() => setFiltersOpen((open) => !open)} style={styles.toolbarButton(filtersOpen)}>
+                Filters ({activeFilters.length}) {filtersOpen ? "▴" : "▾"}
+              </button>
+              <button type="button" onClick={() => { setFilters(CLEANER_FILTERS); setVisibleCount(36); }} style={styles.toolbarButton(false)}>Cleaner spreads</button>
+              <button type="button" onClick={() => { setFilters(CLEAR_FILTERS); setVisibleCount(36); }} style={styles.toolbarButton(false)}>Clear filters</button>
+              <span role="status" style={{ color: COLORS.textDim, fontSize: "12px" }}>{filteredItems.length.toLocaleString()} matches</span>
+            </div>
+            {items.some((item) => item.volumeEstimated) ? <p style={{ color: COLORS.goldSoft, fontSize: "12px", lineHeight: 1.6 }}>Hourly flow is unavailable or delayed. Using five-minute flow estimates; Cleaner spreads excludes these and may have no matches.</p> : null}
+            {activeFilters.length > 0 ? <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px" }}>
+              {activeFilters.map(({ key, label }) => <button key={key} type="button" aria-label={`Remove ${label} filter`} onClick={() => updateFilter(key, CLEAR_FILTERS[key])} style={{ ...styles.toolbarButton(false), fontSize: "11px" }}>{label} ×</button>)}
+            </div> : null}
+            <div id="merchant-filter-controls" hidden={!filtersOpen}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginTop: "14px" }}>
+                {FILTER_FIELDS.map((field) => <label key={field.key} style={{ color: COLORS.textDim, fontSize: "12px" }}>
+                  {field.label}
+                  <select value={filters[field.key]} onChange={(event) => updateFilter(field.key, event.target.value)} style={{ display: "block", width: "100%", marginTop: "6px", padding: "9px", background: COLORS.panel, color: COLORS.text, border: `1px solid ${COLORS.border}`, font: "inherit" }}>
+                    {field.options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </label>)}
+              </div>
+              <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginTop: "14px", color: COLORS.text, fontSize: "12px" }}>
+                {[["taxFree", "Tax-free only"], ["freshFlow", "Fresh hourly flow only"], ["sizedOnly", "At least one modeled item"]].map(([key, label]) => <label key={key}>
+                  <input type="checkbox" checked={filters[key]} onChange={(event) => updateFilter(key, event.target.checked)} /> {label}
+                </label>)}
+              </div>
+              <p style={{ color: COLORS.textDim, fontSize: "12px", lineHeight: 1.6 }}>
+                Capital bands filter the cost of the resized batch. Use Available bankroll to change its quantity. Profit is after tax for the 30-minute plan, conditional on both legs filling. Low instability compares current and hourly prices. Cleaner spreads selects Ready, 500+ slower-side trades/hour, both prices within 10 minutes, and fresh hourly flow. Filters narrow results without changing scores.
+              </p>
+            </div>
+          </section>
+          {loading && !hasItems && activeTab !== "journal" ? (
             <div
               style={{
                 border: `1px solid ${COLORS.border}`,
@@ -976,7 +1082,7 @@ export default function MerchantBoard({ isOpen, onClose }) {
             </div>
           ) : null}
 
-          {!loading && hasItems && activeTab === "all" && !normalizedSearch ? (
+          {!loading && hasItems && activeTab === "all" && !normalizedSearch && sortBy === "score" && activeFilters.length === 0 ? (
             <>
               {readyNow.length ? (
                 <Section label="Ready now" detail="High-confidence picks with decent freshness and volume">
@@ -1029,15 +1135,15 @@ export default function MerchantBoard({ isOpen, onClose }) {
                     fontSize: "13px",
                   }}
                 >
-                  Nothing cleared the current freshness and liquidity guardrails. Try search or check back on the next refresh.
+                  No items match these filters. Clear a filter, try search, or check back on the next refresh.
                 </div>
               ) : null}
             </>
           ) : null}
 
-          {!loading && hasItems && (activeTab === "watchlist" || normalizedSearch) ? (
+          {!loading && hasItems && activeTab !== "journal" && (activeTab === "watchlist" || normalizedSearch || sortBy !== "score" || activeFilters.length > 0) ? (
             <Section
-              label={activeTab === "watchlist" ? "Tracked items" : "Search results"}
+              label={activeTab === "watchlist" ? "Tracked items" : normalizedSearch ? "Search results" : `${SORT_LABELS[sortBy]} ranking`}
               detail={
                 activeTab === "watchlist"
                   ? "Your watchlist is stored separately from the ascent save."
@@ -1065,13 +1171,14 @@ export default function MerchantBoard({ isOpen, onClose }) {
                 >
                   {activeTab === "watchlist"
                     ? "No tracked items yet. Use Track on any card to pin it here."
-                    : "No profitable items match that search right now."}
+                    : "No items match your search and filters. Try clearing a filter."}
                 </div>
               )}
+              {surfacedItems.length < filteredItems.length ? <button type="button" style={styles.toolbarButton(false)} onClick={() => setVisibleCount((count) => count + 36)}>Show more ({filteredItems.length - surfacedItems.length} remaining)</button> : null}
             </Section>
           ) : null}
 
-          {!loading && !hasItems ? (
+          {!loading && !hasItems && activeTab !== "journal" ? (
             <div
               style={{
                 border: `1px solid ${COLORS.border}`,

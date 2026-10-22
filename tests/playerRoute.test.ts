@@ -2,7 +2,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
-import { __resetWomCacheForTests, GET } from "@/app/api/player/[rsn]/route.ts";
+import { GET } from "@/app/api/player/[rsn]/route";
+import { __resetWomCacheForTests, __getWomCacheSizeForTests } from "./womTestState";
 
 function makeJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -231,5 +232,57 @@ describe("api/player/[rsn]", () => {
       code: "WOM_SNAPSHOT_PENDING",
       retryable: true,
     });
+  });
+
+  it("prunes expired cache entries when newer snapshots are cached", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(
+        makeJsonResponse({
+          displayName: "Old Hero",
+          latestSnapshot: {
+            data: {
+              skills: { attack: { level: 60 } },
+              bosses: { vorkath: { kills: 6 } },
+            },
+          },
+        })
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(
+        makeJsonResponse({
+          displayName: "New Hero",
+          latestSnapshot: {
+            data: {
+              skills: { attack: { level: 70 } },
+              bosses: { zulrah: { kills: 8 } },
+            },
+          },
+        })
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const firstResponsePromise = GET(
+      undefined as unknown as NextRequest,
+      { params: Promise.resolve({ rsn: "Old Hero" }) }
+    );
+    await vi.advanceTimersByTimeAsync(1_200);
+    await firstResponsePromise;
+
+    expect(__getWomCacheSizeForTests()).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000 + 1);
+
+    const secondResponsePromise = GET(
+      undefined as unknown as NextRequest,
+      { params: Promise.resolve({ rsn: "New Hero" }) }
+    );
+    await vi.advanceTimersByTimeAsync(1_200);
+    await secondResponsePromise;
+
+    expect(__getWomCacheSizeForTests()).toBe(1);
   });
 });

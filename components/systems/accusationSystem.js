@@ -1,4 +1,6 @@
 import { skillLabel } from "../utils/labels.js";
+import { getModifierForCategory } from "../utils/modifiers.js";
+import { countCompletedDiaryTiers, countStartedQuests } from "../utils/questProgress.js";
 import { accountAverage } from "../utils/skillHelpers.js";
 import { tierForLevel } from "./mettleSystems.js";
 
@@ -12,6 +14,26 @@ const GOD_WARS_BOSSES = [
   "commander_zilyana",
   "kreearra",
   "kril_tsutsaroth",
+];
+const WILDERNESS_BOSSES = [
+  "artio",
+  "callisto",
+  "calvarion",
+  "chaos_elemental",
+  "chaos_fanatic",
+  "crazy_archaeologist",
+  "scorpia",
+  "spindel",
+  "venenatis",
+  "vetion",
+];
+const RAID_BOSSES = [
+  "chambers_of_xeric",
+  "chambers_of_xeric_challenge_mode",
+  "theatre_of_blood",
+  "theatre_of_blood_hard_mode",
+  "tombs_of_amascut",
+  "tombs_of_amascut_expert",
 ];
 
 const PVM_CATEGORIES = new Set(["PvM Intro", "PvM Endurance"]);
@@ -59,6 +81,10 @@ function createTaskId(prefix, key) {
   return `${prefix}_${key.replace(/[^a-z0-9]+/gi, "_")}`;
 }
 
+function numberOrDefault(value, fallback = 0) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 function buildChargeText(lines) {
   return lines.filter(Boolean);
 }
@@ -104,6 +130,128 @@ function formatJudgmentSkillObjective(skill, level, average, difficulty) {
     return `Gain ${target.amount.toLocaleString()} XP in ${label}. The ledger requires visible repair of the gap (currently ${level} vs avg ${average.toFixed(0)}).`;
   }
   return `Bring ${label} to level ${target.amount}. The ledger will not leave the gap open (currently ${level} vs avg ${average.toFixed(0)}).`;
+}
+
+function totalBossKc(bossKeys, bossKC = {}) {
+  return bossKeys.reduce((sum, boss) => sum + (bossKC?.[boss] ?? 0), 0);
+}
+
+function diaryExpectationForLevel(mettleLevel) {
+  if (mettleLevel >= 80) return { count: 5, difficulty: "Elite" };
+  if (mettleLevel >= 60) return { count: 3, difficulty: "Hard" };
+  if (mettleLevel >= 40) return { count: 2, difficulty: "Medium" };
+  return { count: 1, difficulty: "Easy" };
+}
+
+function isDiaryDraftTask(task) {
+  return Boolean(task?.diaryTierAnyOf || typeof task?.diaryTierCountTarget === "number");
+}
+
+function isQuestDraftTask(task) {
+  return task?.category === "Quest";
+}
+
+export function createAccusationOpportunityCounts(raw = null) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  return {
+    pvmIgnored: numberOrDefault(source.pvmIgnored),
+    skillGapIgnored: numberOrDefault(source.skillGapIgnored),
+    questIgnored: numberOrDefault(source.questIgnored),
+    diaryIgnored: numberOrDefault(source.diaryIgnored),
+  };
+}
+
+export const normalizeAccusationOpportunityCounts = createAccusationOpportunityCounts;
+
+export function recordAccusationOpportunityChoice(currentCounts, currentDraft, chosenTask) {
+  const counts = createAccusationOpportunityCounts(currentCounts);
+  const draft = Array.isArray(currentDraft) ? currentDraft : [];
+  const task = chosenTask && typeof chosenTask === "object" ? chosenTask : {};
+  const isPvmTask = PVM_CATEGORIES.has(task.category);
+  const isSkillGapTask = task.category === "Skill Gap";
+  const isQuestTask = isQuestDraftTask(task);
+  const isDiaryTask = isDiaryDraftTask(task);
+
+  return {
+    pvmIgnored:
+      counts.pvmIgnored +
+      (draft.some((draftTask) => PVM_CATEGORIES.has(draftTask.category)) && !isPvmTask ? 1 : 0),
+    skillGapIgnored:
+      counts.skillGapIgnored +
+      (draft.some((draftTask) => draftTask.category === "Skill Gap") && !isSkillGapTask ? 1 : 0),
+    questIgnored:
+      counts.questIgnored +
+      (draft.some((draftTask) => isQuestDraftTask(draftTask)) && !isQuestTask ? 1 : 0),
+    diaryIgnored:
+      counts.diaryIgnored +
+      (draft.some((draftTask) => isDiaryDraftTask(draftTask)) && !isDiaryTask ? 1 : 0),
+  };
+}
+
+export function isAccusationBoardCalm({
+  activeTask,
+  trialPhase,
+  pendingTrialTask,
+  pendingTrial,
+  activeFork,
+  activeLandmark,
+  currentDraftLength = 0,
+  reckoningTaskCount = 0,
+  mustClearAll = false,
+  deferredTaskCount = 0,
+  gateBlocked = false,
+}) {
+  return (
+    !activeTask &&
+    !trialPhase &&
+    !pendingTrialTask &&
+    !pendingTrial &&
+    !activeFork &&
+    !activeLandmark &&
+    currentDraftLength === 0 &&
+    reckoningTaskCount === 0 &&
+    !mustClearAll &&
+    deferredTaskCount < 3 &&
+    !gateBlocked
+  );
+}
+
+export function canEvaluateAccusationWindow({
+  statsLoaded,
+  activeAccusation,
+  pendingAccusationCandidate,
+  completedTasksSinceLastAccusation,
+  accusationSpacingMin,
+}) {
+  return Boolean(
+    statsLoaded &&
+      !activeAccusation &&
+      !pendingAccusationCandidate &&
+      completedTasksSinceLastAccusation >= accusationSpacingMin
+  );
+}
+
+export function getAccusationRefusalPenalty() {
+  return {
+    drawPenalty: ACCUSATION_REFUSAL_DRAW_PENALTY,
+    forcedModifierReady: true,
+  };
+}
+
+export function buildForcedJudgmentTask(accusation, now = Date.now()) {
+  if (!accusation?.judgmentTask) return null;
+  const modifier = getModifierForCategory(accusation.judgmentTask.category, 1);
+  return {
+    ...accusation.judgmentTask,
+    acceptedAt: now,
+    accusationTask: true,
+    accusationResponseType: "judgment",
+    accusationSourceId: accusation.id,
+    accusationKey: accusation.key,
+    accusationTitle: accusation.title,
+    modifier,
+    objective: `${accusation.judgmentTask.objective} — MODIFIER: ${modifier}`,
+  };
 }
 
 function buildZulrahCandidate({ mettleLevel, skillLevels, bossKC, accusationMemory, opportunityCounts = {} }) {
@@ -258,6 +406,219 @@ function buildSkillGapCandidate({ mettleLevel, skillLevels, accusationMemory, op
   };
 }
 
+function buildQuestStagnationCandidate({ mettleLevel, questState, accusationMemory, opportunityCounts = {} }) {
+  if (mettleLevel < ACCUSATION_ACCOUNT_MIN_LEVEL) return null;
+  if ((opportunityCounts.questIgnored ?? 0) < 2) return null;
+
+  const startedQuestCount = countStartedQuests(questState);
+  if (startedQuestCount < 2) return null;
+
+  const key = "stagnation:quest_backlog";
+  const memory = accusationMemory[key];
+  const severity = Math.min(3, (startedQuestCount >= 4 ? 2 : 1) + getMemoryBoost(memory));
+  const repeated = (memory?.timesIssued ?? 0) > 0 && (memory?.timesResolved ?? 0) === 0;
+  const tier = tierForLevel(mettleLevel);
+
+  return {
+    key,
+    family: "stagnation",
+    severity,
+    domainCategory: "Quest",
+    title: repeated ? "The Journal Still Open" : "The Journal Left Open",
+    chargeText: buildChargeText([
+      repeated
+        ? "This account was warned about its unfinished quests."
+        : "This account opens quests and leaves them unfinished.",
+      repeated ? "The backlog still grows." : "The ledger calls the pattern stagnation.",
+      severity >= 3 ? "The ledger demands closure." : "The ledger wants the story advanced.",
+    ]),
+    evidence: [`Started quests ${startedQuestCount}`, `Ignored quest draws ${opportunityCounts.questIgnored ?? 0}`],
+    triggerSource: "started-quest backlog plus ignored quest pressure",
+    priority: 95 + severity,
+    judgmentTask: {
+      id: createTaskId("judgment", key),
+      title: "Judgment: Finish The Story",
+      category: "Quest",
+      difficulty: severity >= 3 ? "Elite" : severity >= 2 ? "Hard" : "Medium",
+      tier,
+      xp: severity >= 3 ? 1200 : severity >= 2 ? 1000 : 825,
+      objective:
+        startedQuestCount >= 4
+          ? "Complete 2 quests you have already started"
+          : "Complete 1 quest you have already started",
+    },
+    defenseTask: {
+      id: createTaskId("defense", key),
+      title: "Defense Trial: Prove Progress",
+      category: "Quest",
+      difficulty: severity >= 3 ? "Elite" : "Hard",
+      tier,
+      xp: severity >= 3 ? 1300 : 1050,
+      objective: "Gain 15 quest points without deferring",
+    },
+  };
+}
+
+function buildDiaryNeglectCandidate({ mettleLevel, diaryState, accusationMemory, opportunityCounts = {} }) {
+  if (mettleLevel < ACCUSATION_ACCOUNT_MIN_LEVEL) return null;
+  if ((opportunityCounts.diaryIgnored ?? 0) < 2) return null;
+
+  const completedDiaryTiers = countCompletedDiaryTiers(diaryState);
+  const expectation = diaryExpectationForLevel(mettleLevel);
+  if (completedDiaryTiers >= expectation.count) return null;
+
+  const key = "neglect:diaries";
+  const memory = accusationMemory[key];
+  const severity = Math.min(
+    3,
+    (expectation.count - completedDiaryTiers >= 2 ? 2 : 1) + getMemoryBoost(memory)
+  );
+  const repeated = (memory?.timesIssued ?? 0) > 0 && (memory?.timesResolved ?? 0) === 0;
+  const tier = tierForLevel(mettleLevel);
+
+  return {
+    key,
+    family: "neglect",
+    severity,
+    domainCategory: "Exploration",
+    title: repeated ? "The Provinces Still Unanswered" : "The Provinces Unanswered",
+    chargeText: buildChargeText([
+      repeated
+        ? "This account was warned about its empty regional record."
+        : "This account has crossed the world without honoring its provinces.",
+      repeated ? "The diary ledger still looks bare." : "The ledger calls this neglect of the realm.",
+      severity >= 3 ? "Regional proof is now demanded." : "Regional proof is expected.",
+    ]),
+    evidence: [
+      `Diary tiers complete ${completedDiaryTiers}`,
+      `Ignored diary draws ${opportunityCounts.diaryIgnored ?? 0}`,
+    ],
+    triggerSource: "regional diary neglect plus ignored diary pressure",
+    priority: 82 + severity,
+    judgmentTask: {
+      id: createTaskId("judgment", key),
+      title: "Judgment: Answer The Provinces",
+      category: "Exploration",
+      difficulty: severity >= 3 ? "Elite" : severity >= 2 ? "Hard" : "Medium",
+      tier,
+      xp: severity >= 3 ? 1175 : severity >= 2 ? 950 : 775,
+      objective: `Complete any unfinished ${expectation.difficulty} Achievement Diary tier`,
+    },
+    defenseTask: {
+      id: createTaskId("defense", key),
+      title: "Defense Trial: Regional Proof",
+      category: "Exploration",
+      difficulty: severity >= 3 ? "Elite" : "Hard",
+      tier,
+      xp: severity >= 3 ? 1250 : 1000,
+      objective: "Complete 5 Achievement Diary tasks in one region without deferring",
+    },
+  };
+}
+
+function buildWildernessAvoidanceCandidate({ mettleLevel, skillLevels, bossKC, accusationMemory, opportunityCounts = {} }) {
+  if (mettleLevel < ACCUSATION_ACCOUNT_MIN_LEVEL) return null;
+  if ((opportunityCounts.pvmIgnored ?? 0) < 2) return null;
+
+  const combatAvg = averageCombat(skillLevels);
+  if (combatAvg < 75) return null;
+
+  const wildernessKc = totalBossKc(WILDERNESS_BOSSES, bossKC);
+  if (wildernessKc > 0) return null;
+
+  const key = "avoidance:wilderness";
+  const memory = accusationMemory[key];
+  const severity = Math.min(3, (combatAvg >= 90 ? 2 : 1) + getMemoryBoost(memory));
+  const repeated = (memory?.timesIssued ?? 0) > 0 && (memory?.timesResolved ?? 0) === 0;
+  const tier = tierForLevel(mettleLevel);
+
+  return {
+    key,
+    family: "avoidance",
+    severity,
+    domainCategory: "PvM Intro",
+    title: repeated ? "The Frontier Still Avoided" : "The Frontier Unentered",
+    chargeText: buildChargeText([
+      repeated
+        ? "This account was warned about the Wilderness."
+        : "This account has combat power, yet keeps the Wilderness at a distance.",
+      repeated ? "It still will not cross the line." : "The ledger reads fear of contested ground.",
+      makeVerdictLine(severity, "The ledger names the frontier avoidance plainly."),
+    ]),
+    evidence: [`Combat average ${Math.round(combatAvg)}`, `Wilderness KC ${wildernessKc}`],
+    triggerSource: "high combat with zero wilderness-boss progress",
+    priority: 118 + severity,
+    judgmentTask: {
+      id: createTaskId("judgment", key),
+      title: "Judgment: Enter The Wilderness",
+      category: "PvM Intro",
+      difficulty: severity >= 3 ? "Elite" : "Hard",
+      tier,
+      xp: severity >= 3 ? 1125 : 900,
+      objective: "Defeat any wilderness boss once",
+    },
+    defenseTask: {
+      id: createTaskId("defense", key),
+      title: "Defense Trial: Prove Nerve",
+      category: "PvM Endurance",
+      difficulty: severity >= 3 ? "Elite" : "Hard",
+      tier,
+      xp: severity >= 3 ? 1200 : 975,
+      objective: "Kill 3 different bosses in one session",
+    },
+  };
+}
+
+function buildRaidAvoidanceCandidate({ mettleLevel, bossKC, accusationMemory, opportunityCounts = {} }) {
+  if (mettleLevel < 60) return null;
+  if ((opportunityCounts.pvmIgnored ?? 0) < 2) return null;
+
+  const raidKc = totalBossKc(RAID_BOSSES, bossKC);
+  if (raidKc > 0) return null;
+
+  const tier = tierForLevel(mettleLevel);
+  const key = "avoidance:raids";
+  const memory = accusationMemory[key];
+  const severity = Math.min(3, (getTierIndex(tier) >= getTierIndex("Zamorak") ? 2 : 1) + getMemoryBoost(memory));
+  const repeated = (memory?.timesIssued ?? 0) > 0 && (memory?.timesResolved ?? 0) === 0;
+
+  return {
+    key,
+    family: "avoidance",
+    severity,
+    domainCategory: "PvM Intro",
+    title: repeated ? "The Great Chambers Still Closed" : "The Great Chambers Closed",
+    chargeText: buildChargeText([
+      repeated
+        ? "This account was warned about raids."
+        : "This account has reached raid level, yet still has no raid claim.",
+      repeated ? "It still has not answered the scale of the content." : "The ledger calls this endgame avoidance.",
+      severity >= 3 ? "A raid answer is now required." : "A raid answer is expected.",
+    ]),
+    evidence: [`Current tier ${tier}`, `Raid KC ${raidKc}`],
+    triggerSource: "raid-ready account with zero raid completions",
+    priority: 126 + severity,
+    judgmentTask: {
+      id: createTaskId("judgment", key),
+      title: "Judgment: Claim A Raid",
+      category: "PvM Intro",
+      difficulty: severity >= 3 ? "Elite" : "Hard",
+      tier,
+      xp: severity >= 3 ? 1250 : 975,
+      objective: "Complete any raid once",
+    },
+    defenseTask: {
+      id: createTaskId("defense", key),
+      title: "Defense Trial: Prove Endgame Breadth",
+      category: "PvM Endurance",
+      difficulty: severity >= 3 ? "Elite" : "Hard",
+      tier,
+      xp: severity >= 3 ? 1325 : 1025,
+      objective: "Kill 4 different bosses in one session",
+    },
+  };
+}
+
 function buildPvmDeferCandidate({ mettleLevel, deferredTasks, categoryDeferCounts, reckoningTotals, accusationMemory, historyCount = 0 }) {
   const livePvMDefers = deferredTasks.filter((task) => PVM_CATEGORIES.has(task.category)).length;
   const pvmWarningCount = (categoryDeferCounts["PvM Intro"] ?? 0) + (categoryDeferCounts["PvM Endurance"] ?? 0);
@@ -314,8 +675,12 @@ export function buildAccusationCandidate(context) {
 
   const candidates = [
     buildPvmDeferCandidate(context),
+    accountStateUnlocked ? buildRaidAvoidanceCandidate(context) : null,
+    accountStateUnlocked ? buildWildernessAvoidanceCandidate(context) : null,
     accountStateUnlocked ? buildZulrahCandidate(context) : null,
     accountStateUnlocked ? buildGodWarsCandidate(context) : null,
+    accountStateUnlocked ? buildQuestStagnationCandidate(context) : null,
+    accountStateUnlocked ? buildDiaryNeglectCandidate(context) : null,
     accountStateUnlocked ? buildSkillGapCandidate(context) : null,
   ].filter(Boolean);
 

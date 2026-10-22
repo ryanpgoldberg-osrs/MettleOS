@@ -3,9 +3,12 @@ import { DEFAULT_KC, DEFAULT_SKILLS } from "@/components/data/constants.js";
 import {
   SAVE_KEY,
   SAVE_VERSION,
+  clearSave,
   importSaveText,
   loadSave,
   parseImportedSave,
+  subscribeToSaveChanges,
+  writeSave,
 } from "@/components/utils/persistence.js";
 
 describe("persistence", () => {
@@ -49,6 +52,12 @@ describe("persistence", () => {
     expect(migrated.diaryState.completedTierIds).toEqual(["ardougne_easy"]);
     expect(migrated.activeAccusation).toBeNull();
     expect(migrated.accusationHistory).toEqual([]);
+    expect(migrated.accusationOpportunityCounts).toEqual({
+      pvmIgnored: 0,
+      skillGapIgnored: 0,
+      questIgnored: 0,
+      diaryIgnored: 0,
+    });
   });
 
   it("imports saves into localStorage and loads them back in the stored shape", () => {
@@ -87,5 +96,40 @@ describe("persistence", () => {
     expect(() => parseImportedSave(JSON.stringify({ foo: "bar" }))).toThrow(
       "That file does not look like a Mettle save."
     );
+  });
+
+  it("notifies same-tab subscribers when the save changes", () => {
+    const onChange = vi.fn();
+    const unsubscribe = subscribeToSaveChanges(onChange);
+
+    writeSave({
+      skillLevels: { ...DEFAULT_SKILLS, attack: 50 },
+      bossKC: { ...DEFAULT_KC, vorkath: 2 },
+    });
+    clearSave();
+    unsubscribe();
+
+    expect(onChange).toHaveBeenCalledTimes(2);
+  });
+
+  it("expands legacy accusation opportunity counts into the current shape", () => {
+    const migrated = parseImportedSave(
+      JSON.stringify({
+        skillLevels: DEFAULT_SKILLS,
+        bossKC: DEFAULT_KC,
+        saveVersion: SAVE_VERSION,
+        accusationOpportunityCounts: {
+          pvmIgnored: 3,
+          skillGapIgnored: 1,
+        },
+      })
+    );
+
+    expect(migrated.accusationOpportunityCounts).toEqual({
+      pvmIgnored: 3,
+      skillGapIgnored: 1,
+      questIgnored: 0,
+      diaryIgnored: 0,
+    });
   });
 });

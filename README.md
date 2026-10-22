@@ -81,30 +81,30 @@ The live account model currently tracks:
 
 | Tier | Levels | Non-Trial Tasks | Theme |
 |---|---:|---:|---|
-| Guthix | 1–20 | 66 | Foundation, first weaknesses, first boss pressure |
-| Saradomin | 21–40 | 73 | Discipline, structure, first serious escalation |
-| Bandos | 41–60 | 75 | Combat force, raid pressure, broader bossing |
-| Zamorak | 61–80 | 69 | Chaos, modifiers, debt punishment, fork pressure |
-| Zaros | 81–99 | 70 | Mastery, pathing, finale shaping |
+| Guthix | 1–20 | 68 | Foundation, first weaknesses, first boss pressure |
+| Saradomin | 21–40 | 74 | Discipline, structure, first serious escalation |
+| Bandos | 41–60 | 79 | Combat force, raid pressure, broader bossing |
+| Zamorak | 61–80 | 71 | Chaos, modifiers, debt punishment, fork pressure |
+| Zaros | 81–99 | 72 | Mastery, pathing, finale shaping |
 
 Current total pool:
 
-- `353` non-trial tasks
+- `364` non-trial tasks
 - `10` Trials
-- `363` total task-pool definitions
-- `126` repeatable tasks
+- `374` total task-pool definitions
+- `132` repeatable tasks
 
 ### Task Categories
 
 | Category | Count |
 |---|---:|
 | Trial | 10 |
-| PvM Intro | 54 |
+| PvM Intro | 55 |
 | PvM Endurance | 30 |
-| Quest | 93 |
-| Exploration | 88 |
+| Quest | 98 |
+| Exploration | 92 |
 | Skill Gap | 47 |
-| Endurance | 36 |
+| Endurance | 37 |
 | Economic | 5 |
 
 ### XP Curve
@@ -139,14 +139,14 @@ Important live rules:
 
 - Unchosen tasks leave the current draw but can return later.
 - Most completed non-repeatable tasks leave the pool permanently.
-- Quest-aware drafting now suppresses tasks already satisfied by synced quest or boss progress.
+- Quest-aware and diary-aware drafting now boosts backlog-cleanup tasks, suppresses already-satisfied sync-backed content, caps diary prompts to one per draw, and avoids duplicate started-quest prompts in the same draft.
 - Favored state is granted for `5` draws after clearing a Trial.
 
 ### Accusations, Judgment, And Defense
 
 - Accusations unlock after `10` completed tasks and level `20`.
 - They only surface when the board is calm and at least `5` completed tasks have passed since the last accusation.
-- Live accusation families currently cover PvM retreat pressure, zero-KC Zulrah avoidance, zero-KC God Wars avoidance, and major skill-gap neglect.
+- Live accusation families currently cover PvM retreat pressure, raid avoidance, wilderness avoidance, zero-KC Zulrah avoidance, zero-KC God Wars avoidance, quest backlog stagnation, diary neglect, and major skill-gap neglect.
 - Each accusation offers `Accept Judgment`, `Defend The Account`, or `Refuse Judgment`.
 - Refusing an accusation narrows the next `2` draws by one option and primes the next accepted Judgment task with a forced modifier.
 - Failing a defense converts immediately into a forced Judgment task with a modifier.
@@ -327,4 +327,4 @@ sync-contract/
 
 ---
 
-*METTLE — living document, updated for the current repo state as of March 19, 2026.*
+*METTLE — living document, updated for the current repo state as of March 31, 2026.*

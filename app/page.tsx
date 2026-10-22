@@ -5,7 +5,7 @@ import EntryScreen from "@/components/EntryScreen";
 import MettlePrototype from "@/components/MettlePrototype";
 import type { createEmptyDiaryState } from "@/components/utils/accountSync.js";
 import type { createEmptyQuestState } from "@/components/utils/questSync.js";
-import { loadSave } from "@/components/utils/persistence.js";
+import { loadSave, subscribeToSaveChanges } from "@/components/utils/persistence.js";
 
 type EntryData = {
   skillLevels: Record<string, number>;
@@ -24,7 +24,7 @@ export default function Home() {
   const [skipToBoard, setSkipToBoard] = useState(false);
   const [forceEntry, setForceEntry] = useState(false);
   const isClient = useSyncExternalStore(subscribe, () => true, () => false);
-  const hasSave = useSyncExternalStore(subscribe, () => Boolean(loadSave()), () => false);
+  const hasSave = useSyncExternalStore(subscribeToSaveChanges, () => Boolean(loadSave()), () => false);
   const theme = "light" as const;
 
   function handleEntryComplete(
